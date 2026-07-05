@@ -93,7 +93,7 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func statusClicked() {
-        guard let event = NSApp.currentEvent, let button = statusItem.button else { return }
+        guard let event = NSApp.currentEvent else { return }
         if event.type == .rightMouseUp {
             showMenu()
             return
