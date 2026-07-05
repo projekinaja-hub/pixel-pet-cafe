@@ -23,6 +23,7 @@ struct PanelView: View {
             ZStack(alignment: .top) {
                 SpriteView(scene: scene)
                     .frame(width: 360, height: 240)
+                    .clipped()
                 if let haul = controller.awayReport {
                     AwayToast(haul: haul) { controller.awayReport = nil }
                         .padding(.top, 10)
@@ -43,7 +44,7 @@ struct PanelView: View {
             }
             .frame(height: 236)
         }
-        .frame(width: 360)
+        .frame(width: 360, height: 544)
         .background(Theme.bg)
         .onAppear { scene.configure(with: controller.state) }
         .onChange(of: controller.state) { newState in

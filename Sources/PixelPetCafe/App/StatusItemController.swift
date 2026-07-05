@@ -43,8 +43,10 @@ final class StatusItemController: NSObject {
         popover = NSPopover()
         popover.behavior = .transient
         popover.animates = true
-        popover.contentViewController = NSHostingController(
-            rootView: PanelView(controller: controller, scene: scene))
+        popover.contentSize = NSSize(width: 360, height: 544)
+        let host = NSHostingController(rootView: PanelView(controller: controller, scene: scene))
+        host.preferredContentSize = NSSize(width: 360, height: 544)
+        popover.contentViewController = host
 
         cancellable = controller.$state
             .receive(on: DispatchQueue.main)
