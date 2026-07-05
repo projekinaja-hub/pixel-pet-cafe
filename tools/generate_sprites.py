@@ -388,6 +388,265 @@ def background(tier):
 
 # ---------------------------------------------------------------- main
 
+
+# ---------------------------------------------------------------- v2: palettes
+
+PALETTES = {
+    "brown":  ((150, 102, 66, 255), (112, 72, 46, 255)),
+    "cream":  ((228, 214, 202, 255), (186, 168, 155, 255)),
+    "orange": ((212, 110, 58, 255), (160, 76, 38, 255)),
+    "gray":   ((138, 130, 140, 255), (100, 92, 104, 255)),
+}
+SPECIES = ["cat", "corgi", "bunny", "fox", "bear", "owl"]
+OWNER_APRON = (44, 62, 100, 255)  # navy owner apron with gold pin
+
+def owner(species, pal):
+    fur, fur_d = PALETTES[pal]
+    c = character(fur, fur_d, CREAM, OWNER_APRON, species)
+    c.set(7, 14, GOLD); c.set(8, 14, GOLD)  # gold pin
+    return c
+
+# ---------------------------------------------------------------- v2: accessories (16x20 overlays)
+
+def acc_bow():
+    c = Canvas(16, 20)
+    for x in (5, 9):
+        c.rect(x, 1, 2, 2, PINK)
+    c.set(7, 1, (200, 110, 120, 255)); c.set(8, 1, (200, 110, 120, 255))
+    c.set(7, 2, INK); c.set(8, 2, INK)
+    return c
+
+def acc_cap():
+    c = Canvas(16, 20)
+    c.rect(4, 1, 8, 2, BLUE)
+    c.rect(3, 3, 10, 1, BLUE)
+    c.rect(11, 3, 4, 1, (70, 100, 150, 255))  # brim
+    c.hline(4, 0, 8, INK)
+    return c
+
+def acc_glasses():
+    c = Canvas(16, 20)
+    for x in (4, 9):
+        c.rect(x, 5, 3, 3, None)
+        c.hline(x, 5, 3, INK); c.hline(x, 7, 3, INK)
+        c.vline(x, 5, 3, INK); c.vline(x + 2, 5, 3, INK)
+    c.set(7, 6, INK); c.set(8, 6, INK)
+    return c
+
+def acc_scarf():
+    c = Canvas(16, 20)
+    c.rect(4, 12, 8, 2, RED)
+    c.rect(9, 14, 2, 3, RED)
+    c.set(9, 17, (150, 55, 50, 255))
+    return c
+
+ACCESSORIES = {"bow": acc_bow, "cap": acc_cap, "glasses": acc_glasses, "scarf": acc_scarf}
+
+# ---------------------------------------------------------------- v2: face icons (18x18, 5 frames)
+
+def face_icon(species, fur, fur_d, frame):
+    """frames: 0 normal, 1 blink, 2 happy, 3 sleep, 4 sip"""
+    c = Canvas(18, 18)
+    # ears by species
+    if species in ("cat", "fox"):
+        inner = PINK if species == "cat" else fur_d
+        for x0 in (2, 12):
+            c.set(x0 + 1, 0, INK)
+            c.set(x0, 1, INK); c.set(x0 + 2, 1, INK); c.set(x0 + 1, 1, fur)
+            c.set(x0, 2, INK); c.set(x0 + 2, 2, INK); c.set(x0 + 1, 2, inner)
+    elif species == "bunny":
+        for x0 in (5, 10):
+            c.rect(x0, 0, 3, 3, fur)
+            c.vline(x0, 0, 3, INK); c.vline(x0 + 2, 0, 3, INK)
+            c.set(x0 + 1, 1, PINK)
+    elif species in ("corgi", "bear"):
+        for x0 in (2, 12):
+            c.rect(x0, 1, 3, 2, fur_d)
+            c.set(x0, 1, INK); c.set(x0 + 2, 1, INK); c.set(x0 + 1, 0, INK)
+    elif species == "owl":
+        c.set(3, 1, INK); c.set(14, 1, INK)
+        c.set(3, 2, fur_d); c.set(14, 2, fur_d)
+    # head, rounded
+    c.rect(2, 4, 14, 11, fur)
+    c.hline(3, 3, 12, fur)
+    c.hline(4, 2, 10, INK)
+    c.set(3, 3, INK); c.set(14, 3, INK)
+    c.vline(2, 4, 1, INK); c.vline(15, 4, 1, INK)
+    c.vline(1, 5, 9, INK); c.vline(16, 5, 9, INK)
+    c.set(2, 14, INK); c.set(15, 14, INK)
+    c.hline(3, 15, 12, INK)
+    c.rect(2, 5, 1, 9, fur_d); c.rect(15, 5, 1, 9, fur_d)
+    if species == "owl":
+        c.rect(3, 6, 5, 4, WHITE); c.rect(10, 6, 5, 4, WHITE)
+    else:
+        c.rect(5, 9, 8, 5, CREAM)
+    # eyes
+    if frame == 1 or frame == 3:                      # blink / sleep
+        c.hline(5, 8, 2, INK); c.hline(11, 8, 2, INK)
+    elif frame == 2:                                  # happy ^ ^
+        for x0 in (5, 11):
+            c.set(x0, 8, INK); c.set(x0 + 1, 7, INK); c.set(x0 - 1, 8, INK)
+    else:
+        c.rect(5, 7, 2, 2, INK); c.rect(11, 7, 2, 2, INK)
+    # nose / beak
+    if species == "owl":
+        c.set(8, 10, GOLD_D); c.set(9, 10, GOLD_D)
+    else:
+        c.set(8, 10, PINK); c.set(9, 10, PINK)
+    # mouth / extras
+    if frame == 3:                                    # sleep: zzz
+        c.set(15, 1, WHITE); c.set(16, 2, WHITE); c.set(15, 3, WHITE)
+        c.set(13, 4, (255, 255, 255, 180))
+    if frame == 4:                                    # sip cup
+        c.rect(6, 13, 6, 4, (206, 106, 76, 255))
+        c.hline(6, 12, 6, WHITE)
+        c.vline(5, 12, 5, INK); c.vline(12, 12, 5, INK)
+        c.hline(6, 17, 6, INK)
+        c.set(13, 13, INK); c.set(14, 14, INK); c.set(13, 15, INK)
+    elif frame == 2:
+        c.set(7, 12, INK); c.set(8, 13, INK); c.set(9, 13, INK); c.set(10, 12, INK)
+        c.set(4, 11, (240, 150, 150, 200)); c.set(13, 11, (240, 150, 150, 200))  # blush
+        c.set(0, 0, GOLD); c.set(17, 5, GOLD)                                    # sparkle
+    elif frame != 3:
+        c.set(7, 12, INK); c.set(8, 13, INK); c.set(9, 13, INK); c.set(10, 12, INK)
+    return c
+
+# ---------------------------------------------------------------- v2: ingredient icons (10x10)
+
+def _icon(draw):
+    c = Canvas(10, 10)
+    draw(c)
+    return c
+
+ING_ICONS = {
+    "beans":  lambda c: [c.rect(2, 3, 3, 4, (120, 78, 48, 255)), c.rect(5, 4, 3, 4, (140, 92, 56, 255)),
+                         c.vline(3, 4, 2, INK), c.vline(6, 5, 2, INK)],
+    "milk":   lambda c: [c.rect(3, 2, 4, 6, WHITE), c.hline(3, 2, 4, BLUE), c.hline(3, 1, 4, INK),
+                         c.vline(2, 2, 6, INK), c.vline(7, 2, 6, INK), c.hline(3, 8, 4, INK)],
+    "flour":  lambda c: [c.rect(2, 3, 6, 5, (232, 222, 200, 255)), c.hline(2, 2, 6, INK),
+                         c.vline(1, 3, 5, INK), c.vline(8, 3, 5, INK), c.hline(2, 8, 6, INK),
+                         c.hline(3, 5, 4, (196, 180, 150, 255))],
+    "sugar":  lambda c: [c.rect(2, 4, 3, 3, WHITE), c.rect(5, 3, 3, 3, (240, 240, 245, 255)),
+                         c.vline(2, 4, 3, (210, 210, 220, 255))],
+    "matcha": lambda c: [c.rect(2, 5, 6, 3, (96, 153, 92, 255)), c.hline(2, 4, 6, (120, 175, 110, 255)),
+                         c.hline(2, 8, 6, INK), c.set(4, 2, GREEN_D), c.set(6, 3, GREEN_D)],
+    "cocoa":  lambda c: [c.rect(2, 3, 6, 5, (94, 62, 44, 255)), c.hline(2, 3, 6, (118, 80, 56, 255)),
+                         c.vline(4, 3, 5, INK), c.vline(6, 3, 5, INK)],
+    "berry":  lambda c: [c.rect(3, 4, 4, 4, RED), c.set(2, 5, RED), c.set(7, 5, RED),
+                         c.set(4, 3, GREEN), c.set(5, 2, GREEN_D), c.set(4, 5, WHITE), c.set(6, 6, WHITE)],
+    "honey":  lambda c: [c.rect(3, 4, 5, 4, GOLD), c.hline(3, 3, 5, GOLD_D), c.hline(4, 2, 3, INK),
+                         c.hline(3, 8, 5, INK), c.set(4, 5, (255, 224, 130, 255))],
+}
+
+ITEM_ICONS = {
+    "espresso":  lambda c: [c.rect(2, 4, 5, 4, WHITE), c.hline(2, 8, 5, INK), c.set(7, 5, INK),
+                            c.set(8, 5, INK), c.set(8, 6, INK), c.set(7, 7, INK),
+                            c.rect(3, 5, 3, 1, (120, 78, 48, 255)), c.set(4, 2, (200,200,210,180))],
+    "latte":     lambda c: [c.rect(3, 2, 4, 6, (222, 198, 168, 255)), c.hline(3, 2, 4, WHITE),
+                            c.hline(3, 1, 4, WHITE), c.vline(2, 2, 6, INK), c.vline(7, 2, 6, INK),
+                            c.hline(3, 8, 4, INK)],
+    "croissant": lambda c: [c.rect(3, 4, 4, 3, (222, 168, 92, 255)), c.set(2, 5, (222, 168, 92, 255)),
+                            c.set(7, 5, (222, 168, 92, 255)), c.set(1, 4, (196, 138, 70, 255)),
+                            c.set(8, 4, (196, 138, 70, 255)), c.vline(4, 4, 3, (196, 138, 70, 255))],
+    "matcha_latte": lambda c: [c.rect(3, 3, 4, 5, (140, 190, 120, 255)), c.hline(3, 3, 4, WHITE),
+                            c.vline(2, 3, 5, INK), c.vline(7, 3, 5, INK), c.hline(3, 8, 4, INK)],
+    "cocoa":     lambda c: [c.rect(3, 3, 5, 5, (118, 80, 56, 255)), c.set(4, 3, WHITE), c.set(6, 3, WHITE),
+                            c.vline(2, 3, 5, INK), c.vline(8, 4, 3, INK), c.hline(3, 8, 5, INK)],
+    "berry_tart": lambda c: [c.rect(2, 5, 6, 3, (222, 168, 92, 255)), c.rect(3, 4, 4, 2, RED),
+                            c.set(4, 3, RED), c.set(6, 3, RED), c.set(5, 4, WHITE), c.hline(2, 8, 6, INK)],
+    "honey_cake": lambda c: [c.rect(2, 4, 6, 4, (240, 214, 160, 255)), c.hline(2, 4, 6, GOLD),
+                            c.hline(2, 6, 6, (222, 188, 130, 255)), c.hline(2, 8, 6, INK),
+                            c.set(4, 3, GOLD), c.set(6, 3, GOLD)],
+    "cookie":    lambda c: [c.rect(3, 3, 5, 5, (198, 148, 90, 255)), c.set(2, 4, (198, 148, 90, 255)),
+                            c.set(8, 5, (198, 148, 90, 255)), c.set(4, 4, INK), c.set(6, 6, INK), c.set(5, 5, INK)],
+}
+
+# ---------------------------------------------------------------- v2: bubbles + dirt
+
+def bubble(angry=False):
+    c = Canvas(16, 15)
+    bgc = (238, 120, 108, 255) if angry else WHITE
+    c.rect(1, 1, 14, 11, bgc)
+    c.hline(2, 0, 12, bgc)
+    c.set(1, 1, CLEAR); c.set(14, 1, CLEAR)
+    c.set(4, 12, bgc); c.set(5, 13, bgc)
+    if angry:
+        c.rect(7, 3, 2, 5, WHITE); c.rect(7, 9, 2, 2, WHITE)
+    return c
+
+def dirt_stain():
+    c = Canvas(10, 6)
+    col = (120, 92, 56, 190)
+    c.rect(2, 2, 6, 3, col)
+    c.set(1, 3, col); c.set(8, 3, col); c.set(3, 1, col); c.set(6, 5, col)
+    return c
+
+def dirt_cup():
+    c = Canvas(8, 8)
+    c.rect(2, 3, 4, 4, (200, 196, 188, 255))
+    c.vline(1, 3, 4, INK); c.vline(6, 3, 4, INK); c.hline(2, 7, 4, INK)
+    c.set(3, 2, (150, 120, 80, 255)); c.set(4, 1, (150, 120, 80, 200))
+    return c
+
+def cobweb():
+    c = Canvas(14, 14)
+    w = (230, 230, 235, 150)
+    for i in range(14):
+        c.set(i, 0, w) if i % 2 == 0 else None
+        c.set(0, i, w) if i % 2 == 0 else None
+    for i in range(0, 12, 2):
+        c.set(i, 12 - i, w)
+    for r in (4, 8):
+        for i in range(0, r + 1, 2):
+            c.set(i, r - i, w)
+    return c
+
+def closed_sign():
+    c = Canvas(30, 20)
+    c.rect(1, 1, 28, 18, (150, 68, 60, 255))
+    c.rect(1, 1, 28, 2, (120, 50, 44, 255))
+    for x in range(1, 29):
+        c.set(x, 0, INK); c.set(x, 19, INK)
+    c.vline(0, 1, 18, INK); c.vline(29, 1, 18, INK)
+    # "CLOSED" as chunky pixels
+    letters = ["XXX X  XX  XX XXX XX ",
+               "X   X X X X   X   X X",
+               "X   X X X  X  XX  X X",
+               "X   X X X   X X   X X",
+               "XXX XX XX XX  XXX XX "]
+    for y, row in enumerate(letters):
+        for x, ch in enumerate(row):
+            if ch == "X":
+                c.set(4 + x, 7 + y, CREAM)
+    return c
+
+STAFF_SPECIES = {"mocha": "cat", "biscuit": "corgi", "poppy": "bunny",
+                 "juno": "fox", "bo": "bear", "earl": "owl"}
+
+def main_v2():
+    count = 0
+    for sp in SPECIES:
+        for pal in PALETTES:
+            f0 = owner(sp, pal)
+            f0.save(f"owner_{sp}_{pal}_0.png"); f0.shifted_down().save(f"owner_{sp}_{pal}_1.png")
+            count += 2
+            fur, fur_d = PALETTES[pal]
+            for f in range(5):
+                face_icon(sp, fur, fur_d, f).save(f"bar_{sp}_{pal}_{f}.png"); count += 1
+    for sid, args in STAFF.items():
+        for f in range(5):
+            face_icon(STAFF_SPECIES[sid], args[0], args[1], f).save(f"barstaff_{sid}_{f}.png"); count += 1
+    for aid, fn in ACCESSORIES.items():
+        fn().save(f"acc_{aid}.png"); count += 1
+    for iid, draw in ING_ICONS.items():
+        _icon(lambda c, d=draw: d(c)).save(f"ing_{iid}.png"); count += 1
+    for iid, draw in ITEM_ICONS.items():
+        _icon(lambda c, d=draw: d(c)).save(f"item_{iid}.png"); count += 1
+    bubble(False).save("bubble.png"); bubble(True).save("bubble_angry.png"); count += 2
+    dirt_stain().save("dirt_stain.png"); dirt_cup().save("dirt_cup.png")
+    cobweb().save("cobweb.png"); closed_sign().save("closed_sign.png"); count += 4
+    print(f"v2: generated {count} more sprites")
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     count = 0
@@ -408,6 +667,7 @@ def main():
     for t in range(3):
         background(t).save(f"bg_tier{t}.png"); count += 1
     print(f"generated {count} sprites -> {os.path.abspath(OUT)}")
+    main_v2()
 
 if __name__ == "__main__":
     main()
