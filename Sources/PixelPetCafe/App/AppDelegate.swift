@@ -1,14 +1,74 @@
 import AppKit
+import SpriteKit
+import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem?
+    private var game: GameController!
+    private var statusController: StatusItemController!
+    private var snapshotWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "☕ 0"
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "Quit Pixel Pet Café", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        item.menu = menu
-        statusItem = item
+        game = GameController(persistence: Persistence())
+        game.start()
+        statusController = StatusItemController(controller: game)
+
+        // dev hook: PPC_SNAPSHOT=/path.png renders the panel offscreen and exits
+        if let path = ProcessInfo.processInfo.environment["PPC_SNAPSHOT"] {
+            runSnapshot(to: path)
+        }
+        // dev hook: PPC_SCENESHOT=/path.png renders the SpriteKit scene and exits
+        if let path = ProcessInfo.processInfo.environment["PPC_SCENESHOT"] {
+            runSceneShot(to: path)
+        }
+    }
+
+    @MainActor
+    private func runSceneShot(to path: String) {
+        let scene = CafeScene()
+        var demo = game.state
+        demo.staffLevels = ["mocha": 3, "biscuit": 2, "poppy": 1, "juno": 1]
+        demo.equipmentLevels = ["espresso": 6, "grinder": 1, "oven": 1, "decor": 1, "sound": 1]
+        demo.stars = 12
+        scene.configure(with: demo)
+        scene.setActive(true)
+        let skView = SKView(frame: NSRect(x: 0, y: 0, width: 360, height: 240))
+        skView.presentScene(scene)
+        let window = NSWindow(contentRect: skView.frame, styleMask: [.borderless],
+                              backing: .buffered, defer: false)
+        window.contentView = skView
+        window.setFrameOrigin(NSPoint(x: -3000, y: -3000))
+        window.orderBack(nil)
+        snapshotWindow = window
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            guard let tex = skView.texture(from: scene) else { exit(1) }
+            let rep = NSBitmapImageRep(cgImage: tex.cgImage())
+            try? rep.representation(using: .png, properties: [:])?
+                .write(to: URL(fileURLWithPath: path))
+            exit(0)
+        }
+    }
+
+    @MainActor
+    private func runSnapshot(to path: String) {
+        let scene = CafeScene()
+        scene.configure(with: game.state)
+        scene.setActive(true)
+        let host = NSHostingController(rootView: PanelView(controller: game, scene: scene))
+        let window = NSWindow(contentViewController: host)
+        window.setFrameOrigin(NSPoint(x: -2000, y: -2000))
+        window.orderBack(nil)
+        snapshotWindow = window
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            let id = CGWindowID(window.windowNumber)
+            guard let cg = CGWindowListCreateImage(.null, .optionIncludingWindow, id, []) else { exit(1) }
+            let rep = NSBitmapImageRep(cgImage: cg)
+            try? rep.representation(using: .png, properties: [:])?
+                .write(to: URL(fileURLWithPath: path))
+            exit(0)
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        game.saveNow()
     }
 }
