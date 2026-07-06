@@ -128,9 +128,17 @@ final class GameController: ObservableObject {
     }
 
     private func updateWorkBoost(now: Date) {
-        // trust can be granted while running — pick it up and (re)attach
+        // trust can be granted while running — pick it up and (re)attach.
+        // Monitors created BEFORE the grant are dead: always rebuild on change.
         let trusted = AXIsProcessTrusted()
-        if trusted != axTrusted { axTrusted = trusted }
+        if trusted != axTrusted {
+            axTrusted = trusted
+            if state.workMode, trusted {
+                stopKeyMonitor()
+                state.workMode = true      // stopKeyMonitor is state-agnostic; keep mode
+                startKeyMonitor()
+            }
+        }
         if state.workMode, trusted, keyMonitor == nil {
             startKeyMonitor()
         }
