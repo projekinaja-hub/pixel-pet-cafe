@@ -2,16 +2,18 @@ import SpriteKit
 
 /// The animated pixel café. Logical size 180×120, presented .aspectFit into a
 /// 360×240 SpriteView. Customers walk in via events from the GameController.
-enum SceneMode { case cafe, casino }
+enum SceneMode { case cafe, casino, map }
 enum CasinoGame { case slots, blackjack, roulette, mahjong }
 
 final class CafeScene: SKScene {
     var onGoldenTip: (() -> Void)?
     var onCleanSpot: (() -> Void)?
+    var onMapSelect: ((String) -> Void)?
 
     private(set) var mode: SceneMode = .cafe
     private let cafeLayer = SKNode()
     private let casinoLayer = SKNode()
+    private let mapLayer = SKNode()
     private let gameFocus = SKNode()
     private var casinoBuilt = false
     private var casinoGame: CasinoGame = .slots
@@ -71,6 +73,9 @@ final class CafeScene: SKScene {
         casinoLayer.zPosition = 1
         casinoLayer.isHidden = true
         addChild(casinoLayer)
+        mapLayer.zPosition = 1
+        mapLayer.isHidden = true
+        addChild(mapLayer)
         let cam = SKCameraNode()
         cam.position = CGPoint(x: 90, y: 60)
         addChild(cam)
@@ -105,12 +110,63 @@ final class CafeScene: SKScene {
     func setMode(_ newMode: SceneMode) {
         guard newMode != mode else { return }
         mode = newMode
-        cafeLayer.isHidden = mode == .casino
-        casinoLayer.isHidden = mode == .cafe
-        if mode == .cafe { focusTable(false) }
+        cafeLayer.isHidden = mode != .cafe
+        casinoLayer.isHidden = mode != .casino
+        mapLayer.isHidden = mode != .map
+        if mode != .casino { focusTable(false) }
         currentBGKey = ""              // force background swap
         if mode == .casino { buildCasinoIfNeeded() }
         lastState.map { configure(with: $0) }
+    }
+
+    /// World map: pins for all cities — gold owned, green affordable, grey locked.
+    static let mapSpots: [String: CGPoint] = [   // scene coords (y-up)
+        "home": CGPoint(x: 28, y: 68), "sakura": CGPoint(x: 58, y: 88),
+        "neon": CGPoint(x: 94, y: 98), "seaside": CGPoint(x: 22, y: 32),
+        "forest": CGPoint(x: 58, y: 54), "desert": CGPoint(x: 94, y: 38),
+        "snowy": CGPoint(x: 128, y: 78), "sunset": CGPoint(x: 124, y: 28),
+        "ember": CGPoint(x: 152, y: 50), "royal": CGPoint(x: 104, y: 68),
+        "cloud": CGPoint(x: 148, y: 102), "moon": CGPoint(x: 168, y: 112),
+    ]
+
+    private func rebuildMap(_ state: GameState) {
+        mapLayer.removeAllChildren()
+        for city in Cities.all {
+            guard let pos = Self.mapSpots[city.id] else { continue }
+            let owned = state.ownsCity(city.id)
+            let kind = owned ? "own" : (state.coins >= city.cost ? "buy" : "lock")
+            let pin = SKSpriteNode(texture: SpriteLoader.texture("pin_\(kind)"))
+            pin.size = pin.texture!.size()
+            pin.name = "map:\(city.id)"
+            pin.position = CGPoint(x: pos.x, y: pos.y + 5)
+            pin.zPosition = 5
+            mapLayer.addChild(pin)
+            if kind == "buy" {
+                pin.run(.repeatForever(.sequence([
+                    .moveBy(x: 0, y: 2, duration: 0.45),
+                    .moveBy(x: 0, y: -2, duration: 0.45),
+                ])))
+            }
+            if owned, state.cafe.city == city.id {
+                let here = SKSpriteNode(texture: SpriteLoader.texture("glow"))
+                here.position = pos
+                here.zPosition = 4
+                here.blendMode = .add
+                here.setScale(0.8)
+                here.run(.repeatForever(.sequence([
+                    .fadeAlpha(to: 0.3, duration: 0.7), .fadeAlpha(to: 0.8, duration: 0.7),
+                ])))
+                mapLayer.addChild(here)
+            }
+            let label = SKLabelNode(text: owned || state.coins >= city.cost
+                                    ? city.name : "🪙\(formatNumber(city.cost))")
+            label.fontName = "Menlo-Bold"
+            label.fontSize = 5
+            label.fontColor = owned ? .white : NSColor(calibratedWhite: 1, alpha: 0.75)
+            label.position = CGPoint(x: pos.x, y: pos.y - 8)
+            label.zPosition = 5
+            mapLayer.addChild(label)
+        }
     }
 
     private func buildCasinoIfNeeded() {
@@ -308,6 +364,7 @@ final class CafeScene: SKScene {
     func configure(with state: GameState) {
         lastState = state
         configureBackground(state)
+        if mode == .map { rebuildMap(state) }
         guard mode == .cafe else { return }
         configureStaff(state)
         configureEquipment(state)
@@ -320,7 +377,9 @@ final class CafeScene: SKScene {
 
     private func configureBackground(_ state: GameState) {
         let tier = min(2, state.stars == 0 ? 0 : (state.stars < 10 ? 1 : 2))
-        let key = mode == .casino ? "bg_casino" : "bg_\(state.cafe.city)_tier\(tier)"
+        let key = mode == .casino ? "bg_casino"
+            : mode == .map ? "worldmap"
+            : "bg_\(state.cafe.city)_tier\(tier)"
         guard key != currentBGKey else { return }
         currentBGKey = key
         let bgTexture = SpriteLoader.texture(key)
@@ -587,6 +646,17 @@ final class CafeScene: SKScene {
     }
 
     override func mouseDown(with event: NSEvent) {
+        if mode == .map {
+            let p = event.location(in: self)
+            for node in mapLayer.children {
+                if let name = node.name, name.hasPrefix("map:"),
+                   node.frame.insetBy(dx: -6, dy: -6).contains(p) {
+                    onMapSelect?(String(name.dropFirst(4)))
+                    return
+                }
+            }
+            return
+        }
         guard mode == .cafe else { return }
         let p = event.location(in: self)
         if let tip = tipNode, tip.parent != nil, tip.frame.insetBy(dx: -6, dy: -6).contains(p) {

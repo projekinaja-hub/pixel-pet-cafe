@@ -86,9 +86,23 @@ struct CafeTab: View {
     var body: some View {
         // locations
         VStack(alignment: .leading, spacing: 6) {
-            Text("Locations")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(Theme.cream)
+            HStack {
+                Text("Locations")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                Spacer()
+                Button {
+                    controller.mapOpen.send(true)
+                } label: {
+                    Text("🗺 World Map")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.bg)
+                        .padding(.horizontal, 9).padding(.vertical, 4)
+                        .background(Theme.gold)
+                        .cornerRadius(6)
+                }
+                .buttonStyle(.plain)
+            }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 3),
                       alignment: .leading, spacing: 4) {
                 ForEach(Array(controller.state.cafes.enumerated()), id: \.offset) { i, cafe in

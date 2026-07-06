@@ -35,6 +35,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demo.owner.accessory = "cap"
         if ProcessInfo.processInfo.environment["PPC_MODE"] == "casino" {
             scene.setMode(.casino)
+            if ProcessInfo.processInfo.environment["PPC_GAME"] == "map" {
+                scene.setMode(.map)
+            }
             switch ProcessInfo.processInfo.environment["PPC_GAME"] {
             case "mahjong":
                 scene.setCasinoGame(.mahjong)

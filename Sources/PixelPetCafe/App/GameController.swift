@@ -17,6 +17,7 @@ final class GameController: ObservableObject {
     let rouletteResult = PassthroughSubject<Int, Never>()
     let mahjongDiscards = PassthroughSubject<Int, Never>()
     let casinoFocus = PassthroughSubject<Bool, Never>()
+    let mapOpen = PassthroughSubject<Bool, Never>()
 
     private let persistence: Persistence
     private var timer: Timer?
@@ -162,6 +163,23 @@ final class GameController: ObservableObject {
             startKeyMonitor()
         } else {
             stopKeyMonitor()
+        }
+    }
+
+    /// Map pin tapped: travel to owned cafés, buy new ones on the spot.
+    func mapSelect(_ cityId: String) {
+        let def = Cities.def(cityId)
+        if let index = state.cafes.firstIndex(where: { $0.city == cityId }) {
+            switchCafe(index)
+            banner = ("🧭", "Welcome back to \(def.name)!")
+            mapOpen.send(false)
+        } else if state.coins >= def.cost {
+            buyCity(cityId)
+            banner = ("🎉", "\(def.name) café opened!")
+            soundRequest.send("achieve")
+            mapOpen.send(false)
+        } else {
+            banner = ("🔒", "\(def.name) needs 🪙 \(formatNumber(def.cost))")
         }
     }
 

@@ -979,6 +979,81 @@ def barcup(level, frame):
         c.set(9, 0, (255, 255, 255, 120))
     return c
 
+MAP_SPOTS = {  # image coords (y-down)
+    "home": (28, 52), "sakura": (58, 32), "neon": (94, 22), "seaside": (22, 88),
+    "forest": (58, 66), "desert": (94, 82), "snowy": (128, 42), "sunset": (124, 92),
+    "ember": (152, 70), "royal": (104, 52), "cloud": (148, 18), "moon": (168, 8),
+}
+
+def worldmap():
+    W, H = 180, 120
+    sea = (62, 108, 148, 255)
+    c = Canvas(W, H, sea)
+    # gentle wave dots
+    for y in range(0, H, 6):
+        for x in ((y // 6) % 2 * 3, ):
+            for xx in range(x, W, 9):
+                c.set(xx, y, (78, 124, 162, 255))
+    def blob(cx, cy, rx, ry, col, edge):
+        for y in range(cy - ry, cy + ry + 1):
+            for x in range(cx - rx, cx + rx + 1):
+                if 0 <= x < W and 0 <= y < H:
+                    d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2
+                    if d <= 1:
+                        c.px[y][x] = edge if d > 0.72 else col
+    # landmasses per region (theme-tinted)
+    blob(30, 55, 22, 18, (150, 176, 120, 255), (118, 146, 96, 255))     # home meadows
+    blob(60, 34, 16, 12, (238, 188, 204, 255), (216, 158, 180, 255))    # sakura
+    blob(96, 24, 18, 11, (96, 88, 128, 255), (72, 66, 100, 255))        # neon
+    blob(24, 90, 15, 11, (232, 210, 160, 255), (204, 180, 132, 255))    # seaside sands
+    blob(60, 68, 16, 12, (88, 134, 84, 255), (64, 106, 66, 255))        # forest
+    blob(96, 84, 18, 12, (226, 196, 130, 255), (198, 166, 104, 255))    # desert
+    blob(130, 44, 15, 11, (226, 232, 242, 255), (188, 200, 220, 255))   # snowy
+    blob(126, 94, 16, 10, (236, 176, 130, 255), (206, 142, 104, 255))   # sunset
+    blob(154, 72, 12, 10, (110, 70, 64, 255), (84, 52, 50, 255))        # ember
+    blob(106, 54, 12, 9, (150, 128, 178, 255), (122, 100, 150, 255))    # royal
+    # cloud island floats
+    blob(150, 19, 13, 7, (240, 244, 252, 255), (210, 218, 236, 255))
+    # moon corner (night sky patch)
+    for y in range(0, 16):
+        for x in range(158, W):
+            c.px[y][x] = (28, 26, 52, 255)
+    blob(170, 8, 5, 5, (232, 228, 204, 255), (200, 196, 176, 255))
+    c.set(162, 4, WHITE); c.set(176, 13, WHITE); c.set(160, 12, WHITE)
+    # landmarks
+    c.rect(129, 36, 2, 5, (160, 170, 190, 255)); c.set(129, 35, WHITE)          # snowy peak
+    c.set(153, 66, (250, 140, 60, 255)); c.set(154, 65, (250, 190, 60, 255))    # lava
+    c.rect(104, 48, 5, 5, (196, 176, 220, 255)); c.set(105, 47, GOLD); c.set(107, 47, GOLD)  # castle
+    for px, py in ((56, 30), (62, 28), (66, 34)):
+        c.set(px, py, (244, 150, 172, 255))                                     # blossoms
+    c.rect(93, 20, 6, 4, (140, 230, 220, 255))                                  # neon block
+    # dotted routes between owned-ish chain (decorative)
+    order = ["home", "sakura", "neon", "seaside", "forest", "desert", "snowy", "sunset", "ember", "royal", "cloud", "moon"]
+    for a, b in zip(order, order[1:]):
+        x1, y1 = MAP_SPOTS[a]; x2, y2 = MAP_SPOTS[b]
+        steps = max(abs(x2 - x1), abs(y2 - y1)) // 4
+        for i in range(1, steps):
+            t = i / steps
+            c.set(int(x1 + (x2 - x1) * t), int(y1 + (y2 - y1) * t), (255, 244, 214, 130))
+    # parchment border
+    for i in range(2):
+        col = (120, 96, 60, 255) if i == 0 else (168, 138, 92, 255)
+        c.hline(i, i, W - 2 * i, col); c.hline(i, H - 1 - i, W - 2 * i, col)
+        c.vline(i, i, H - 2 * i, col); c.vline(W - 1 - i, i, H - 2 * i, col)
+    return c
+
+def map_pin(kind):
+    c = Canvas(9, 12)
+    col = {"own": GOLD, "buy": (120, 220, 130, 255), "lock": (150, 150, 158, 255)}[kind]
+    c.rect(2, 1, 5, 5, col)
+    c.set(1, 2, col); c.set(7, 2, col)
+    c.set(1, 3, col); c.set(7, 3, col)
+    c.set(3, 6, col); c.set(5, 6, col); c.set(4, 6, col)
+    c.set(4, 7, col); c.set(4, 8, tuple(max(0, v - 50) for v in col[:3]) + (255,))
+    c.set(4, 3, WHITE if kind != "lock" else (100, 100, 108, 255))
+    c.hline(2, 0, 5, INK)
+    return c
+
 def main_v4():
     count = 0
     glow().save("glow.png"); count += 1
@@ -991,6 +1066,9 @@ def main_v4():
     d.save("dealer_0.png"); d.shifted_down().save("dealer_1.png"); count += 2
     roulette_wheel().save("wheel.png"); count += 1
     char_shadow().save("shadow.png"); count += 1
+    worldmap().save("worldmap.png"); count += 1
+    for k in ("own", "buy", "lock"):
+        map_pin(k).save(f"pin_{k}.png"); count += 1
     for lvl in range(3):
         for f in range(2):
             barcup(lvl, f).save(f"barcup_{lvl}_{f}.png"); count += 1

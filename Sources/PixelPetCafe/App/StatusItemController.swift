@@ -28,6 +28,7 @@ final class StatusItemController: NSObject {
 
         scene.onGoldenTip = { [weak controller] in controller?.collectGoldenTip() }
         scene.onCleanSpot = { [weak controller] in controller?.cleanSpot() }
+        scene.onMapSelect = { [weak controller] city in controller?.mapSelect(city) }
         scene.isPaused = true
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -95,6 +96,14 @@ final class StatusItemController: NSObject {
         controller.casinoFocus
             .receive(on: DispatchQueue.main)
             .sink { [weak self] zoom in self?.scene.focusTable(zoom) }
+            .store(in: &cancellables)
+        controller.mapOpen
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] open in
+                guard let self else { return }
+                self.scene.setMode(open ? .map : .cafe)
+                self.scene.configure(with: self.controller.state)
+            }
             .store(in: &cancellables)
         controller.casinoWin
             .receive(on: DispatchQueue.main)
