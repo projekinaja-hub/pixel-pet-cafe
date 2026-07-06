@@ -412,9 +412,26 @@ struct StyleTab: View {
             }
             if controller.state.workMode {
                 if controller.axTrusted {
-                    Text("✓ listening — type fast and watch the ☕ steam & ⚡ in the menu bar")
-                        .font(.system(size: 9, weight: .semibold, design: .rounded))
-                        .foregroundColor(Color(red: 0.55, green: 0.85, blue: 0.55))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("✓ listening — type fast and watch the ☕ steam & ⚡ in the menu bar")
+                            .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            .foregroundColor(Color(red: 0.55, green: 0.85, blue: 0.55))
+                        // live proof: raw keystrokes/sec, no trust required
+                        HStack(spacing: 6) {
+                            Text("⌨️ \(String(format: "%.1f", controller.keystrokesPerSec)) keys/sec")
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundColor(Theme.cream)
+                            if let last = controller.lastKeystrokeAt {
+                                Text("· last key \(Int(Date().timeIntervalSince(last)))s ago")
+                                    .font(.system(size: 8.5, design: .rounded))
+                                    .foregroundColor(Theme.dim)
+                            } else {
+                                Text("· type something to test!")
+                                    .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                                    .foregroundColor(Theme.gold)
+                            }
+                        }
+                    }
                 } else {
                     HStack(spacing: 6) {
                         Text("⚠️ macOS permission needed to hear typing in other apps")

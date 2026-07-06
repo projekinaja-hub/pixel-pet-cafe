@@ -31,6 +31,8 @@ final class GameController: ObservableObject {
     private var keystrokes: [Date] = []
     @Published private(set) var workBoost: Double = 1
     @Published private(set) var axTrusted: Bool = AXIsProcessTrusted()
+    @Published private(set) var lastKeystrokeAt: Date?
+    @Published private(set) var keystrokesPerSec: Double = 0
     @Published var banner: (emoji: String, text: String)?
     let soundRequest = PassthroughSubject<String, Never>()
     private var bannerClearAt = Date.distantPast
@@ -113,12 +115,17 @@ final class GameController: ObservableObject {
         // Global monitors only deliver events with Accessibility permission.
         // We count key-down events; key content is never inspected or stored.
         keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] _ in
-            Task { @MainActor in self?.keystrokes.append(Date()) }
+            Task { @MainActor in self?.recordKeystroke() }
         }
         localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            Task { @MainActor in self?.keystrokes.append(Date()) }
+            Task { @MainActor in self?.recordKeystroke() }
             return event
         }
+    }
+
+    private func recordKeystroke() {
+        keystrokes.append(Date())
+        lastKeystrokeAt = Date()
     }
 
     private func stopKeyMonitor() {
@@ -126,6 +133,7 @@ final class GameController: ObservableObject {
         if let m = localKeyMonitor { NSEvent.removeMonitor(m); localKeyMonitor = nil }
         keystrokes = []
         workBoost = 1
+        keystrokesPerSec = 0
     }
 
     private func updateWorkBoost(now: Date) {
@@ -149,6 +157,7 @@ final class GameController: ObservableObject {
         }
         keystrokes.removeAll { now.timeIntervalSince($0) > 10 }
         let kps = Double(keystrokes.count) / 10
+        keystrokesPerSec = kps
         let boost = 1 + 1.5 * min(1, kps / 6)     // 6 keys/sec sustained = ×2.5
         if abs(boost - workBoost) > 0.01 { workBoost = boost }
     }

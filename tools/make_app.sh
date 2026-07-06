@@ -33,5 +33,16 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-codesign --force --sign - "$APP"
+# Sign with a real Apple Development identity when available so macOS
+# permissions (Accessibility for Work Mode) survive across rebuilds — an
+# ad-hoc signature ("-") gets a new identity hash every build, which silently
+# invalidates TCC grants each time. Falls back to ad-hoc if none is found.
+IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | grep "Apple Development" | head -1 | sed -E 's/.*"(.*)"/\1/')
+if [ -n "$IDENTITY" ]; then
+  echo "signing with: $IDENTITY"
+  codesign --force --deep --sign "$IDENTITY" "$APP"
+else
+  echo "no Apple Development identity found — signing ad-hoc (Accessibility grants won't survive rebuilds)"
+  codesign --force --sign - "$APP"
+fi
 echo "built $APP"
