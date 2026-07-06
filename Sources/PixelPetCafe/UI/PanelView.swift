@@ -175,6 +175,25 @@ struct PanelView: View {
                 }
             }
             .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+            // next milestone — anticipation you can see
+            if let goal = Achievements.nextGoal(controller.state) {
+                HStack(spacing: 6) {
+                    Text("\(goal.def.emoji) \(goal.def.name)")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Theme.card)
+                            Capsule().fill(Theme.gold)
+                                .frame(width: max(3, geo.size.width * goal.progress))
+                        }
+                    }
+                    .frame(height: 4)
+                    Text("\(Int(goal.progress * 100))%")
+                        .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.gold)
+                }
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)

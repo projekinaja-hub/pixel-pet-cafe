@@ -13,6 +13,7 @@ struct SaleEvent: Equatable {
     let price: Double        // 0 when no sale
     let mood: CustomerMood
     let customerSpecies: Int // 0..2, picks the customer sprite
+    var bigSpender: Bool = false   // rare 10× whale
     var angry: Bool { mood == .angry }
 }
 
@@ -249,7 +250,9 @@ enum SalesEngine {
                 s.stock[ing, default: 0] -= qty
             }
         }
-        let earned = price(chosen, s)
+        // 2% of customers are big spenders paying 10× — the core-loop jackpot
+        let whale = Double.random(in: 0..<1, using: &rng) < 0.02
+        let earned = price(chosen, s) * (whale ? 10 : 1)
         s.coins += earned
         s.lifetimeCoins += earned
         s.lifetimeCoinsThisRun += earned
@@ -266,7 +269,7 @@ enum SalesEngine {
         s.lastSaleAt = now
         unlockNewMenuItems(&s)
         return SaleEvent(itemIcon: chosen.icon, itemName: chosen.name, price: earned,
-                         mood: mood, customerSpecies: species)
+                         mood: mood, customerSpecies: species, bigSpender: whale)
     }
 
     static func unlockNewMenuItems(_ s: inout GameState) {

@@ -89,4 +89,10 @@ write_wav("event.wav", seq(tone(988, 0.1, 0.28, "tri", 10), tone(1318, 0.22, 0.2
 write_wav("achieve.wav", seq(tone(784, 0.08, 0.3, "square", 12), tone(988, 0.08, 0.3, "square", 12),
                              tone(1175, 0.08, 0.3, "square", 12),
                              mix(tone(1568, 0.35, 0.24, "tri", 4), tone(1175, 0.35, 0.18, "tri", 4))))
+# purchase: satisfying pop-ding
+write_wav("buy.wav", seq(mix(noise(0.03, 0.3, 50, 0.2), tone(520, 0.05, 0.25, "square", 25)),
+                         tone(1040, 0.11, 0.28, "tri", 14)))
+# big spender: cash register cha-ching
+write_wav("chaching.wav", seq(mix(noise(0.04, 0.35, 45, 0.2), tone(1200, 0.04, 0.2, "square", 30)),
+                              mix(tone(1568, 0.22, 0.3, "tri", 8), tone(1976, 0.22, 0.2, "tri", 8))))
 print("generated 10 sounds ->", os.path.abspath(OUT))

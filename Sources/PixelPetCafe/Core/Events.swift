@@ -106,6 +106,36 @@ enum Achievements {
         s.salesCount.values.reduce(0, +)
     }
 
+    /// 0…1 progress toward an unearned achievement (nil = not measurable).
+    static func progress(_ id: String, _ s: GameState) -> Double? {
+        let served = Double(total(s))
+        switch id {
+        case "first_100": return served / 100
+        case "serve_1k": return served / 1_000
+        case "serve_10k": return served / 10_000
+        case "coins_1m": return s.lifetimeCoins / 1e6
+        case "coins_1b": return s.lifetimeCoins / 1e9
+        case "coins_1t": return s.lifetimeCoins / 1e12
+        case "cities_3": return Double(s.cafes.count) / 3
+        case "cities_all": return Double(s.cafes.count) / Double(Cities.all.count)
+        case "stars_10": return Double(s.stars) / 10
+        case "rep_100": return s.reputation / 100
+        case "taste_max": return Double(s.menuTaste.values.max() ?? 0) / 10
+        case "full_crew": return Double(Catalog.staff.filter { (s.staffLevels[$0.id] ?? 0) > 0 }.count) / 7
+        default: return nil
+        }
+    }
+
+    /// The unearned goal you're closest to — fuel for the header progress bar.
+    static func nextGoal(_ s: GameState) -> (def: AchievementDef, progress: Double)? {
+        all.compactMap { def -> (AchievementDef, Double)? in
+            guard !s.achievements.contains(def.id),
+                  let p = progress(def.id, s), p < 1 else { return nil }
+            return (def, p)
+        }
+        .max { $0.1 < $1.1 }
+    }
+
     /// Returns newly earned achievement ids and records them.
     static func checkAll(_ s: inout GameState) -> [AchievementDef] {
         var fresh: [AchievementDef] = []

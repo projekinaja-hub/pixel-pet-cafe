@@ -4,7 +4,17 @@ import SwiftUI
 struct CasinoTab: View {
     @ObservedObject var controller: GameController
     @State private var game = 0
-    @State private var bet: Double = 25
+    @State private var bet: Double = 100
+    @State private var betIdx = 0
+
+    /// Stakes that scale with your fortune — risk stays real forever.
+    private var betOptions: [(label: String, value: Double)] {
+        let c = controller.state.coins
+        return [("100", 100),
+                ("1% · \(formatNumber(max(100, (c * 0.01).rounded())))", max(100, (c * 0.01).rounded())),
+                ("5% · \(formatNumber(max(100, (c * 0.05).rounded())))", max(100, (c * 0.05).rounded())),
+                ("10% · \(formatNumber(max(100, (c * 0.10).rounded())))", max(100, (c * 0.10).rounded()))]
+    }
 
     var body: some View {
         if !controller.state.casinoUnlocked {
@@ -24,21 +34,24 @@ struct CasinoTab: View {
                 Text("Bet")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundColor(Theme.dim)
-                ForEach([25.0, 100, 500, 2500], id: \.self) { b in
+                ForEach(Array(betOptions.enumerated()), id: \.offset) { i, opt in
                     Button {
-                        bet = b
+                        betIdx = i
+                        bet = opt.value
                     } label: {
-                        Text(formatNumber(b))
+                        Text(opt.label)
                             .font(.system(size: 10, weight: .bold, design: .rounded))
-                            .foregroundColor(bet == b ? Theme.bg : Theme.dim)
+                            .foregroundColor(betIdx == i ? Theme.bg : Theme.dim)
                             .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(bet == b ? Theme.gold : Theme.card)
+                            .background(betIdx == i ? Theme.gold : Theme.card)
                             .cornerRadius(6)
                     }
                     .buttonStyle(.plain)
                 }
                 Spacer()
             }
+            .onChange(of: controller.state.coins) { _ in bet = betOptions[betIdx].value }
+            .onAppear { bet = betOptions[betIdx].value }
             switch game {
             case 0: SlotsView(controller: controller, bet: $bet)
             case 1: BlackjackView(controller: controller, bet: $bet)
@@ -64,6 +77,8 @@ struct SlotsView: View {
     @ObservedObject var controller: GameController
     @Binding var bet: Double
     @State private var reels = ["beans", "croissant", "star"]
+    @State private var locked = [false, false, false]   // reels stopped so far
+    @State private var winPulse = false
     @State private var spinning = false
     @State private var message = "3×⭐ 60× · 3×🍯 25× · triple 10× · pair = bet back"
     @State private var rng = SystemRandomNumberGenerator()
@@ -76,6 +91,12 @@ struct SlotsView: View {
                         .frame(width: 48, height: 48)
                         .background(Theme.bg.opacity(0.6))
                         .cornerRadius(8)
+                        .overlay(RoundedRectangle(cornerRadius: 8)
+                            .stroke(winPulse ? Theme.gold : (locked[i] && spinning ? Theme.cream.opacity(0.6) : .clear),
+                                    lineWidth: winPulse ? 2.5 : 1.5))
+                        .scaleEffect(locked[i] && spinning ? 1.08 : (winPulse ? 1.06 : 1.0))
+                        .animation(.spring(response: 0.25, dampingFraction: 0.5), value: locked[i])
+                        .animation(.easeInOut(duration: 0.3).repeatCount(5, autoreverses: true), value: winPulse)
                 }
             }
             Text(message)
@@ -110,25 +131,39 @@ struct SlotsView: View {
     private func spin() {
         guard controller.casinoTrySpend(bet) else { return }
         spinning = true
+        winPulse = false
+        locked = [false, false, false]
         controller.casinoFocus.send(true)
         message = "…"
         Task { @MainActor in
-            for _ in 0..<9 {   // reel flicker
-                reels = CasinoEngine.slotSpin(rng: &rng)
-                try? await Task.sleep(nanoseconds: 80_000_000)
-            }
             let final = CasinoEngine.slotSpin(rng: &rng)
+            // reels stop one by one — and linger when a jackpot is brewing
+            for stop in 0..<3 {
+                let spins = stop == 2 && final[0] == final[1] ? 10 : 6   // near-miss suspense
+                for _ in 0..<spins {
+                    var r = reels
+                    for i in stop..<3 { r[i] = CasinoEngine.slotSymbols.randomElement(using: &rng)! }
+                    reels = r
+                    try? await Task.sleep(nanoseconds: stop == 2 && final[0] == final[1] ? 130_000_000 : 75_000_000)
+                }
+                reels[stop] = final[stop]
+                locked[stop] = true
+                SoundPlayer.shared.play("clack", minGap: 0.05)
+                try? await Task.sleep(nanoseconds: 160_000_000)
+            }
             reels = final
             let mult = CasinoEngine.slotPayout(final)
             if mult > 0 {
                 let win = bet * mult
                 controller.casinoAward(win)
                 message = "🎉 \(Int(mult))× — won 🪙 \(formatNumber(win))!"
+                winPulse = true
                 if final.allSatisfy({ $0 == "star" }) { controller.unlockAchievement("slots_jackpot") }
             } else {
                 message = "No luck — try again?"
             }
             spinning = false
+            locked = [false, false, false]
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
                 controller.casinoFocus.send(false)
             }
@@ -200,8 +235,13 @@ struct BlackjackView: View {
                 .frame(width: 42, alignment: .leading)
             ForEach(Array(cards.enumerated()), id: \.offset) { _, card in
                 CardView(card: card)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity).combined(with: .scale(scale: 1.3)),
+                        removal: .opacity))
             }
-            ForEach(0..<hidden, id: \.self) { _ in CardBack() }
+            ForEach(0..<hidden, id: \.self) { _ in
+                CardBack().transition(.opacity)
+            }
             if let v = value {
                 Text("= \(v)")
                     .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -226,7 +266,10 @@ struct BlackjackView: View {
         guard controller.casinoTrySpend(bet) else { return }
         settled = false
         controller.casinoFocus.send(true)
-        hand = CasinoEngine.BlackjackGame(bet: bet, rng: &rng)
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+            hand = CasinoEngine.BlackjackGame(bet: bet, rng: &rng)
+        }
+        SoundPlayer.shared.play("clack", minGap: 0.05)
         message = "Hit, stand or double?"
         publishCards()
         settleIfFinished()
@@ -244,7 +287,8 @@ struct BlackjackView: View {
     private func mutate(_ change: (inout CasinoEngine.BlackjackGame) -> Void) {
         guard var g = hand else { return }
         change(&g)
-        hand = g
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { hand = g }
+        SoundPlayer.shared.play("clack", minGap: 0.05)
         publishCards()
         settleIfFinished()
     }

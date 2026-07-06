@@ -237,9 +237,15 @@ final class GameController: ObservableObject {
 
     // MARK: actions
 
-    func buyStaff(_ id: String) { EconomyEngine.buyStaff(id, &state) }
-    func buyEquipment(_ id: String) { EconomyEngine.buyEquipment(id, &state) }
-    func buyPack(_ ingredient: String, units: Int) { SalesEngine.buyPack(ingredient, units: units, &state) }
+    func buyStaff(_ id: String) {
+        if EconomyEngine.buyStaff(id, &state) { soundRequest.send("buy") }
+    }
+    func buyEquipment(_ id: String) {
+        if EconomyEngine.buyEquipment(id, &state) { soundRequest.send("buy") }
+    }
+    func buyPack(_ ingredient: String, units: Int) {
+        if SalesEngine.buyPack(ingredient, units: units, &state) { soundRequest.send("buy") }
+    }
     func renovate() { EconomyEngine.renovate(&state); saveNow() }
     func toggleMuted() { state.muted.toggle() }
     func cleanSpot() { SalesEngine.cleanSpot(&state) }
@@ -271,7 +277,9 @@ final class GameController: ObservableObject {
         state.menuEnabled.removeAll { $0 == id }
     }
 
-    func upgradeTaste(_ id: String) { SalesEngine.upgradeTaste(id, &state) }
+    func upgradeTaste(_ id: String) {
+        if SalesEngine.upgradeTaste(id, &state) { soundRequest.send("buy") }
+    }
     func researchTaste() { SalesEngine.researchTaste(&state) }
 
     func setOwner(_ owner: OwnerConfig) { state.owner = owner }

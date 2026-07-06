@@ -569,6 +569,9 @@ final class CafeScene: SKScene {
         customer.run(toCounter) { [weak self, weak customer] in
             guard let self, let customer else { return }
             self.showBubble(over: customer, event: event)
+            if event.bigSpender {
+                self.sparkle(at: customer.position, color: NSColor(calibratedRed: 1, green: 0.85, blue: 0.4, alpha: 1))
+            }
             if event.mood == .angry || event.mood == .sadLeave {
                 customer.run(.sequence([
                     .wait(forDuration: 1.4),

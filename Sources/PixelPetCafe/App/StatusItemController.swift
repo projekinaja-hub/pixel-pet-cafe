@@ -66,10 +66,16 @@ final class StatusItemController: NSObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
                 self?.scene.playSale(event)
-                switch event.mood {
-                case .happy, .settled: SoundPlayer.shared.play("coin", minGap: 1.2)
-                case .sadLeave: SoundPlayer.shared.play("sad", minGap: 2)
-                case .angry: SoundPlayer.shared.play("angry", minGap: 2)
+                if event.bigSpender {
+                    SoundPlayer.shared.play("chaching", minGap: 1)
+                    self?.happyUntil = Date().addingTimeInterval(2.5)
+                    self?.refreshIcon()
+                } else {
+                    switch event.mood {
+                    case .happy, .settled: SoundPlayer.shared.play("coin", minGap: 1.2)
+                    case .sadLeave: SoundPlayer.shared.play("sad", minGap: 2)
+                    case .angry: SoundPlayer.shared.play("angry", minGap: 2)
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -215,9 +221,12 @@ final class StatusItemController: NSObject {
 
     private func updateTitle(_ state: GameState) {
         let warning = SalesEngine.hasStockOut(state) ? "❗" : ""
-        let boost = controller.workBoost > 1.05 ? String(format: " ⚡%.1f×", controller.workBoost) : ""
+        // fixed-width segments so the menu bar never jitters as digits change
+        var num = formatNumber(state.coins)
+        while num.count < 6 { num = "\u{2007}" + num }     // figure-space pad
+        let boost = state.workMode ? String(format: " ⚡%.1f×", controller.workBoost) : ""
         statusItem.button?.attributedTitle = NSAttributedString(
-            string: " \(warning)\(formatNumber(state.coins))\(boost)",
+            string: " \(warning)\(num)\(boost)",
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)])
     }
 
