@@ -18,6 +18,8 @@ final class StatusItemController: NSObject {
     private var cancellables: Set<AnyCancellable> = []
     private var iconCharacterKey = ""
     private var icons: [NSImage] = []   // frames 0..4: normal, blink, happy, sleep, sip
+    private var cupIcons: [[NSImage]] = []   // [steamLevel][wiggleFrame]
+    private var iconInterval: TimeInterval = 2.0
 
     init(controller: GameController) {
         self.controller = controller
@@ -110,6 +112,12 @@ final class StatusItemController: NSObject {
         RunLoop.main.add(t, forMode: .common)
         iconTimer = t
 
+        controller.$workBoost
+            .receive(on: DispatchQueue.main)
+            .map { _ in () }
+            .sink { [weak self] in self?.refreshIcon() }
+            .store(in: &cancellables)
+
         // dev hook: PPC_OPEN=1 opens the popover on launch (for screenshots)
         if ProcessInfo.processInfo.environment["PPC_OPEN"] == "1" {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
@@ -121,27 +129,51 @@ final class StatusItemController: NSObject {
     // MARK: icon
 
     private func iconPrefix(_ state: GameState) -> String {
+        if state.barCharacter == "coffee" { return "barcup" }
         if state.barCharacter != "owner", Catalog.staffDef(state.barCharacter) != nil {
             return "barstaff_\(state.barCharacter)"
         }
         return "bar_\(state.owner.species)_\(state.owner.palette)"
     }
 
+    private func loadIcon(_ name: String) -> NSImage? {
+        guard let url = Bundle.module.url(forResource: name, withExtension: "png", subdirectory: "Sprites"),
+              let image = NSImage(contentsOf: url) else { return nil }
+        image.size = NSSize(width: 18, height: 18)
+        return image
+    }
+
     private func reloadIconsIfNeeded(_ state: GameState) {
         let prefix = iconPrefix(state)
         guard prefix != iconCharacterKey else { return }
         iconCharacterKey = prefix
-        icons = (0..<5).compactMap { f in
-            guard let url = Bundle.module.url(forResource: "\(prefix)_\(f)",
-                                              withExtension: "png", subdirectory: "Sprites"),
-                  let image = NSImage(contentsOf: url) else { return nil }
-            image.size = NSSize(width: 18, height: 18)
-            return image
+        if prefix == "barcup" {
+            cupIcons = (0..<3).map { lvl in
+                (0..<2).compactMap { f in loadIcon("barcup_\(lvl)_\(f)") }
+            }
+            icons = []
+        } else {
+            cupIcons = []
+            icons = (0..<5).compactMap { f in loadIcon("\(prefix)_\(f)") }
         }
         refreshIcon()
     }
 
     private func refreshIcon() {
+        // ☕ mode: steam level & wiggle speed follow the typing boost
+        if !cupIcons.isEmpty {
+            let boost = controller.workBoost
+            let level = boost < 1.05 ? 0 : (boost < 1.7 ? 1 : 2)
+            let wanted: TimeInterval = [1.4, 0.8, 0.4][level]
+            if wanted != iconInterval { restartIconTimer(interval: wanted) }
+            if level == 0 {
+                statusItem.button?.image = cupIcons[0][0]
+            } else {
+                statusItem.button?.image = cupIcons[level][iconTick % 2]
+            }
+            return
+        }
+        if iconInterval != 2.0 { restartIconTimer(interval: 2.0) }
         guard icons.count == 5 else { return }
         let frame: Int
         if Date() < happyUntil {
@@ -164,6 +196,19 @@ final class StatusItemController: NSObject {
         statusItem.button?.attributedTitle = NSAttributedString(
             string: " \(warning)\(formatNumber(state.coins))\(boost)",
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)])
+    }
+
+    private func restartIconTimer(interval: TimeInterval) {
+        iconInterval = interval
+        iconTimer?.invalidate()
+        let t = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.iconTick += 1
+                self?.refreshIcon()
+            }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        iconTimer = t
     }
 
     // MARK: popover

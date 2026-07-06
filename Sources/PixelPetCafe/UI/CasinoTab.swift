@@ -443,9 +443,9 @@ struct MahjongView: View {
                 }
                 if !g.discards.isEmpty {
                     HStack(spacing: 1) {
-                        let recent = Array(g.discards.suffix(11))
+                        let recent = Array(g.discards.suffix(9))
                         ForEach(Array(recent.enumerated()), id: \.offset) { i, t in
-                            tileFace(t, size: 13)
+                            tileFace(t, size: 17)
                                 .overlay(RoundedRectangle(cornerRadius: 3)
                                     .stroke(i == recent.count - 1 ? Theme.gold : .clear, lineWidth: 1.5))
                         }
@@ -465,7 +465,7 @@ struct MahjongView: View {
                         ForEach(g.melds[0]) { meld in
                             HStack(spacing: 1) {
                                 ForEach(Array(meld.tiles.enumerated()), id: \.offset) { _, t in
-                                    tileFace(t, size: 12)
+                                    tileFace(t, size: 15)
                                 }
                             }
                             .padding(2)
@@ -515,7 +515,7 @@ struct MahjongView: View {
                     if let i = handTiles.firstIndex(of: d) { handTiles.remove(at: i) }
                 }
                 HStack(spacing: 0) {
-                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(23), spacing: 2), count: 7), spacing: 3) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(34), spacing: 3), count: 7), spacing: 4) {
                         ForEach(Array(handTiles.enumerated()), id: \.offset) { _, t in
                             handTile(t)
                         }
@@ -537,7 +537,7 @@ struct MahjongView: View {
                     Text("Discarded:")
                         .font(.system(size: 10, design: .rounded))
                         .foregroundColor(Theme.dim)
-                    tileFace(d, size: 20)
+                    tileFace(d, size: 28)
                 }
                 HStack(spacing: 6) {
                     if canClaimWin(g, d) { mjButton("WIN!") { mutate { $0.playerClaimWin() } } }
@@ -563,8 +563,8 @@ struct MahjongView: View {
                 selected = t
             }
         } label: {
-            tileFace(t, size: 19)
-                .overlay(RoundedRectangle(cornerRadius: 3)
+            tileFace(t, size: 28)
+                .overlay(RoundedRectangle(cornerRadius: 4)
                     .stroke(selected == t ? Theme.gold : .clear, lineWidth: 2))
                 .offset(y: selected == t ? -3 : 0)
                 .animation(.easeOut(duration: 0.12), value: selected)
@@ -579,12 +579,15 @@ struct MahjongView: View {
 
     private func tileFace(_ t: Mahjong.Tile, size: CGFloat) -> some View {
         Text(t.glyph)
-            .font(.system(size: size))
+            .font(.system(size: size * 1.15))
             .foregroundColor(.black)
-            .frame(width: size + 4, height: size + 8)
-            .background(Color.white)
-            .cornerRadius(3)
-            .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.black.opacity(0.2), lineWidth: 0.5))
+            .frame(width: size + 6, height: size + 10)
+            .background(
+                LinearGradient(colors: [Color.white, Color(white: 0.88)],
+                               startPoint: .top, endPoint: .bottom))
+            .cornerRadius(4)
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.black.opacity(0.25), lineWidth: 0.6))
+            .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
     }
 
     private func mjButton(_ label: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {

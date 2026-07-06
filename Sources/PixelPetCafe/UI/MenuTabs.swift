@@ -376,6 +376,7 @@ struct StyleTab: View {
             LazyVGrid(columns: Array(repeating: GridItem(.fixed(42), spacing: 5), count: 7),
                       alignment: .leading, spacing: 5) {
                 barChoice("owner", icon: "bar_\(owner.species)_\(owner.palette)_0")
+                barChoice("coffee", icon: "barcup_2_0")
                 ForEach(Catalog.staff, id: \.id) { def in
                     if (controller.state.staffLevels[def.id] ?? 0) > 0 {
                         barChoice(def.id, icon: "barstaff_\(def.id)_0")

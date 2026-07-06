@@ -102,6 +102,17 @@ def character(fur, fur_d, belly, apron, species, accent=None):
         for x0 in (2, 11):
             c.rect(x0, 2, 3, 2, fur_d)
             c.set(x0, 2, INK); c.set(x0 + 2, 2, INK); c.set(x0 + 1, 1, INK)
+    elif species == "panda":
+        dark = (58, 56, 64, 255)
+        for x0 in (2, 11):
+            c.rect(x0, 2, 3, 2, dark)
+            c.set(x0, 2, INK); c.set(x0 + 2, 2, INK); c.set(x0 + 1, 1, INK)
+    elif species == "deer":
+        antler = (150, 112, 70, 255)
+        for x0 in (3, 11):
+            c.vline(x0, 0, 3, antler)
+            c.set(x0 + (1 if x0 == 3 else -1), 1, antler)
+        c.set(2, 3, fur_d); c.set(13, 3, fur_d)   # side ears
     elif species == "owl":
         c.set(3, 2, INK); c.set(12, 2, INK)  # small tufts
         c.set(3, 3, fur_d); c.set(12, 3, fur_d)
@@ -123,6 +134,8 @@ def character(fur, fur_d, belly, apron, species, accent=None):
         c.rect(4, 5, 3, 4, WHITE); c.rect(9, 5, 3, 4, WHITE)
     if species == "raccoon":  # bandit mask
         c.rect(4, 5, 8, 3, (72, 62, 78, 255))
+    if species == "panda":    # eye patches
+        c.rect(4, 5, 3, 3, (58, 56, 64, 255)); c.rect(9, 5, 3, 3, (58, 56, 64, 255))
     # eyes (with glint)
     ey = 6
     c.set(5, ey, INK); c.set(10, ey, INK)
@@ -489,7 +502,7 @@ PALETTES = {
     "orange": ((212, 110, 58, 255), (160, 76, 38, 255)),
     "gray":   ((138, 130, 140, 255), (100, 92, 104, 255)),
 }
-SPECIES = ["cat", "corgi", "bunny", "fox", "bear", "owl"]
+SPECIES = ["cat", "corgi", "bunny", "fox", "bear", "owl", "raccoon", "panda", "deer"]
 OWNER_APRON = (44, 62, 100, 255)  # navy owner apron with gold pin
 
 def owner(species, pal):
@@ -555,6 +568,14 @@ def face_icon(species, fur, fur_d, frame):
         for x0 in (2, 12):
             c.rect(x0, 1, 3, 2, fur_d)
             c.set(x0, 1, INK); c.set(x0 + 2, 1, INK); c.set(x0 + 1, 0, INK)
+    elif species == "panda":
+        for x0 in (2, 12):
+            c.rect(x0, 1, 3, 2, (58, 56, 64, 255))
+            c.set(x0, 1, INK); c.set(x0 + 2, 1, INK); c.set(x0 + 1, 0, INK)
+    elif species == "deer":
+        for x0 in (3, 13):
+            c.vline(x0, 0, 3, (150, 112, 70, 255))
+            c.set(x0 + (1 if x0 == 3 else -1), 0, (150, 112, 70, 255))
     elif species == "owl":
         c.set(3, 1, INK); c.set(14, 1, INK)
         c.set(3, 2, fur_d); c.set(14, 2, fur_d)
@@ -574,6 +595,8 @@ def face_icon(species, fur, fur_d, frame):
         c.rect(5, 9, 8, 5, CREAM)
     if species == "raccoon":
         c.rect(3, 6, 12, 3, (72, 62, 78, 255))
+    if species == "panda":
+        c.rect(4, 6, 3, 3, (58, 56, 64, 255)); c.rect(11, 6, 3, 3, (58, 56, 64, 255))
     # eyes
     if frame == 1 or frame == 3:                      # blink / sleep
         c.hline(5, 8, 2, INK); c.hline(11, 8, 2, INK)
@@ -929,6 +952,33 @@ def light_shaft():
                     c.px[y][x] = (255, 240, 200, a)
     return c
 
+def barcup(level, frame):
+    c = Canvas(18, 18)
+    # saucer + cup
+    c.rect(3, 15, 12, 1, (230, 230, 235, 255))
+    c.hline(3, 16, 12, INK)
+    c.rect(5, 8, 8, 7, (206, 106, 76, 255))
+    c.hline(5, 7, 8, WHITE)                     # foam
+    c.set(6, 7, (240, 220, 190, 255))
+    c.vline(4, 7, 8, INK); c.vline(13, 7, 8, INK)
+    c.hline(5, 15, 8, INK)
+    c.set(14, 9, INK); c.set(15, 10, INK); c.set(15, 11, INK); c.set(14, 12, INK)  # handle
+    c.set(7, 10, (230, 140, 110, 255))          # glaze glint
+    # steam: more + taller with level, frame wiggles
+    if level >= 1:
+        base = [(7, 5), (10, 4)] if frame == 0 else [(8, 5), (11, 4)]
+        for (x, y) in base:
+            c.set(x, y, (240, 240, 245, 200))
+            c.set(x + (1 if frame else -1), y - 1, (240, 240, 245, 150))
+    if level >= 2:
+        cols = [6, 9, 12] if frame == 0 else [7, 10, 11]
+        for i, x in enumerate(cols):
+            for dy in range(3 + (i % 2)):
+                a = 220 - dy * 45
+                c.set(x + (dy % 2 if frame else -(dy % 2)), 5 - dy, (250, 250, 255, max(60, a)))
+        c.set(9, 0, (255, 255, 255, 120))
+    return c
+
 def main_v4():
     count = 0
     glow().save("glow.png"); count += 1
@@ -941,6 +991,9 @@ def main_v4():
     d.save("dealer_0.png"); d.shifted_down().save("dealer_1.png"); count += 2
     roulette_wheel().save("wheel.png"); count += 1
     char_shadow().save("shadow.png"); count += 1
+    for lvl in range(3):
+        for f in range(2):
+            barcup(lvl, f).save(f"barcup_{lvl}_{f}.png"); count += 1
     light_shaft().save("shaft.png"); count += 1
     print(f"v4: generated {count} more sprites")
 

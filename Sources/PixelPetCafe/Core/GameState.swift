@@ -6,7 +6,7 @@ struct OwnerConfig: Codable, Equatable {
     var accessory: String = "none"   // none, bow, cap, glasses, scarf
     var cafeName: String = "Pixel Pet Café"
 
-    static let speciesOptions = ["cat", "corgi", "bunny", "fox", "bear", "owl"]
+    static let speciesOptions = ["cat", "corgi", "bunny", "fox", "bear", "owl", "raccoon", "panda", "deer"]
     static let paletteOptions = ["brown", "cream", "orange", "gray"]
     static let accessoryOptions = ["none", "bow", "cap", "glasses", "scarf"]
 }
