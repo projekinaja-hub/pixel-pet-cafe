@@ -300,6 +300,29 @@ struct StyleTab: View {
         .cornerRadius(9)
     }
 
+    var workModeSection: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("⚡ Work Mode")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                Text("Typing on your Mac boosts customers up to ×2.5 (counts keystrokes only,\nnever reads them — needs Accessibility permission)")
+                    .font(.system(size: 9, design: .rounded))
+                    .foregroundColor(Theme.dim)
+            }
+            Spacer()
+            Toggle("", isOn: Binding(
+                get: { controller.state.workMode },
+                set: { _ in controller.toggleWorkMode() }))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .labelsHidden()
+        }
+        .padding(10)
+        .background(Theme.card)
+        .cornerRadius(9)
+    }
+
     private func barChoice(_ id: String, icon: String) -> some View {
         Button { controller.setBarCharacter(id) } label: {
             PixelImage(name: icon, scale: 2)

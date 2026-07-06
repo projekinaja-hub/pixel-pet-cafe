@@ -18,6 +18,12 @@ final class GameController: ObservableObject {
     private var lastAutosave = Date()
     private var rng = SystemRandomNumberGenerator()
 
+    // work mode: count (never read) keystrokes to measure typing activity
+    private var keyMonitor: Any?
+    private var localKeyMonitor: Any?
+    private var keystrokes: [Date] = []
+    @Published private(set) var workBoost: Double = 1
+
     var incomeEstimate: Double { SalesEngine.incomeEstimate(state) }
     var isClosed: Bool { SalesEngine.isClosed(state) }
     var hasStockOut: Bool { SalesEngine.hasStockOut(state) }
@@ -40,6 +46,7 @@ final class GameController: ObservableObject {
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
+        if state.workMode { startKeyMonitor() }
 
         let wc = NSWorkspace.shared.notificationCenter
         wc.addObserver(self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil)
@@ -50,7 +57,8 @@ final class GameController: ObservableObject {
         let now = Date()
         let dt = min(max(0, now.timeIntervalSince(lastTick)), 5)
         lastTick = now
-        let events = SalesEngine.tick(&state, dt: dt, now: now, rng: &rng)
+        updateWorkBoost(now: now)
+        let events = SalesEngine.tick(&state, dt: dt, now: now, boost: workBoost, rng: &rng)
         for e in events { saleEvents.send(e) }
         if now.timeIntervalSince(lastAutosave) >= 30 {
             saveNow()
@@ -70,6 +78,88 @@ final class GameController: ObservableObject {
             lastTick = Date()
             saveNow()
         }
+    }
+
+    // MARK: work mode (typing boost)
+
+    private func startKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        // Global monitors only deliver events with Accessibility permission.
+        // We count key-down events; key content is never inspected or stored.
+        keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] _ in
+            Task { @MainActor in self?.keystrokes.append(Date()) }
+        }
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            Task { @MainActor in self?.keystrokes.append(Date()) }
+            return event
+        }
+    }
+
+    private func stopKeyMonitor() {
+        if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
+        if let m = localKeyMonitor { NSEvent.removeMonitor(m); localKeyMonitor = nil }
+        keystrokes = []
+        workBoost = 1
+    }
+
+    private func updateWorkBoost(now: Date) {
+        guard state.workMode, keyMonitor != nil else {
+            if workBoost != 1 { workBoost = 1 }
+            return
+        }
+        keystrokes.removeAll { now.timeIntervalSince($0) > 10 }
+        let kps = Double(keystrokes.count) / 10
+        let boost = 1 + 1.5 * min(1, kps / 6)     // 6 keys/sec sustained = ×2.5
+        if abs(boost - workBoost) > 0.01 { workBoost = boost }
+    }
+
+    func toggleWorkMode() {
+        state.workMode.toggle()
+        if state.workMode {
+            if !AXIsProcessTrusted() {
+                let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+                _ = AXIsProcessTrustedWithOptions(opts)   // asks once for Accessibility
+            }
+            startKeyMonitor()
+        } else {
+            stopKeyMonitor()
+        }
+    }
+
+    // MARK: cities
+
+    func buyCity(_ id: String) {
+        let def = Cities.def(id)
+        guard !state.ownsCity(id), state.coins >= def.cost else { return }
+        state.coins -= def.cost
+        var fresh = CafeState.fresh(city: id)
+        fresh.menuEnabled = state.menuEnabled     // carry the menu layout over
+        state.cafes.append(fresh)
+        state.activeCafe = state.cafes.count - 1
+        saveNow()
+    }
+
+    func switchCafe(_ index: Int) {
+        guard state.cafes.indices.contains(index) else { return }
+        state.activeCafe = index
+        state.customerProgress = 0
+    }
+
+    func toggleAds() {
+        state.adsActive.toggle()
+    }
+
+    // MARK: casino (moves coins only — never lifetime/prestige)
+
+    func casinoTrySpend(_ amount: Double) -> Bool {
+        guard amount > 0, state.coins >= amount else { return false }
+        state.coins -= amount
+        return true
+    }
+
+    func casinoAward(_ amount: Double) {
+        guard amount > 0 else { return }
+        state.coins += amount
     }
 
     // MARK: actions

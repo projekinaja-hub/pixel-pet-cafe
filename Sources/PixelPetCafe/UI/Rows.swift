@@ -79,8 +79,74 @@ struct CafeTab: View {
     @ObservedObject var controller: GameController
 
     private static let emoji = ["espresso": "☕", "grinder": "⚙️", "oven": "🔥", "decor": "🪴", "sound": "🎵"]
+    private static let cityEmoji = ["home": "🏡", "sakura": "🌸", "neon": "🌃"]
 
     var body: some View {
+        // locations
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Locations")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.cream)
+            HStack(spacing: 5) {
+                ForEach(Array(controller.state.cafes.enumerated()), id: \.offset) { i, cafe in
+                    Button {
+                        controller.switchCafe(i)
+                    } label: {
+                        Text("\(Self.cityEmoji[cafe.city] ?? "☕") \(Cities.def(cafe.city).name)")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundColor(controller.state.activeCafe == i ? Theme.bg : Theme.dim)
+                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .background(controller.state.activeCafe == i ? Theme.gold : Theme.bg.opacity(0.5))
+                            .cornerRadius(7)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            ForEach(Cities.all, id: \.id) { city in
+                if !controller.state.ownsCity(city.id) {
+                    HStack {
+                        Text("\(Self.cityEmoji[city.id] ?? "") \(city.name)")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.cream)
+                        Text(city.vibe + (city.rateBonus > 1 ? " · ×\(String(format: "%.1f", city.rateBonus)) customers" : "")
+                             + (city.priceBonus > 1 ? " · ×\(String(format: "%.1f", city.priceBonus)) prices" : ""))
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundColor(Theme.dim)
+                        Spacer()
+                        CostButton(cost: city.cost,
+                                   affordable: controller.state.coins >= city.cost) {
+                            controller.buyCity(city.id)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(9)
+        .background(Theme.card)
+        .cornerRadius(9)
+
+        // ads campaign
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("📣 Ad campaign")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                Text("×1.8 customers & slowly builds 💖 — costs 25% of income/s")
+                    .font(.system(size: 9, design: .rounded))
+                    .foregroundColor(Theme.dim)
+            }
+            Spacer()
+            Toggle("", isOn: Binding(
+                get: { controller.state.adsActive },
+                set: { _ in controller.toggleAds() }))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .labelsHidden()
+        }
+        .padding(9)
+        .background(Theme.card)
+        .cornerRadius(9)
         if controller.state.cleanliness < 100 {
             HStack {
                 Text("🧹 Sweep the café")

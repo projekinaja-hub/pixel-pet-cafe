@@ -70,13 +70,16 @@ final class CafeScene: SKScene {
         configureClosed(SalesEngine.isClosed(state))
     }
 
+    private var currentBGKey = ""
+
     private func configureBackground(_ state: GameState) {
         let tier = min(2, state.stars == 0 ? 0 : (state.stars < 10 ? 1 : 2))
-        guard tier != currentBGTier else { return }
-        let bgTexture = SpriteLoader.texture("bg_tier\(tier)")
+        let key = "bg_\(state.cafe.city)_tier\(tier)"
+        guard key != currentBGKey else { return }
+        currentBGKey = key
+        let bgTexture = SpriteLoader.texture(key)
         background.texture = bgTexture
         background.size = CGSize(width: 180, height: 120)
-        currentBGTier = tier
         childNode(withName: "counterFront")?.removeFromParent()
         let counterRect = CGRect(x: 96.0 / 180, y: 40.0 / 120, width: 74.0 / 180, height: 28.0 / 120)
         let front = SKSpriteNode(texture: SKTexture(rect: counterRect, in: bgTexture))

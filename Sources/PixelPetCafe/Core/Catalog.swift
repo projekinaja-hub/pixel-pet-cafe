@@ -24,6 +24,7 @@ enum Catalog {
         StaffDef(id: "juno",    name: "Juno",    role: "Cashier",     baseRate: 160,   baseCost: 32_000,    unlockAtLifetime: 18_000),
         StaffDef(id: "bo",      name: "Bo",      role: "Roaster",     baseRate: 900,   baseCost: 400_000,   unlockAtLifetime: 220_000),
         StaffDef(id: "earl",    name: "Earl",    role: "Night Shift", baseRate: 4_500, baseCost: 5_000_000, unlockAtLifetime: 2_500_000),
+        StaffDef(id: "marble",  name: "Marble",  role: "Manager",     baseRate: 0,     baseCost: 1_000_000, unlockAtLifetime: 500_000),
     ]
 
     static let equipment: [EquipmentDef] = [

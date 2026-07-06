@@ -3,7 +3,7 @@ import SwiftUI
 
 enum PanelTab: String, CaseIterable {
     case menu = "Menu", stock = "Stock", staff = "Staff"
-    case cafe = "Café", style = "Style", renovate = "⭐"
+    case cafe = "Café", style = "Style", casino = "🎰", renovate = "⭐"
 }
 
 enum Theme {
@@ -57,6 +57,7 @@ struct PanelView: View {
                     case .staff: StaffTab(controller: controller)
                     case .cafe: CafeTab(controller: controller)
                     case .style: StyleTab(controller: controller)
+                    case .casino: CasinoTab(controller: controller)
                     case .renovate: RenovateTab(controller: controller)
                     }
                 }
@@ -77,10 +78,19 @@ struct PanelView: View {
             Text("🪙 \(formatNumber(controller.state.coins))")
                 .font(.system(size: 19, weight: .bold, design: .rounded))
                 .foregroundColor(Theme.gold)
-            Text("+\(formatNumber(controller.incomeEstimate))/s")
+            Text("+\(formatNumber(controller.incomeEstimate * controller.workBoost))/s")
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundColor(Theme.dim)
+            if controller.workBoost > 1.05 {
+                Text(String(format: "⚡%.1f×", controller.workBoost))
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .foregroundColor(Theme.gold)
+            }
             Spacer()
+            Text("💖 \(Int(controller.state.reputation))")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundColor(controller.state.reputation < 30 ? Theme.danger : Theme.dim)
+                .help("Reputation — happy sales build it, angry customers wreck it")
             if controller.isClosed {
                 Text("CLOSED")
                     .font(.system(size: 10, weight: .heavy, design: .rounded))

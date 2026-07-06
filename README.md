@@ -34,6 +34,25 @@ game below in four tabs — **Café** (equipment), **Staff**, **Recipes**, and
 - **Offline earnings** — the café keeps selling while you're away (up to the
   cap) — but only while ingredients last.
 
+### v3 — cities, manager, reputation & casino
+
+- **Staff specialties** — Mocha boosts drink prices, Poppy pastries, Juno all
+  prices, Bo sometimes serves without using ingredients, Earl extends offline —
+  and **Marble the raccoon Manager** auto-restocks ingredients with your coins.
+- **Cities** — buy cafés in **Sakura Town** 🌸 (×1.3 customers) and **Neon
+  City** 🌃 (×1.5 prices); each has its own crew, stock and look. Only the café
+  you're at operates. (Café tab → Locations)
+- **Reputation 💖** — happy sales build it, angry walk-outs and closures wreck
+  it; it directly scales customer flow. Cause and effect.
+- **Ad campaign 📣** — ×1.8 customers while it drains 25% of your income/s.
+- **Work Mode ⚡** — opt-in: typing on your Mac boosts customers up to ×2.5
+  based on typing speed. Counts keystrokes only (never reads them); needs
+  Accessibility permission. Working literally pays.
+- **Casino 🎰** (unlocks at 50K lifetime) — real-rules **slots** (~94% RTP),
+  **blackjack** (dealer stands 17, blackjack 3:2, double down) and **European
+  roulette** (straight 35:1, colors/odds/dozens). Coins only — gambling never
+  advances unlocks or stars.
+
 ## Build & run
 
 ```bash

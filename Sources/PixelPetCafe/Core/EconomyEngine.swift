@@ -64,14 +64,16 @@ enum EconomyEngine {
         s.stars += prestigeStars(s)
         s.coins = 0
         s.lifetimeCoinsThisRun = 0
-        s.staffLevels = ["mocha": 1]
-        s.equipmentLevels = [:]
-        s.stock = GameState.starterStock
-        s.cleanliness = 100
-        s.customerProgress = 0
-        s.menuEnabled = MenuCatalog.items
+        s.reputation = 50
+        s.adsActive = false
+        let menu = MenuCatalog.items
             .filter { s.lifetimeCoins >= $0.unlockAtLifetime }
             .map(\.id) + s.customItems.map(\.id)
+        for i in s.cafes.indices {                        // cities stay owned,
+            var fresh = CafeState.fresh(city: s.cafes[i].city)   // contents reset
+            fresh.menuEnabled = menu
+            s.cafes[i] = fresh
+        }
     }
 
     // MARK: golden tip

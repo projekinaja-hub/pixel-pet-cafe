@@ -41,7 +41,22 @@ enum SalesEngine {
     }
 
     static func priceMultiplier(_ s: GameState) -> Double {
-        equipMultiplier(s) * (1 + 0.10 * Double(s.stars))
+        equipMultiplier(s) * (1 + 0.10 * Double(s.stars)) * s.city.priceBonus
+            * (1 + 0.02 * Double(s.staffLevels["juno"] ?? 0))
+    }
+
+    /// Role bonuses: Mocha boosts drinks, Poppy boosts pastries (+4%/level).
+    static func categoryBonus(_ category: ItemCategory, _ s: GameState) -> Double {
+        switch category {
+        case .drink:  return 1 + 0.04 * Double(s.staffLevels["mocha"] ?? 0)
+        case .pastry: return 1 + 0.04 * Double(s.staffLevels["poppy"] ?? 0)
+        case .special: return 1
+        }
+    }
+
+    /// Bo the roaster: chance a sale consumes no ingredients (2%/level, cap 50%).
+    static func freeSaleChance(_ s: GameState) -> Double {
+        min(0.5, 0.02 * Double(s.staffLevels["bo"] ?? 0))
     }
 
     static func customerRate(_ s: GameState) -> Double {
@@ -51,10 +66,13 @@ enum SalesEngine {
             * equipMultiplier(s)
             * (0.3 + 0.7 * s.cleanliness / 100)
             * (1 + 0.10 * Double(s.stars))
+            * s.city.rateBonus
+            * (0.5 + s.reputation / 100)
+            * (s.adsActive ? 1.8 : 1.0)
     }
 
     static func price(_ item: ResolvedItem, _ s: GameState) -> Double {
-        item.basePrice * priceMultiplier(s)
+        item.basePrice * priceMultiplier(s) * categoryBonus(item.category, s)
     }
 
     static func servable(_ s: GameState) -> [ResolvedItem] {
@@ -89,11 +107,26 @@ enum SalesEngine {
 
     // MARK: live tick
 
+    /// `boost` multiplies the customer flow (work-mode typing boost).
     static func tick<R: RandomNumberGenerator>(
-        _ s: inout GameState, dt: TimeInterval, now: Date = Date(), rng: inout R
+        _ s: inout GameState, dt: TimeInterval, now: Date = Date(), boost: Double = 1,
+        rng: inout R
     ) -> [SaleEvent] {
         guard dt > 0 else { return [] }
-        s.customerProgress += customerRate(s) * dt
+        managerRestock(&s)
+        if s.adsActive {
+            let cost = 0.25 * incomeEstimate(s) * dt
+            if s.coins >= cost, cost > 0 {
+                s.coins -= cost
+                s.reputation = min(100, s.reputation + 0.005 * dt)
+            } else {
+                s.adsActive = false     // campaign ends when you can't pay
+            }
+        }
+        if isClosed(s, now: now) {
+            s.reputation = max(0, s.reputation - 0.01 * dt)
+        }
+        s.customerProgress += customerRate(s) * boost * dt
         var events: [SaleEvent] = []
         while s.customerProgress >= 1 {
             s.customerProgress -= 1
@@ -109,6 +142,7 @@ enum SalesEngine {
         let species = Int.random(in: 0...2, using: &rng)
         let options = servable(s)
         guard !options.isEmpty else {
+            s.reputation = max(0, s.reputation - 2)   // word gets around
             return SaleEvent(itemIcon: "", itemName: "", price: 0, angry: true, customerSpecies: species)
         }
         // preference: preferred category counts double
@@ -122,15 +156,18 @@ enum SalesEngine {
             roll -= w
         }
         weighted = []
-        // serve: consume + earn + dirty up
-        for (ing, qty) in chosen.ingredients {
-            s.stock[ing, default: 0] -= qty
+        // serve: consume + earn + dirty up (Bo sometimes roasts for free)
+        if Double.random(in: 0..<1, using: &rng) >= freeSaleChance(s) {
+            for (ing, qty) in chosen.ingredients {
+                s.stock[ing, default: 0] -= qty
+            }
         }
         let earned = price(chosen, s)
         s.coins += earned
         s.lifetimeCoins += earned
         s.lifetimeCoinsThisRun += earned
         s.cleanliness = max(0, s.cleanliness - dirtPerSale)
+        s.reputation = min(100, s.reputation + 0.05)
         s.lastSaleAt = now
         unlockNewMenuItems(&s)
         return SaleEvent(itemIcon: chosen.icon, itemName: chosen.name, price: earned,
@@ -152,12 +189,17 @@ enum SalesEngine {
     static func offlineSim(_ s: inout GameState, elapsed: TimeInterval) -> Double {
         guard elapsed > 0 else { return 0 }
         let window = min(elapsed, EconomyEngine.offlineCap(s))
+        managerRestock(&s)
         var customers = Int(customerRate(s) * window)
         var haul = 0.0
         var safety = 250_000
         while customers > 0, safety > 0 {
             let options = servable(s)
-            if options.isEmpty { break }
+            if options.isEmpty {
+                managerRestock(&s)
+                if servable(s).isEmpty { break }
+                continue
+            }
             for item in options {
                 guard customers > 0 else { break }
                 for (ing, qty) in item.ingredients { s.stock[ing, default: 0] -= qty }
@@ -173,6 +215,26 @@ enum SalesEngine {
         if haul > 0 { s.lastSaleAt = Date() }
         unlockNewMenuItems(&s)
         return haul
+    }
+
+    // MARK: manager (Marble) auto-restock
+
+    /// Keeps every ingredient stocked at ≥ 10 × Marble's level, buying 25-packs
+    /// with the player's coins.
+    static func managerRestock(_ s: inout GameState) {
+        let level = s.staffLevels["marble"] ?? 0
+        guard level > 0 else { return }
+        let target = 10 * level
+        for ing in MenuCatalog.ingredients {
+            var safety = 40
+            while (s.stock[ing.id] ?? 0) < target, safety > 0 {
+                let cost = MenuCatalog.packCost(ing.id, units: 25)
+                guard s.coins >= cost else { return }
+                s.coins -= cost
+                s.stock[ing.id, default: 0] += 25
+                safety -= 1
+            }
+        }
     }
 
     // MARK: player actions
