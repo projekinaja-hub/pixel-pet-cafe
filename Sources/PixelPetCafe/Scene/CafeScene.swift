@@ -2,10 +2,16 @@ import SpriteKit
 
 /// The animated pixel café. Logical size 180×120, presented .aspectFit into a
 /// 360×240 SpriteView. Customers walk in via events from the GameController.
+enum SceneMode { case cafe, casino }
+
 final class CafeScene: SKScene {
     var onGoldenTip: (() -> Void)?
     var onCleanSpot: (() -> Void)?
 
+    private(set) var mode: SceneMode = .cafe
+    private let cafeLayer = SKNode()
+    private let casinoLayer = SKNode()
+    private var casinoBuilt = false
     private var background = SKSpriteNode()
     private var staffNodes: [String: SKSpriteNode] = [:]
     private var ownerNode: SKSpriteNode?
@@ -55,14 +61,105 @@ final class CafeScene: SKScene {
         background.position = .zero
         background.zPosition = 0
         addChild(background)
+        cafeLayer.zPosition = 1
+        addChild(cafeLayer)
+        casinoLayer.zPosition = 1
+        casinoLayer.isHidden = true
+        addChild(casinoLayer)
+        let vig = SKSpriteNode(texture: SpriteLoader.texture("vignette"))
+        vig.anchorPoint = .zero
+        vig.position = .zero
+        vig.size = CGSize(width: 180, height: 120)
+        vig.zPosition = 40
+        vig.alpha = 0.85
+        addChild(vig)
     }
+
+    // MARK: scene mode (café ⇄ casino room)
+
+    func setMode(_ newMode: SceneMode) {
+        guard newMode != mode else { return }
+        mode = newMode
+        cafeLayer.isHidden = mode == .casino
+        casinoLayer.isHidden = mode == .cafe
+        currentBGKey = ""              // force background swap
+        if mode == .casino { buildCasinoIfNeeded() }
+        lastState.map { configure(with: $0) }
+    }
+
+    private func buildCasinoIfNeeded() {
+        guard !casinoBuilt else { return }
+        casinoBuilt = true
+        for i in 0..<3 {
+            let slot = SKSpriteNode(texture: SpriteLoader.texture("slot_\(i)"))
+            slot.size = slot.texture!.size()
+            slot.anchorPoint = CGPoint(x: 0.5, y: 0)
+            slot.position = CGPoint(x: 32 + CGFloat(i) * 22, y: 46)
+            slot.zPosition = 5
+            casinoLayer.addChild(slot)
+            let g = SKSpriteNode(texture: SpriteLoader.texture("glow"))
+            g.position = CGPoint(x: slot.position.x, y: 62)
+            g.zPosition = 6
+            g.blendMode = .add
+            g.alpha = 0.55
+            g.run(.repeatForever(.sequence([
+                .fadeAlpha(to: 0.3, duration: 0.9 + Double(i) * 0.2),
+                .fadeAlpha(to: 0.6, duration: 0.9 + Double(i) * 0.2),
+            ])))
+            casinoLayer.addChild(g)
+        }
+        let dealer = animatedSprite(prefix: "dealer")
+        dealer.position = CGPoint(x: 133, y: 44)
+        dealer.zPosition = 4
+        casinoLayer.addChild(dealer)
+        // chandelier + sign glows
+        for (pos, scale, alpha) in [(CGPoint(x: 30, y: 112), 1.6, 0.6),
+                                    (CGPoint(x: 90, y: 98), 2.2, 0.35),
+                                    (CGPoint(x: 133, y: 34), 1.8, 0.3)] {
+            let g = SKSpriteNode(texture: SpriteLoader.texture("glow"))
+            g.position = pos
+            g.setScale(scale)
+            g.zPosition = 12
+            g.blendMode = .add
+            g.alpha = alpha
+            casinoLayer.addChild(g)
+        }
+    }
+
+    /// Coin shower over the table when the player wins at the casino.
+    func playCasinoWin(_ amount: Double) {
+        guard mode == .casino, !isPaused else { return }
+        let n = min(14, 5 + Int(amount / 100))
+        for i in 0..<n {
+            let coin = SKSpriteNode(texture: SpriteLoader.texture("tip"))
+            coin.size = coin.texture!.size()
+            coin.position = CGPoint(x: 110 + CGFloat.random(in: 0...50), y: 120)
+            coin.zPosition = 25
+            casinoLayer.addChild(coin)
+            let fall = SKAction.sequence([
+                .wait(forDuration: Double(i) * 0.08),
+                .group([.moveTo(y: CGFloat.random(in: 24...40), duration: 0.7),
+                        .rotate(byAngle: .pi * 2, duration: 0.7)]),
+                .wait(forDuration: 0.6),
+                .fadeOut(withDuration: 0.4),
+                .removeFromParent(),
+            ])
+            fall.timingMode = .easeIn
+            coin.run(fall)
+        }
+        sparkle(at: CGPoint(x: 133, y: 40), color: NSColor(calibratedRed: 1, green: 0.9, blue: 0.5, alpha: 1))
+    }
+
+    private var lastState: GameState?
 
     required init?(coder: NSCoder) { fatalError("unused") }
 
     // MARK: configuration from game state
 
     func configure(with state: GameState) {
+        lastState = state
         configureBackground(state)
+        guard mode == .cafe else { return }
         configureStaff(state)
         configureEquipment(state)
         configureOwner(state)
@@ -74,13 +171,14 @@ final class CafeScene: SKScene {
 
     private func configureBackground(_ state: GameState) {
         let tier = min(2, state.stars == 0 ? 0 : (state.stars < 10 ? 1 : 2))
-        let key = "bg_\(state.cafe.city)_tier\(tier)"
+        let key = mode == .casino ? "bg_casino" : "bg_\(state.cafe.city)_tier\(tier)"
         guard key != currentBGKey else { return }
         currentBGKey = key
         let bgTexture = SpriteLoader.texture(key)
         background.texture = bgTexture
         background.size = CGSize(width: 180, height: 120)
-        childNode(withName: "counterFront")?.removeFromParent()
+        guard mode == .cafe else { return }
+        cafeLayer.childNode(withName: "counterFront")?.removeFromParent()
         let counterRect = CGRect(x: 96.0 / 180, y: 40.0 / 120, width: 74.0 / 180, height: 28.0 / 120)
         let front = SKSpriteNode(texture: SKTexture(rect: counterRect, in: bgTexture))
         front.name = "counterFront"
@@ -88,7 +186,7 @@ final class CafeScene: SKScene {
         front.position = CGPoint(x: 96, y: 40)
         front.size = CGSize(width: 74, height: 28)
         front.zPosition = 8
-        addChild(front)
+        cafeLayer.addChild(front)
     }
 
     private func configureStaff(_ state: GameState) {
@@ -114,7 +212,7 @@ final class CafeScene: SKScene {
                     node.position = pos
                     node.zPosition = z
                 }
-                addChild(node)
+                cafeLayer.addChild(node)
                 equipNodes[id] = node
                 configuredEquipTiers[id] = visTier
             }
@@ -138,7 +236,7 @@ final class CafeScene: SKScene {
         }
         node.position = CGPoint(x: 40, y: 42)
         node.zPosition = 10
-        addChild(node)
+        cafeLayer.addChild(node)
         ownerNode = node
         let wander = SKAction.repeatForever(.sequence([
             .moveTo(x: 90, duration: 4.5), .wait(forDuration: 2),
@@ -162,7 +260,7 @@ final class CafeScene: SKScene {
             node.position = Self.dirtSpots[i % Self.dirtSpots.count]
             node.zPosition = 4
             node.alpha = 0
-            addChild(node)
+            cafeLayer.addChild(node)
             node.run(.fadeAlpha(to: 0.9, duration: 0.8))
             dirtNodes.append(node)
         }
@@ -190,7 +288,7 @@ final class CafeScene: SKScene {
                 overlay.addChild(web)
             }
             overlay.alpha = 0
-            addChild(overlay)
+            cafeLayer.addChild(overlay)
             overlay.run(.fadeIn(withDuration: 1.5))
             closedOverlay = overlay
         } else {
@@ -204,7 +302,7 @@ final class CafeScene: SKScene {
         let node = animatedSprite(prefix: "staff_\(id)")
         node.position = Self.staffSpots[id] ?? CGPoint(x: 90, y: 30)
         node.zPosition = id == "biscuit" ? 10 : 6
-        addChild(node)
+        cafeLayer.addChild(node)
         staffNodes[id] = node
         if id == "biscuit" {
             let patrol = SKAction.repeatForever(.sequence([
@@ -227,13 +325,13 @@ final class CafeScene: SKScene {
     // MARK: customer visits (event-driven)
 
     func playSale(_ event: SaleEvent) {
-        guard !isPaused, activeCustomers < 4 else { return }
+        guard !isPaused, mode == .cafe, activeCustomers < 4 else { return }
         activeCustomers += 1
         let customer = animatedSprite(prefix: "customer_\(event.customerSpecies)")
         customer.position = Self.doorPoint
         customer.zPosition = 11
         customer.alpha = 0
-        addChild(customer)
+        cafeLayer.addChild(customer)
 
         let toCounter = SKAction.sequence([
             .fadeIn(withDuration: 0.3),
@@ -291,6 +389,7 @@ final class CafeScene: SKScene {
     }
 
     override func update(_ currentTime: TimeInterval) {
+        guard mode == .cafe else { return }
         if tipNode == nil, Date() >= nextTipAt {
             spawnTip()
         }
@@ -306,12 +405,13 @@ final class CafeScene: SKScene {
             .moveBy(x: 0, y: 3, duration: 0.5),
             .moveBy(x: 0, y: -3, duration: 0.5),
         ])))
-        addChild(node)
+        cafeLayer.addChild(node)
         tipNode = node
         node.run(.sequence([.wait(forDuration: 45), .fadeOut(withDuration: 1), .removeFromParent()]))
     }
 
     override func mouseDown(with event: NSEvent) {
+        guard mode == .cafe else { return }
         let p = event.location(in: self)
         if let tip = tipNode, tip.parent != nil, tip.frame.insetBy(dx: -6, dy: -6).contains(p) {
             collectTip(tip)

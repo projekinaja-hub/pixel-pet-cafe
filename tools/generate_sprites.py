@@ -682,6 +682,142 @@ def main_v2():
     cobweb().save("cobweb.png"); closed_sign().save("closed_sign.png"); count += 4
     print(f"v2: generated {count} more sprites")
 
+
+# ---------------------------------------------------------------- v4: casino + lighting
+
+import math
+
+def glow(size=36, color=(255, 214, 140)):
+    c = Canvas(size, size)
+    r = size / 2
+    for y in range(size):
+        for x in range(size):
+            d = math.hypot(x - r + 0.5, y - r + 0.5) / r
+            if d < 1:
+                a = int(90 * (1 - d) ** 2)
+                if a > 2:
+                    c.px[y][x] = (color[0], color[1], color[2], a)
+    return c
+
+def vignette(w=180, h=120):
+    c = Canvas(w, h)
+    cx, cy = w / 2, h / 2
+    for y in range(h):
+        for x in range(w):
+            d = math.hypot((x - cx) / cx, (y - cy) / cy) / 1.42
+            a = int(110 * max(0, d - 0.55) ** 1.6)
+            if a > 2:
+                c.px[y][x] = (14, 8, 20, min(90, a))
+    return c
+
+def slot_machine(variant):
+    c = Canvas(16, 26)
+    body = [(150, 60, 70, 255), (70, 90, 150, 255), (170, 130, 50, 255)][variant]
+    body_d = tuple(max(0, v - 40) for v in body[:3]) + (255,)
+    c.rect(2, 2, 12, 22, body)
+    c.rect(2, 2, 12, 2, body_d)
+    c.hline(2, 1, 12, INK); c.hline(2, 24, 12, INK)
+    c.vline(1, 2, 22, INK); c.vline(14, 2, 22, INK)
+    c.rect(4, 6, 8, 6, (20, 16, 24, 255))          # screen
+    for i, col in enumerate([GOLD, RED, GREEN]):    # reels
+        c.rect(5 + i * 2, 8, 1, 2, col)
+    c.rect(4, 14, 8, 3, (240, 220, 170, 255))       # tray
+    c.set(15, 6, (220, 220, 230, 255)); c.set(15, 5, INK)  # arm
+    c.set(15, 4, RED)
+    c.rect(6, 20, 4, 2, GOLD_D)                     # coin slot
+    c.hline(2, 25, 12, (30, 22, 30, 255))
+    return c
+
+def bg_casino():
+    W, H = 180, 120
+    wall = (70, 34, 52, 255)
+    c = Canvas(W, H, wall)
+    # gold picture rail + paneling
+    c.hline(0, 8, W, (140, 100, 40, 255))
+    for x in range(0, W, 26):
+        c.vline(x, 10, 46, (58, 28, 44, 255))
+    # wainscot
+    c.rect(0, 56, W, 12, (44, 22, 36, 255))
+    c.hline(0, 56, W, GOLD_D)
+    # carpet with diamond pattern
+    c.rect(0, 68, W, H - 68, (110, 30, 44, 255))
+    for y in range(70, H, 10):
+        for x in range((y // 10) % 2 * 8, W, 16):
+            c.set(x, y, (196, 150, 70, 255))
+            c.set(x + 1, y + 1, (150, 60, 66, 255))
+    # CASINO sign
+    c.rect(60, 14, 60, 16, (30, 18, 30, 255))
+    c.hline(60, 14, 60, GOLD); c.hline(60, 29, 60, GOLD)
+    c.vline(60, 14, 16, GOLD); c.vline(119, 14, 16, GOLD)
+    # suit pips: spade, heart, diamond, club
+    gold_l = (255, 210, 120, 255)
+    red_l = (240, 110, 110, 255)
+    def pip(px, py, kind, col):
+        if kind == "spade":
+            c.set(px + 2, py, col)
+            c.rect(px + 1, py + 1, 3, 2, col)
+            c.rect(px, py + 2, 5, 1, col)
+            c.set(px + 2, py + 4, col)
+        elif kind == "heart":
+            c.set(px + 1, py, col); c.set(px + 3, py, col)
+            c.rect(px, py + 1, 5, 2, col)
+            c.set(px + 1, py + 3, col); c.set(px + 2, py + 3, col); c.set(px + 3, py + 3, col)
+            c.set(px + 2, py + 4, col)
+        elif kind == "diamond":
+            c.set(px + 2, py, col)
+            c.rect(px + 1, py + 1, 3, 1, col)
+            c.rect(px, py + 2, 5, 1, col)
+            c.rect(px + 1, py + 3, 3, 1, col)
+            c.set(px + 2, py + 4, col)
+        else:  # club
+            c.set(px + 2, py, col); c.set(px + 1, py + 1, col); c.set(px + 3, py + 1, col)
+            c.rect(px, py + 2, 5, 2, col)
+            c.set(px + 2, py + 4, col)
+    pip(68, 17, "spade", gold_l)
+    pip(81, 17, "heart", red_l)
+    pip(94, 17, "diamond", red_l)
+    pip(107, 17, "club", gold_l)
+    # marquee dots around the frame
+    for x in range(62, 119, 4):
+        c.set(x, 16, gold_l); c.set(x, 27, gold_l)
+    # chandelier
+    c.vline(30, 0, 4, GOLD_D)
+    c.rect(26, 4, 9, 3, GOLD)
+    for dx in (25, 30, 35):
+        c.set(dx, 8, (255, 240, 180, 255))
+    # card table (green felt, wood rim) right side
+    c.rect(102, 78, 62, 26, (32, 20, 16, 255))
+    c.rect(104, 80, 58, 22, (36, 110, 70, 255))
+    c.rect(106, 82, 54, 18, (44, 130, 84, 255))
+    c.hline(112, 90, 42, (222, 200, 150, 120))      # card line
+    for i in range(3):                               # cards on felt
+        c.rect(118 + i * 12, 86, 7, 9, WHITE)
+        c.set(121 + i * 12, 89, RED if i % 2 == 0 else INK)
+    # velvet rope stubs at door zone
+    c.rect(4, 46, 3, 22, (120, 96, 50, 255))
+    c.rect(16, 46, 3, 22, (120, 96, 50, 255))
+    c.hline(6, 50, 10, (170, 60, 70, 255))
+    return c
+
+def dealer_sprite():
+    # sleek fox dealer in a black-and-red vest
+    fur, fur_d = (212, 110, 58, 255), (160, 76, 38, 255)
+    c = character(fur, fur_d, WHITE, (34, 26, 34, 255), "fox", INK)
+    c.rect(7, 14, 2, 2, (170, 60, 70, 255))   # red bow tie
+    return c
+
+def main_v4():
+    count = 0
+    glow().save("glow.png"); count += 1
+    glow(28, (150, 220, 255)).save("glow_cool.png"); count += 1
+    vignette().save("vignette.png"); count += 1
+    for v in range(3):
+        slot_machine(v).save(f"slot_{v}.png"); count += 1
+    bg_casino().save("bg_casino.png"); count += 1
+    d = dealer_sprite()
+    d.save("dealer_0.png"); d.shifted_down().save("dealer_1.png"); count += 2
+    print(f"v4: generated {count} more sprites")
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     count = 0
@@ -706,6 +842,7 @@ def main():
             background(t, theme).save(f"bg_{theme}_tier{t}.png"); count += 1
     print(f"generated {count} sprites -> {os.path.abspath(OUT)}")
     main_v2()
+    main_v4()
 
 if __name__ == "__main__":
     main()

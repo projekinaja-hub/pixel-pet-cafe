@@ -66,10 +66,26 @@ struct PanelView: View {
             .frame(height: 236)
         }
         .frame(width: 360, height: 544)
-        .background(Theme.bg)
-        .onAppear { scene.configure(with: controller.state) }
+        .background(panelTint)
+        .onAppear {
+            scene.setMode(tab == .casino ? .casino : .cafe)
+            scene.configure(with: controller.state)
+        }
         .onChange(of: controller.state) { newState in
             scene.configure(with: newState)
+        }
+        .onChange(of: tab) { newTab in
+            scene.setMode(newTab == .casino ? .casino : .cafe)
+        }
+    }
+
+    /// The panel subtly re-tints per location — and goes velvet in the casino.
+    private var panelTint: Color {
+        if tab == .casino { return Color(red: 0.20, green: 0.10, blue: 0.14) }
+        switch controller.state.cafe.city {
+        case "sakura": return Color(red: 0.21, green: 0.13, blue: 0.16)
+        case "neon":   return Color(red: 0.14, green: 0.12, blue: 0.20)
+        default:       return Theme.bg
         }
     }
 
@@ -134,7 +150,6 @@ struct PanelView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
-        .background(Theme.bg)
     }
 }
 

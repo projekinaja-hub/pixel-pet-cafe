@@ -33,9 +33,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demo.owner.species = "fox"
         demo.owner.palette = "cream"
         demo.owner.accessory = "cap"
+        if ProcessInfo.processInfo.environment["PPC_MODE"] == "casino" {
+            scene.setMode(.casino)
+        }
         scene.configure(with: demo)
         scene.setActive(true)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak scene] in
+            if scene?.mode == .casino { scene?.playCasinoWin(500) }
             scene?.playSale(SaleEvent(itemIcon: "latte", itemName: "Latte", price: 15,
                                       angry: false, customerSpecies: 0))
             scene?.playSale(SaleEvent(itemIcon: "", itemName: "", price: 0,

@@ -11,6 +11,7 @@ final class GameController: ObservableObject {
 
     let saleEvents = PassthroughSubject<SaleEvent, Never>()
     let tipCollected = PassthroughSubject<Void, Never>()
+    let casinoWin = PassthroughSubject<Double, Never>()
 
     private let persistence: Persistence
     private var timer: Timer?
@@ -160,6 +161,7 @@ final class GameController: ObservableObject {
     func casinoAward(_ amount: Double) {
         guard amount > 0 else { return }
         state.coins += amount
+        casinoWin.send(amount)
     }
 
     // MARK: actions

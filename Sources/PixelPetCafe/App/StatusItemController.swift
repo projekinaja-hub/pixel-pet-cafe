@@ -55,6 +55,14 @@ final class StatusItemController: NSObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in self?.scene.playSale(event) }
             .store(in: &cancellables)
+        controller.casinoWin
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] amount in
+                self?.scene.playCasinoWin(amount)
+                self?.happyUntil = Date().addingTimeInterval(3)
+                self?.refreshIcon()
+            }
+            .store(in: &cancellables)
         controller.tipCollected
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in

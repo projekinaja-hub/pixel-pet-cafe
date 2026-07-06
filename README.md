@@ -48,6 +48,10 @@ game below in four tabs — **Café** (equipment), **Staff**, **Recipes**, and
 - **Work Mode ⚡** — opt-in: typing on your Mac boosts customers up to ×2.5
   based on typing speed. Counts keystrokes only (never reads them); needs
   Accessibility permission. Working literally pays.
+- **Casino room** — opening the 🎰 tab transports the scene into a velvet
+  casino: slot machines with pulsing glows, a fox dealer at the green felt,
+  suit-pip marquee, chandelier light and a coin shower whenever you win.
+  Scene lighting (glows + vignette) runs across all locations.
 - **Casino 🎰** (unlocks at 50K lifetime) — real-rules **slots** (~94% RTP),
   **blackjack** (dealer stands 17, blackjack 3:2, double down) and **European
   roulette** (straight 35:1, colors/odds/dozens). Coins only — gambling never
