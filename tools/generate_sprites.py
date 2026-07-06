@@ -98,7 +98,7 @@ def character(fur, fur_d, belly, apron, species, accent=None):
         for x0 in (4, 9):
             c.rect(x0, 0, 3, 4, fur); c.vline(x0, 0, 4, INK); c.vline(x0 + 2, 0, 4, INK)
             c.set(x0 + 1, 0, INK); c.set(x0 + 1, 1, PINK); c.set(x0 + 1, 2, PINK)
-    elif species in ("corgi", "bear"):
+    elif species in ("corgi", "bear", "raccoon"):
         for x0 in (2, 11):
             c.rect(x0, 2, 3, 2, fur_d)
             c.set(x0, 2, INK); c.set(x0 + 2, 2, INK); c.set(x0 + 1, 1, INK)
@@ -117,10 +117,12 @@ def character(fur, fur_d, belly, apron, species, accent=None):
     c.set(3, 11, INK); c.set(12, 11, INK)
     c.hline(4, 12, 8, INK)
     # face plate
-    if species in ("fox", "corgi", "bunny", "cat"):
+    if species in ("fox", "corgi", "bunny", "cat", "raccoon"):
         c.rect(5, 8, 6, 4, belly)
     if species == "owl":
         c.rect(4, 5, 3, 4, WHITE); c.rect(9, 5, 3, 4, WHITE)
+    if species == "raccoon":  # bandit mask
+        c.rect(4, 5, 8, 3, (72, 62, 78, 255))
     # eyes (with glint)
     ey = 6
     c.set(5, ey, INK); c.set(10, ey, INK)
@@ -157,6 +159,7 @@ STAFF = {
     "juno":    ((212, 110, 58, 255), (160, 76, 38, 255), WHITE, (74, 110, 88, 255), "fox", INK),
     "bo":      ((122, 88, 62, 255), (88, 60, 42, 255), (168, 132, 100, 255), (150, 68, 60, 255), "bear", INK),
     "earl":    ((138, 120, 150, 255), (100, 84, 114, 255), WHITE, (46, 58, 92, 255), "owl", None),
+    "marble":  ((172, 168, 178, 255), (120, 116, 130, 255), CREAM, (90, 74, 52, 255), "raccoon", INK),
 }
 
 CUSTOMERS = [
@@ -314,9 +317,22 @@ def baricon(frame):
 
 # ---------------------------------------------------------------- backgrounds 180x120
 
-def background(tier):
+THEMES = {
+    "home":   {"walls": [(226, 204, 172, 255), (222, 192, 178, 255), (198, 176, 202, 255)],
+               "floors": [(214, 168, 118, 255), (206, 158, 108, 255), (168, 128, 96, 255)],
+               "sky": SKY, "accent": GOLD},
+    "sakura": {"walls": [(244, 216, 224, 255), (240, 204, 216, 255), (232, 188, 208, 255)],
+               "floors": [(222, 186, 160, 255), (216, 176, 150, 255), (196, 152, 130, 255)],
+               "sky": (198, 226, 240, 255), "accent": (238, 150, 170, 255)},
+    "neon":   {"walls": [(56, 50, 78, 255), (60, 52, 86, 255), (68, 56, 98, 255)],
+               "floors": [(74, 62, 84, 255), (68, 58, 80, 255), (60, 50, 72, 255)],
+               "sky": (24, 22, 48, 255), "accent": (94, 230, 224, 255)},
+}
+
+def background(tier, theme="home"):
     W, H = 180, 120
-    wall = [(226, 204, 172, 255), (222, 192, 178, 255), (198, 176, 202, 255)][tier]
+    th = THEMES[theme]
+    wall = th["walls"][tier]
     wall_d = tuple(max(0, v - 24) for v in wall[:3]) + (255,)
     c = Canvas(W, H, wall)
     # wainscot
@@ -325,7 +341,7 @@ def background(tier):
     for x in range(0, W, 12):
         c.vline(x, 60, 12, (100, 62, 36, 255))
     # floor
-    floor_a = [(214, 168, 118, 255), (206, 158, 108, 255), (168, 128, 96, 255)][tier]
+    floor_a = th["floors"][tier]
     floor_b = tuple(max(0, v - 22) for v in floor_a[:3]) + (255,)
     c.rect(0, 72, W, H - 72, floor_a)
     for y in range(72, H, 8):
@@ -335,10 +351,18 @@ def background(tier):
         c.hline(0, y, W, (150, 108, 70, 255))
     # window (left-center)
     c.rect(30, 12, 34, 38, INK)
-    c.rect(32, 14, 30, 34, SKY)
+    c.rect(32, 14, 30, 34, th["sky"])
     c.vline(46, 14, 34, INK); c.hline(32, 30, 30, INK)
-    c.set(38, 18, WHITE); c.set(39, 18, WHITE); c.set(40, 19, WHITE)   # cloud
-    c.set(54, 24, WHITE); c.set(55, 24, WHITE)
+    if theme == "neon":  # moon + stars
+        c.rect(38, 18, 4, 4, (240, 236, 210, 255))
+        c.set(52, 20, WHITE); c.set(57, 26, WHITE); c.set(44, 28, WHITE)
+    elif theme == "sakura":  # blossom branch
+        c.rect(36, 20, 22, 2, (120, 82, 60, 255))
+        for px, py in ((38, 18), (44, 17), (50, 19), (56, 18), (41, 22), (53, 23)):
+            c.set(px, py, (244, 168, 186, 255)); c.set(px + 1, py, (238, 150, 170, 255))
+    else:
+        c.set(38, 18, WHITE); c.set(39, 18, WHITE); c.set(40, 19, WHITE)   # cloud
+        c.set(54, 24, WHITE); c.set(55, 24, WHITE)
     c.rect(28, 50, 38, 3, WOOD)                                       # sill
     # door (far left)
     c.rect(4, 22, 20, 50, WOOD)
@@ -376,11 +400,20 @@ def background(tier):
         c.rect(120, 96, 46, 16, (172, 96, 84, 255))
         c.rect(122, 98, 42, 12, (198, 120, 100, 255))
         c.rect(74, 30, 14, 12, WOOD_D); c.rect(76, 32, 10, 8, (140, 180, 190, 255))  # picture
+    # theme extras
+    if theme == "sakura":  # falling petals
+        for px, py in ((20, 80), (60, 95), (110, 86), (150, 100), (86, 108), (36, 104)):
+            c.set(px, py, (244, 168, 186, 255))
+    if theme == "neon":    # neon sign over the counter
+        c.rect(110, 36, 48, 10, (30, 26, 48, 255))
+        c.hline(112, 38, 44, (255, 96, 180, 255))
+        c.hline(112, 41, 44, (94, 230, 224, 255))
+        c.set(110, 36, INK); c.set(157, 36, INK)
     # tier 2: hanging lights, banner
     if tier >= 2:
         for x in range(20, W, 30):
             c.vline(x, 0, 5, INK)
-            c.rect(x - 1, 5, 3, 3, GOLD)
+            c.rect(x - 1, 5, 3, 3, th["accent"])
             c.set(x, 6, (255, 230, 150, 255))
         c.rect(126, 38, 18, 8, (150, 68, 60, 255))                    # ★ banner
         c.set(134, 41, GOLD); c.set(135, 41, GOLD)
@@ -459,7 +492,7 @@ def face_icon(species, fur, fur_d, frame):
             c.rect(x0, 0, 3, 3, fur)
             c.vline(x0, 0, 3, INK); c.vline(x0 + 2, 0, 3, INK)
             c.set(x0 + 1, 1, PINK)
-    elif species in ("corgi", "bear"):
+    elif species in ("corgi", "bear", "raccoon"):
         for x0 in (2, 12):
             c.rect(x0, 1, 3, 2, fur_d)
             c.set(x0, 1, INK); c.set(x0 + 2, 1, INK); c.set(x0 + 1, 0, INK)
@@ -480,6 +513,8 @@ def face_icon(species, fur, fur_d, frame):
         c.rect(3, 6, 5, 4, WHITE); c.rect(10, 6, 5, 4, WHITE)
     else:
         c.rect(5, 9, 8, 5, CREAM)
+    if species == "raccoon":
+        c.rect(3, 6, 12, 3, (72, 62, 78, 255))
     # eyes
     if frame == 1 or frame == 3:                      # blink / sleep
         c.hline(5, 8, 2, INK); c.hline(11, 8, 2, INK)
@@ -621,7 +656,7 @@ def closed_sign():
     return c
 
 STAFF_SPECIES = {"mocha": "cat", "biscuit": "corgi", "poppy": "bunny",
-                 "juno": "fox", "bo": "bear", "earl": "owl"}
+                 "juno": "fox", "bo": "bear", "earl": "owl", "marble": "raccoon"}
 
 def main_v2():
     count = 0
@@ -666,6 +701,9 @@ def main():
         baricon(f).save(f"baricon_{f}.png"); count += 1
     for t in range(3):
         background(t).save(f"bg_tier{t}.png"); count += 1
+    for theme in THEMES:
+        for t in range(3):
+            background(t, theme).save(f"bg_{theme}_tier{t}.png"); count += 1
     print(f"generated {count} sprites -> {os.path.abspath(OUT)}")
     main_v2()
 
