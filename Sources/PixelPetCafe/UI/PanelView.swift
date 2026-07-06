@@ -162,6 +162,15 @@ struct PanelView: View {
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundColor(Theme.cream)
             }
+            Button {
+                controller.toggleMuted()
+            } label: {
+                Image(systemName: controller.state.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .font(.system(size: 11))
+                    .foregroundColor(controller.state.muted ? Theme.dim : Theme.cream)
+            }
+            .buttonStyle(.plain)
+            .help(controller.state.muted ? "Unmute sounds" : "Mute all sounds")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
