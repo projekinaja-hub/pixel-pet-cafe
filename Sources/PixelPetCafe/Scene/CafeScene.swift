@@ -3,6 +3,7 @@ import SpriteKit
 /// The animated pixel café. Logical size 180×120, presented .aspectFit into a
 /// 360×240 SpriteView. Customers walk in via events from the GameController.
 enum SceneMode { case cafe, casino }
+enum CasinoGame { case slots, blackjack, roulette, mahjong }
 
 final class CafeScene: SKScene {
     var onGoldenTip: (() -> Void)?
@@ -11,7 +12,11 @@ final class CafeScene: SKScene {
     private(set) var mode: SceneMode = .cafe
     private let cafeLayer = SKNode()
     private let casinoLayer = SKNode()
+    private let gameFocus = SKNode()
     private var casinoBuilt = false
+    private var casinoGame: CasinoGame = .slots
+    private var wheelNode: SKSpriteNode?
+    private var dealerNode: SKSpriteNode?
     private var background = SKSpriteNode()
     private var staffNodes: [String: SKSpriteNode] = [:]
     private var ownerNode: SKSpriteNode?
@@ -112,6 +117,9 @@ final class CafeScene: SKScene {
         dealer.position = CGPoint(x: 133, y: 44)
         dealer.zPosition = 4
         casinoLayer.addChild(dealer)
+        dealerNode = dealer
+        gameFocus.zPosition = 14
+        casinoLayer.addChild(gameFocus)
         // chandelier + sign glows
         for (pos, scale, alpha) in [(CGPoint(x: 30, y: 112), 1.6, 0.6),
                                     (CGPoint(x: 90, y: 98), 2.2, 0.35),
@@ -124,6 +132,105 @@ final class CafeScene: SKScene {
             g.alpha = alpha
             casinoLayer.addChild(g)
         }
+    }
+
+    // MARK: per-game table displays
+
+    func setCasinoGame(_ game: CasinoGame) {
+        casinoGame = game
+        buildCasinoIfNeeded()
+        gameFocus.removeAllChildren()
+        wheelNode = nil
+        switch game {
+        case .slots:
+            break
+        case .blackjack:
+            break   // cards arrive via showBlackjackCards
+        case .roulette:
+            let wheel = SKSpriteNode(texture: SpriteLoader.texture("wheel"))
+            wheel.size = wheel.texture!.size()
+            wheel.position = CGPoint(x: 133, y: 30)
+            gameFocus.addChild(wheel)
+            wheelNode = wheel
+        case .mahjong:
+            // three animal opponents seated around the felt
+            let seats = [CGPoint(x: 104, y: 44), CGPoint(x: 133, y: 48), CGPoint(x: 162, y: 44)]
+            for (i, pos) in seats.enumerated() {
+                let ai = animatedSprite(prefix: "customer_\(i)")
+                ai.position = pos
+                gameFocus.addChild(ai)
+            }
+            dealerNode?.isHidden = true
+        }
+        if game != .mahjong { dealerNode?.isHidden = false }
+    }
+
+    /// Mirrors the real blackjack hands onto the felt.
+    func showBlackjackCards(player: [(String, Bool)], dealer: [(String, Bool)], hole: Bool) {
+        guard casinoGame == .blackjack else { return }
+        gameFocus.removeAllChildren()
+        func draw(_ cards: [(String, Bool)], y: CGFloat, hole: Bool) {
+            for (i, card) in cards.enumerated() {
+                let node = SKSpriteNode(color: .white, size: CGSize(width: 9, height: 12))
+                node.position = CGPoint(x: 112 + CGFloat(i) * 11, y: y)
+                let label = SKLabelNode(text: card.0)
+                label.fontName = "Menlo-Bold"
+                label.fontSize = 6
+                label.fontColor = card.1 ? NSColor(calibratedRed: 0.75, green: 0.15, blue: 0.15, alpha: 1) : .black
+                label.verticalAlignmentMode = .center
+                node.addChild(label)
+                gameFocus.addChild(node)
+            }
+            if hole {
+                let back = SKSpriteNode(color: NSColor(calibratedRed: 0.35, green: 0.25, blue: 0.5, alpha: 1),
+                                        size: CGSize(width: 9, height: 12))
+                back.position = CGPoint(x: 112 + CGFloat(cards.count) * 11, y: y)
+                gameFocus.addChild(back)
+            }
+        }
+        draw(dealer, y: 36, hole: hole)
+        draw(player, y: 22, hole: false)
+    }
+
+    /// Spins the wheel and settles on the result.
+    func spinRouletteWheel(result: Int) {
+        guard let wheel = wheelNode else { return }
+        wheel.removeAllActions()
+        gameFocus.childNode(withName: "resultChip")?.removeFromParent()
+        let spin = SKAction.rotate(byAngle: .pi * 8 + CGFloat.random(in: 0...(2 * .pi)), duration: 1.6)
+        spin.timingMode = .easeOut
+        wheel.run(spin) { [weak self] in
+            guard let self else { return }
+            let chip = SKSpriteNode(color: result == 0
+                ? NSColor(calibratedRed: 0.15, green: 0.5, blue: 0.3, alpha: 1)
+                : (CasinoEngine.redNumbers.contains(result)
+                    ? NSColor(calibratedRed: 0.75, green: 0.2, blue: 0.2, alpha: 1)
+                    : NSColor(calibratedRed: 0.12, green: 0.12, blue: 0.15, alpha: 1)),
+                size: CGSize(width: 14, height: 10))
+            chip.name = "resultChip"
+            chip.position = CGPoint(x: 155, y: 30)
+            let label = SKLabelNode(text: "\(result)")
+            label.fontName = "Menlo-Bold"
+            label.fontSize = 7
+            label.fontColor = .white
+            label.verticalAlignmentMode = .center
+            chip.addChild(label)
+            self.gameFocus.addChild(chip)
+        }
+    }
+
+    /// Sprinkles the mahjong discard pool onto the felt.
+    func updateMahjongTable(discards: Int) {
+        guard casinoGame == .mahjong else { return }
+        gameFocus.childNode(withName: "mjPool")?.removeFromParent()
+        let pool = SKNode()
+        pool.name = "mjPool"
+        for i in 0..<min(discards, 21) {
+            let tile = SKSpriteNode(color: .white, size: CGSize(width: 4, height: 6))
+            tile.position = CGPoint(x: 110 + CGFloat(i % 7) * 6, y: 34 - CGFloat(i / 7) * 7)
+            pool.addChild(tile)
+        }
+        gameFocus.addChild(pool)
     }
 
     /// Coin shower over the table when the player wins at the casino.

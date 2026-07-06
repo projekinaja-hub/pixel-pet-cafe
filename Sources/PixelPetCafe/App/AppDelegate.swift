@@ -35,6 +35,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demo.owner.accessory = "cap"
         if ProcessInfo.processInfo.environment["PPC_MODE"] == "casino" {
             scene.setMode(.casino)
+            switch ProcessInfo.processInfo.environment["PPC_GAME"] {
+            case "mahjong":
+                scene.setCasinoGame(.mahjong)
+                scene.updateMahjongTable(discards: 9)
+            case "roulette":
+                scene.setCasinoGame(.roulette)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak scene] in
+                    scene?.spinRouletteWheel(result: 17)
+                }
+            default: break
+            }
         }
         scene.configure(with: demo)
         scene.setActive(true)

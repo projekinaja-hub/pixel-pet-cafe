@@ -51,9 +51,32 @@ final class StatusItemController: NSObject {
                 self?.updateTitle(state)
             }
             .store(in: &cancellables)
+        controller.$workBoost
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.updateTitle(self.controller.state)
+            }
+            .store(in: &cancellables)
         controller.saleEvents
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in self?.scene.playSale(event) }
+            .store(in: &cancellables)
+        controller.casinoGameChanged
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] game in self?.scene.setCasinoGame(game) }
+            .store(in: &cancellables)
+        controller.blackjackDisplay
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] d in self?.scene.showBlackjackCards(player: d.player, dealer: d.dealer, hole: d.hole) }
+            .store(in: &cancellables)
+        controller.rouletteResult
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] n in self?.scene.spinRouletteWheel(result: n) }
+            .store(in: &cancellables)
+        controller.mahjongDiscards
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] n in self?.scene.updateMahjongTable(discards: n) }
             .store(in: &cancellables)
         controller.casinoWin
             .receive(on: DispatchQueue.main)
@@ -133,8 +156,9 @@ final class StatusItemController: NSObject {
 
     private func updateTitle(_ state: GameState) {
         let warning = SalesEngine.hasStockOut(state) ? "❗" : ""
+        let boost = controller.workBoost > 1.05 ? String(format: " ⚡%.1f×", controller.workBoost) : ""
         statusItem.button?.attributedTitle = NSAttributedString(
-            string: " \(warning)\(formatNumber(state.coins))",
+            string: " \(warning)\(formatNumber(state.coins))\(boost)",
             attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)])
     }
 

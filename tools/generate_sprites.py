@@ -806,6 +806,31 @@ def dealer_sprite():
     c.rect(7, 14, 2, 2, (170, 60, 70, 255))   # red bow tie
     return c
 
+def roulette_wheel(size=30):
+    c = Canvas(size, size)
+    r = size / 2
+    for y in range(size):
+        for x in range(size):
+            dx, dy = x - r + 0.5, y - r + 0.5
+            d = math.hypot(dx, dy)
+            if d > r - 0.5:
+                continue
+            if d > r - 2:
+                c.px[y][x] = (150, 110, 40, 255)          # gold rim
+            elif d > 4:
+                ang = (math.atan2(dy, dx) + math.pi) / (2 * math.pi)
+                seg = int(ang * 13) % 13
+                if seg == 0:
+                    c.px[y][x] = (40, 120, 70, 255)       # green zero
+                else:
+                    c.px[y][x] = (150, 45, 45, 255) if seg % 2 else (30, 26, 32, 255)
+            elif d > 2:
+                c.px[y][x] = (90, 60, 30, 255)
+            else:
+                c.px[y][x] = GOLD                          # hub
+    c.set(int(r), 1, WHITE)                                # ball at top
+    return c
+
 def main_v4():
     count = 0
     glow().save("glow.png"); count += 1
@@ -816,6 +841,7 @@ def main_v4():
     bg_casino().save("bg_casino.png"); count += 1
     d = dealer_sprite()
     d.save("dealer_0.png"); d.shifted_down().save("dealer_1.png"); count += 2
+    roulette_wheel().save("wheel.png"); count += 1
     print(f"v4: generated {count} more sprites")
 
 def main():

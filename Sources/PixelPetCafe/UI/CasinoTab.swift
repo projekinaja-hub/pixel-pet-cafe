@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Casino corner: slots, blackjack, roulette. Real rules, café coins.
+/// Casino corner: slots, blackjack, roulette, mahjong. Real rules, café coins.
 struct CasinoTab: View {
     @ObservedObject var controller: GameController
     @State private var game = 0
@@ -12,11 +12,14 @@ struct CasinoTab: View {
         } else {
             Picker("", selection: $game) {
                 Text("🎰 Slots").tag(0)
-                Text("🃏 Blackjack").tag(1)
+                Text("🃏 21").tag(1)
                 Text("🎡 Roulette").tag(2)
+                Text("🀄 Mahjong").tag(3)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .onAppear { publishGame(game) }
+            .onChange(of: game) { publishGame($0) }
             HStack(spacing: 5) {
                 Text("Bet")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
@@ -39,12 +42,18 @@ struct CasinoTab: View {
             switch game {
             case 0: SlotsView(controller: controller, bet: $bet)
             case 1: BlackjackView(controller: controller, bet: $bet)
-            default: RouletteView(controller: controller, bet: $bet)
+            case 2: RouletteView(controller: controller, bet: $bet)
+            default: MahjongView(controller: controller, bet: $bet)
             }
             Text("The house always wins in the long run — gambling never counts toward unlocks or stars.")
                 .font(.system(size: 8.5, design: .rounded))
                 .foregroundColor(Theme.dim.opacity(0.8))
         }
+    }
+
+    private func publishGame(_ g: Int) {
+        let games: [CasinoGame] = [.slots, .blackjack, .roulette, .mahjong]
+        controller.casinoGameChanged.send(games[min(g, 3)])
     }
 }
 
@@ -198,13 +207,24 @@ struct BlackjackView: View {
         settled = false
         hand = CasinoEngine.BlackjackGame(bet: bet, rng: &rng)
         message = "Hit, stand or double?"
+        publishCards()
         settleIfFinished()
+    }
+
+    private func publishCards() {
+        guard let g = hand else { return }
+        func fmt(_ c: CasinoEngine.Card) -> (String, Bool) { ("\(c.label)\(c.suitSymbol)", c.isRed) }
+        controller.blackjackDisplay.send((
+            player: g.player.map(fmt),
+            dealer: (g.finished ? g.dealer : [g.dealer[0]]).map(fmt),
+            hole: !g.finished))
     }
 
     private func mutate(_ change: (inout CasinoEngine.BlackjackGame) -> Void) {
         guard var g = hand else { return }
         change(&g)
         hand = g
+        publishCards()
         settleIfFinished()
     }
 
@@ -352,6 +372,7 @@ struct RouletteView: View {
                 try? await Task.sleep(nanoseconds: 90_000_000)
             }
             let result = CasinoEngine.rouletteSpin(rng: &rng)
+            controller.rouletteResult.send(result)
             history.append(result)
             let ret = CasinoEngine.roulettePayout(placed, result: result) * bet
             controller.casinoAward(ret)
@@ -360,6 +381,160 @@ struct RouletteView: View {
                 ? "Ball lands \(result) (\(color)) — won 🪙 \(formatNumber(ret - bet))!"
                 : "Ball lands \(result) (\(color)) — house takes it"
             spinning = false
+        }
+    }
+}
+
+
+// MARK: - Mahjong (Hong Kong style, vs 3 AI)
+
+struct MahjongView: View {
+    @ObservedObject var controller: GameController
+    @Binding var bet: Double
+    @State private var game: Mahjong.Game?
+    @State private var settled = false
+    @State private var message = "4 melds + a pair wins · self-draw 3× · off a discard 2.5×"
+    @State private var rng = SystemRandomNumberGenerator()
+
+    private static let aiFaces = ["🐱", "🐻", "🐰"]
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if let g = game {
+                HStack(spacing: 10) {
+                    ForEach(1...3, id: \.self) { seat in
+                        Text("\(Self.aiFaces[seat - 1]) \(g.hands[seat].count)🀫\(g.melds[seat].isEmpty ? "" : " ·\(g.melds[seat].count)m")")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundColor(Theme.dim)
+                    }
+                    Spacer()
+                    Text("wall \(g.wall.count)")
+                        .font(.system(size: 9, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                }
+                if !g.discards.isEmpty {
+                    HStack(spacing: 1) {
+                        ForEach(Array(g.discards.suffix(12).enumerated()), id: \.offset) { _, t in
+                            tileFace(t, size: 13)
+                        }
+                        Spacer()
+                    }
+                }
+                Text(message)
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                phaseControls(g)
+            } else {
+                Text(message)
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                    .multilineTextAlignment(.center)
+                mjButton("Deal 🪙 \(formatNumber(bet))", disabled: controller.state.coins < bet) { deal() }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(10)
+        .background(Theme.card)
+        .cornerRadius(9)
+        .onChange(of: game?.discards.count ?? 0) { n in
+            controller.mahjongDiscards.send(n)
+        }
+    }
+
+    @ViewBuilder
+    private func phaseControls(_ g: Mahjong.Game) -> some View {
+        switch g.phase {
+        case .playerDiscard:
+            VStack(spacing: 5) {
+                if g.playerCanWinNow {
+                    mjButton("🀄 WIN — Self-draw!") { mutate { $0.playerDeclareWin() } }
+                }
+                Text("Tap a tile to discard · melds \(g.melds[0].count)")
+                    .font(.system(size: 9, design: .rounded))
+                    .foregroundColor(Theme.dim)
+                let hand = g.hands[0]
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(24), spacing: 3), count: 7), spacing: 4) {
+                    ForEach(Array(hand.enumerated()), id: \.offset) { _, t in
+                        Button { mutate { $0.playerDiscard(t, rng: &rng) } } label: {
+                            tileFace(t, size: 20)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        case .playerClaim(let d, _):
+            VStack(spacing: 5) {
+                HStack(spacing: 5) {
+                    Text("Discarded:")
+                        .font(.system(size: 10, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                    tileFace(d, size: 20)
+                }
+                HStack(spacing: 6) {
+                    if canClaimWin(g, d) { mjButton("WIN!") { mutate { $0.playerClaimWin() } } }
+                    if g.canPong(d) { mjButton("Pong") { mutate { $0.playerPong(rng: &rng) } } }
+                    ForEach(g.chowOptions(d), id: \.id) { low in
+                        mjButton("Chow \(low.rank)-\(low.rank + 2)") { mutate { $0.playerChow(low, rng: &rng) } }
+                    }
+                    mjButton("Pass") { mutate { $0.playerPass(rng: &rng) } }
+                }
+            }
+        case .finished:
+            mjButton("Play again 🪙 \(formatNumber(bet))", disabled: controller.state.coins < bet) { deal() }
+        }
+    }
+
+    private func canClaimWin(_ g: Mahjong.Game, _ d: Mahjong.Tile) -> Bool {
+        var h = g.hands[0]; h.append(d)
+        return Mahjong.isWinningHand(concealed: h, claimedMelds: g.melds[0].count)
+    }
+
+    private func tileFace(_ t: Mahjong.Tile, size: CGFloat) -> some View {
+        Text(t.glyph)
+            .font(.system(size: size))
+            .foregroundColor(.black)
+            .frame(width: size + 4, height: size + 8)
+            .background(Color.white)
+            .cornerRadius(3)
+            .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.black.opacity(0.2), lineWidth: 0.5))
+    }
+
+    private func mjButton(_ label: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(label, action: action)
+            .buttonStyle(.plain)
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .foregroundColor(disabled ? Theme.dim : Theme.bg)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(disabled ? Theme.card.opacity(0.6) : Theme.gold)
+            .cornerRadius(7)
+            .disabled(disabled)
+    }
+
+    private func deal() {
+        guard controller.casinoTrySpend(bet) else { return }
+        settled = false
+        game = Mahjong.Game(rng: &rng)
+        message = "Your turn — tap a tile to discard"
+    }
+
+    private func mutate(_ change: (inout Mahjong.Game) -> Void) {
+        guard var g = game else { return }
+        change(&g)
+        game = g
+        if case .finished(let outcome) = g.phase, !settled {
+            settled = true
+            let ret = Mahjong.payout(outcome, bet: bet)
+            controller.casinoAward(ret)
+            switch outcome {
+            case .playerWinSelfDraw: message = "🀄 Self-draw! Won 🪙 \(formatNumber(ret - bet))"
+            case .playerWinDiscard: message = "🀄 Mahjong! Won 🪙 \(formatNumber(ret - bet))"
+            case .aiWin(let seat): message = "\(Self.aiFaces[seat - 1]) wins this round"
+            case .wallExhausted: message = "Wall empty — draw, bet returned"
+            }
+        } else if case .playerClaim = g.phase {
+            message = "You can claim this tile!"
+        } else if case .playerDiscard = g.phase {
+            message = "Your turn — tap a tile to discard"
         }
     }
 }

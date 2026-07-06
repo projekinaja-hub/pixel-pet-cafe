@@ -53,9 +53,14 @@ game below in four tabs — **Café** (equipment), **Staff**, **Recipes**, and
   suit-pip marquee, chandelier light and a coin shower whenever you win.
   Scene lighting (glows + vignette) runs across all locations.
 - **Casino 🎰** (unlocks at 50K lifetime) — real-rules **slots** (~94% RTP),
-  **blackjack** (dealer stands 17, blackjack 3:2, double down) and **European
-  roulette** (straight 35:1, colors/odds/dozens). Coins only — gambling never
-  advances unlocks or stars.
+  **blackjack** (dealer stands 17, blackjack 3:2, double down), **European
+  roulette** (straight 35:1, colors/odds/dozens) and **mahjong** — Hong
+  Kong–style vs 3 AI players: 136-tile wall, draw/discard, Pong any discard,
+  Chow from your left, 4 melds + a pair to win (self-draw 3×, off a discard
+  2.5×, exhausted wall returns the bet). The scene mirrors the table you're
+  playing: cards appear on the felt in 21, the roulette wheel spins and lands,
+  and the mahjong table seats three animal opponents with the live discard
+  pool. Coins only — gambling never advances unlocks or stars.
 
 ## Build & run
 
