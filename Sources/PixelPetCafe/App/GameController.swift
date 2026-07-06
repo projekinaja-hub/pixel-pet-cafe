@@ -30,6 +30,9 @@ final class GameController: ObservableObject {
     private var keystrokes: [Date] = []
     @Published private(set) var workBoost: Double = 1
     @Published private(set) var axTrusted: Bool = AXIsProcessTrusted()
+    @Published var banner: (emoji: String, text: String)?
+    let soundRequest = PassthroughSubject<String, Never>()
+    private var bannerClearAt = Date.distantPast
 
     var incomeEstimate: Double { SalesEngine.incomeEstimate(state) }
     var isClosed: Bool { SalesEngine.isClosed(state) }
@@ -65,6 +68,21 @@ final class GameController: ObservableObject {
         let dt = min(max(0, now.timeIntervalSince(lastTick)), 5)
         lastTick = now
         updateWorkBoost(now: now)
+        if let event = Events.maybeSpawn(&state, dt: dt, now: now, rng: &rng) {
+            var text = "\(event.name) — \(event.desc)"
+            if event.id == "critic", let verdict = state.lastCriticVerdict {
+                text = verdict ? "Food Critic loved it! 💖 +8" : "Food Critic was unimpressed… 💖 −8"
+            }
+            showBanner(event.emoji, text)
+            soundRequest.send("event")
+        }
+        for def in Achievements.checkAll(&state) {
+            showBanner(def.emoji, "Achievement: \(def.name)!")
+            soundRequest.send("achieve")
+        }
+        if let clear = banner, bannerClearAt < now, clear.text.isEmpty == false, now > bannerClearAt {
+            banner = nil
+        }
         let events = SalesEngine.tick(&state, dt: dt, now: now, boost: workBoost, rng: &rng)
         for e in events { saleEvents.send(e) }
         if now.timeIntervalSince(lastAutosave) >= 30 {
@@ -176,6 +194,21 @@ final class GameController: ObservableObject {
         casinoWin.send(amount)
     }
 
+    private func showBanner(_ emoji: String, _ text: String) {
+        banner = (emoji, text)
+        bannerClearAt = Date().addingTimeInterval(6)
+    }
+
+    /// Casino games report their special feats directly.
+    func unlockAchievement(_ id: String) {
+        guard !state.achievements.contains(id) else { return }
+        state.achievements.append(id)
+        if let def = Achievements.all.first(where: { $0.id == id }) {
+            showBanner(def.emoji, "Achievement: \(def.name)!")
+            soundRequest.send("achieve")
+        }
+    }
+
     // MARK: actions
 
     func buyStaff(_ id: String) { EconomyEngine.buyStaff(id, &state) }
@@ -184,7 +217,9 @@ final class GameController: ObservableObject {
     func renovate() { EconomyEngine.renovate(&state); saveNow() }
     func toggleMuted() { state.muted.toggle() }
     func cleanSpot() { SalesEngine.cleanSpot(&state) }
-    func sweepAll() { SalesEngine.sweepAll(&state) }
+    func sweepAll() {
+        if SalesEngine.sweepAll(&state) { soundRequest.send("sweep") }
+    }
 
     func toggleMenuItem(_ id: String) {
         if let i = state.menuEnabled.firstIndex(of: id) {

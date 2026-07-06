@@ -272,5 +272,37 @@ struct RenovateTab: View {
         .padding(.vertical, 14)
         .background(Theme.card)
         .cornerRadius(9)
+
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Milestones \(controller.state.achievements.count)/\(Achievements.all.count)")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.cream)
+            ForEach(Achievements.all, id: \.id) { def in
+                let earned = controller.state.achievements.contains(def.id)
+                HStack(spacing: 7) {
+                    Text(earned ? def.emoji : "🔒")
+                        .font(.system(size: 13))
+                        .opacity(earned ? 1 : 0.5)
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(def.name)
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(earned ? Theme.gold : Theme.dim)
+                        Text(def.desc)
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundColor(Theme.dim)
+                    }
+                    Spacer()
+                    if earned {
+                        Text("✓")
+                            .font(.system(size: 11, weight: .heavy))
+                            .foregroundColor(Color(red: 0.55, green: 0.85, blue: 0.55))
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Theme.card)
+        .cornerRadius(9)
     }
 }

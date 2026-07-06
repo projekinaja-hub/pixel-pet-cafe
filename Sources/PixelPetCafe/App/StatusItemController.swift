@@ -51,6 +51,7 @@ final class StatusItemController: NSObject {
             .sink { [weak self] state in
                 self?.reloadIconsIfNeeded(state)
                 self?.updateTitle(state)
+                SoundPlayer.shared.muted = state.muted
             }
             .store(in: &cancellables)
         controller.$workBoost
@@ -62,7 +63,18 @@ final class StatusItemController: NSObject {
             .store(in: &cancellables)
         controller.saleEvents
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] event in self?.scene.playSale(event) }
+            .sink { [weak self] event in
+                self?.scene.playSale(event)
+                switch event.mood {
+                case .happy, .settled: SoundPlayer.shared.play("coin", minGap: 1.2)
+                case .sadLeave: SoundPlayer.shared.play("sad", minGap: 2)
+                case .angry: SoundPlayer.shared.play("angry", minGap: 2)
+                }
+            }
+            .store(in: &cancellables)
+        controller.soundRequest
+            .receive(on: DispatchQueue.main)
+            .sink { name in SoundPlayer.shared.play(name) }
             .store(in: &cancellables)
         controller.casinoGameChanged
             .receive(on: DispatchQueue.main)
@@ -90,6 +102,7 @@ final class StatusItemController: NSObject {
                 self?.scene.playCasinoWin(amount)
                 self?.happyUntil = Date().addingTimeInterval(3)
                 self?.refreshIcon()
+                SoundPlayer.shared.play("win")
             }
             .store(in: &cancellables)
         controller.tipCollected
@@ -97,6 +110,7 @@ final class StatusItemController: NSObject {
             .sink { [weak self] in
                 self?.happyUntil = Date().addingTimeInterval(4)
                 self?.refreshIcon()
+                SoundPlayer.shared.play("tip")
             }
             .store(in: &cancellables)
 
@@ -219,6 +233,7 @@ final class StatusItemController: NSObject {
         scene.setActive(true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
+        SoundPlayer.shared.enabled = true
     }
 
     @objc private func statusClicked() {
@@ -237,6 +252,7 @@ final class StatusItemController: NSObject {
     private func closePopover() {
         popover.performClose(nil)
         scene.setActive(false)
+        SoundPlayer.shared.enabled = false
     }
 
     private func showMenu() {

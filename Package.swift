@@ -8,7 +8,7 @@ let package = Package(
         .executableTarget(
             name: "PixelPetCafe",
             path: "Sources/PixelPetCafe",
-            resources: [.copy("Resources/Sprites")]
+            resources: [.copy("Resources/Sprites"), .copy("Resources/Sounds")]
         ),
         .testTarget(
             name: "PixelPetCafeTests",

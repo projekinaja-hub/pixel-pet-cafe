@@ -33,6 +33,10 @@ struct GameState: Codable, Equatable {
     var menuTaste: [String: Int] = [:]   // item id -> taste level (0-10)
     var salesCount: [String: Int] = [:]  // item id -> lifetime sales
     var tasteKnown: [String] = []        // city ids with researched preferences
+    var activeEvent: String?
+    var eventEndsAt: Date?
+    var lastCriticVerdict: Bool?
+    var achievements: [String] = []
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -102,6 +106,7 @@ struct GameState: Codable, Equatable {
         case customItems, owner, barCharacter
         case cafes, activeCafe, reputation, adsActive, workMode
         case menuTaste, salesCount, tasteKnown
+        case activeEvent, eventEndsAt, lastCriticVerdict, achievements
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -124,6 +129,10 @@ struct GameState: Codable, Equatable {
         menuTaste = try c.decodeIfPresent([String: Int].self, forKey: .menuTaste) ?? [:]
         salesCount = try c.decodeIfPresent([String: Int].self, forKey: .salesCount) ?? [:]
         tasteKnown = try c.decodeIfPresent([String].self, forKey: .tasteKnown) ?? []
+        activeEvent = try c.decodeIfPresent(String.self, forKey: .activeEvent)
+        eventEndsAt = try c.decodeIfPresent(Date.self, forKey: .eventEndsAt)
+        lastCriticVerdict = try c.decodeIfPresent(Bool.self, forKey: .lastCriticVerdict)
+        achievements = try c.decodeIfPresent([String].self, forKey: .achievements) ?? []
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -162,5 +171,9 @@ struct GameState: Codable, Equatable {
         try c.encode(menuTaste, forKey: .menuTaste)
         try c.encode(salesCount, forKey: .salesCount)
         try c.encode(tasteKnown, forKey: .tasteKnown)
+        try c.encodeIfPresent(activeEvent, forKey: .activeEvent)
+        try c.encodeIfPresent(eventEndsAt, forKey: .eventEndsAt)
+        try c.encodeIfPresent(lastCriticVerdict, forKey: .lastCriticVerdict)
+        try c.encode(achievements, forKey: .achievements)
     }
 }

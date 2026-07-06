@@ -124,6 +124,7 @@ struct SlotsView: View {
                 let win = bet * mult
                 controller.casinoAward(win)
                 message = "🎉 \(Int(mult))× — won 🪙 \(formatNumber(win))!"
+                if final.allSatisfy({ $0 == "star" }) { controller.unlockAchievement("slots_jackpot") }
             } else {
                 message = "No luck — try again?"
             }
@@ -256,7 +257,9 @@ struct BlackjackView: View {
             controller.casinoFocus.send(false)
         }
         switch g.outcome {
-        case .playerBlackjack: message = "🃏 BLACKJACK! Won 🪙 \(formatNumber(g.payout - g.bet))"
+        case .playerBlackjack:
+            message = "🃏 BLACKJACK! Won 🪙 \(formatNumber(g.payout - g.bet))"
+            controller.unlockAchievement("blackjack_natural")
         case .win: message = "🎉 You win 🪙 \(formatNumber(g.payout - g.bet))"
         case .push: message = "Push — bet returned"
         case .lose: message = CasinoEngine.handValue(g.player) > 21 ? "Bust! Dealer takes it" : "Dealer wins"
@@ -558,6 +561,7 @@ struct MahjongView: View {
         Button {
             if selected == t {
                 selected = nil
+                SoundPlayer.shared.play("clack", minGap: 0.1)
                 mutateSlow { $0.playerDiscard(t, rng: &rng) }
             } else {
                 selected = t
@@ -633,8 +637,12 @@ struct MahjongView: View {
             let ret = Mahjong.payout(outcome, bet: bet)
             controller.casinoAward(ret)
             switch outcome {
-            case .playerWinSelfDraw: message = "🀄 Self-draw! Won 🪙 \(formatNumber(ret - bet))"
-            case .playerWinDiscard: message = "🀄 Mahjong! Won 🪙 \(formatNumber(ret - bet))"
+            case .playerWinSelfDraw:
+                message = "🀄 Self-draw! Won 🪙 \(formatNumber(ret - bet))"
+                controller.unlockAchievement("mahjong_win")
+            case .playerWinDiscard:
+                message = "🀄 Mahjong! Won 🪙 \(formatNumber(ret - bet))"
+                controller.unlockAchievement("mahjong_win")
             case .aiWin(let seat): message = "\(Self.aiFaces[seat - 1]) wins this round"
             case .wallExhausted: message = "Wall empty — draw, bet returned"
             }

@@ -55,8 +55,9 @@ enum SalesEngine {
 
     /// Role bonuses: Mocha boosts drinks, Poppy boosts pastries (+4%/level).
     static func categoryBonus(_ category: ItemCategory, _ s: GameState) -> Double {
+        let rainBoost = category == .drink && Events.isActive("rain", s) ? 1.3 : 1.0
         switch category {
-        case .drink:  return min(2, 1 + 0.04 * Double(s.staffLevels["mocha"] ?? 0))
+        case .drink:  return rainBoost * min(2, 1 + 0.04 * Double(s.staffLevels["mocha"] ?? 0))
         case .pastry: return min(2, 1 + 0.04 * Double(s.staffLevels["poppy"] ?? 0))
         case .special: return 1
         }
@@ -77,6 +78,8 @@ enum SalesEngine {
             * s.city.rateBonus
             * (0.5 + s.reputation / 100)
             * (s.adsActive ? 1.8 : 1.0)
+            * (Events.isActive("rush", s) ? 2.0 : 1.0)
+            * (Events.isActive("rain", s) ? 0.7 : 1.0)
     }
 
     static func price(_ item: ResolvedItem, _ s: GameState) -> Double {
@@ -331,10 +334,16 @@ enum SalesEngine {
 
     // MARK: player actions
 
+    /// Pack price with any live supplier deal applied.
+    static func packPrice(_ ingredient: String, units: Int, _ s: GameState) -> Double {
+        MenuCatalog.packCost(ingredient, units: units)
+            * (Events.isActive("supplier", s) ? 0.5 : 1.0)
+    }
+
     /// Buys a pack of 25 or 100 units. Returns false if unaffordable.
     @discardableResult
     static func buyPack(_ ingredient: String, units: Int, _ s: inout GameState) -> Bool {
-        let cost = MenuCatalog.packCost(ingredient, units: units)
+        let cost = packPrice(ingredient, units: units, s)
         guard s.coins >= cost, cost > 0 else { return false }
         s.coins -= cost
         s.stock[ingredient, default: 0] += units

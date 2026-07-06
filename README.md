@@ -62,6 +62,17 @@ game below in four tabs — **Café** (equipment), **Staff**, **Recipes**, and
   and the mahjong table seats three animal opponents with the live discard
   pool. Coins only — gambling never advances unlocks or stars.
 
+### v6 — sounds, events & milestones
+
+- **Chiptune SFX** — synthesized from scratch (`tools/generate_sounds.py`):
+  coin rings, tip sparkles, angry huffs, casino fanfares, mahjong tile clacks,
+  sweeping. Plays only while the panel is open; Mute in the right-click menu.
+- **Random events** (~every 7 min): 🏃 Morning Rush (×2 customers), 🌧 Rainy Day
+  (fewer walk-ins, hot drinks +30%), 🚚 Supplier Deal (half-price packs), and
+  the 🧐 Food Critic — impress with a clean café & refined recipes (💖 ±8).
+- **15 milestones** (⭐ tab) — from Regulars to World Tour, including casino
+  feats (slots jackpot, natural 21, mahjong win).
+
 ## Build & run
 
 ```bash

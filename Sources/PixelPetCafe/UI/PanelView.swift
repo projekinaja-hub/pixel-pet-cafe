@@ -54,6 +54,23 @@ struct PanelView: View {
                 if let haul = controller.awayReport {
                     AwayToast(haul: haul) { controller.awayReport = nil }
                         .padding(.top, 10)
+                } else if let banner = controller.banner {
+                    HStack(spacing: 7) {
+                        Text(banner.emoji).font(.system(size: 15))
+                        Text(banner.text)
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.cream)
+                        Button { controller.banner = nil } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundColor(Theme.dim)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(Theme.bg.opacity(0.92))
+                    .cornerRadius(10)
+                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.gold.opacity(0.6), lineWidth: 1))
+                    .padding(.top, 10)
+                    .transition(.opacity)
                 }
             }
             header
@@ -115,6 +132,13 @@ struct PanelView: View {
                     .foregroundColor(Theme.gold)
             }
             Spacer()
+            if let id = controller.state.activeEvent, let ev = Events.def(id),
+               let ends = controller.state.eventEndsAt, ends > Date() {
+                Text("\(ev.emoji) \(Int(ends.timeIntervalSinceNow))s")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.gold)
+                    .help(ev.desc)
+            }
             Text("💖 \(Int(controller.state.reputation))")
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundColor(controller.state.reputation < 30 ? Theme.danger : Theme.dim)

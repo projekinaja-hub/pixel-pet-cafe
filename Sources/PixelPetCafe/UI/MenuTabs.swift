@@ -300,11 +300,11 @@ struct StockTab: View {
                         .foregroundColor(have == 0 ? Theme.danger : Theme.dim)
                 }
                 Spacer()
-                CostButton(cost: MenuCatalog.packCost(ing.id, units: 25),
-                           affordable: controller.state.coins >= MenuCatalog.packCost(ing.id, units: 25),
+                CostButton(cost: SalesEngine.packPrice(ing.id, units: 25, controller.state),
+                           affordable: controller.state.coins >= SalesEngine.packPrice(ing.id, units: 25, controller.state),
                            label: "25 · ") { controller.buyPack(ing.id, units: 25) }
-                CostButton(cost: MenuCatalog.packCost(ing.id, units: 100),
-                           affordable: controller.state.coins >= MenuCatalog.packCost(ing.id, units: 100),
+                CostButton(cost: SalesEngine.packPrice(ing.id, units: 100, controller.state),
+                           affordable: controller.state.coins >= SalesEngine.packPrice(ing.id, units: 100, controller.state),
                            label: "100 · ") { controller.buyPack(ing.id, units: 100) }
             }
             .padding(8)
