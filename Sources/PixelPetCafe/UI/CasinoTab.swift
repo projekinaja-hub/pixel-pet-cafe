@@ -54,6 +54,7 @@ struct CasinoTab: View {
     private func publishGame(_ g: Int) {
         let games: [CasinoGame] = [.slots, .blackjack, .roulette, .mahjong]
         controller.casinoGameChanged.send(games[min(g, 3)])
+        controller.casinoFocus.send(false)
     }
 }
 
@@ -109,6 +110,7 @@ struct SlotsView: View {
     private func spin() {
         guard controller.casinoTrySpend(bet) else { return }
         spinning = true
+        controller.casinoFocus.send(true)
         message = "…"
         Task { @MainActor in
             for _ in 0..<9 {   // reel flicker
@@ -126,6 +128,9 @@ struct SlotsView: View {
                 message = "No luck — try again?"
             }
             spinning = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                controller.casinoFocus.send(false)
+            }
         }
     }
 }
@@ -139,6 +144,9 @@ struct BlackjackView: View {
     @State private var settled = false
     @State private var message = "Dealer stands on 17 · blackjack pays 3:2"
     @State private var rng = SystemRandomNumberGenerator()
+    @State private var busy = false          // debounce: one action per beat
+
+    private var inRound: Bool { hand.map { !$0.finished } ?? false }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -151,25 +159,36 @@ struct BlackjackView: View {
             Text(message)
                 .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                 .foregroundColor(Theme.cream)
-            HStack(spacing: 8) {
-                if let g = hand, !g.finished {
-                    actionButton("Hit") { mutate { $0.hit() } }
-                    actionButton("Stand") { mutate { $0.stand() } }
-                    if g.player.count == 2, controller.state.coins >= g.bet {
-                        actionButton("Double") {
+            if inRound, let g = hand {
+                // fixed slots: buttons never move or vanish mid-hand
+                HStack(spacing: 8) {
+                    actionButton("Hit", disabled: busy) { act { mutate { $0.hit() } } }
+                    actionButton("Stand", disabled: busy) { act { mutate { $0.stand() } } }
+                    actionButton("Double",
+                                 disabled: busy || g.player.count != 2 || controller.state.coins < g.bet) {
+                        act {
                             _ = controller.casinoTrySpend(g.bet)
                             mutate { $0.doubleDown() }
                         }
                     }
-                } else {
-                    actionButton("Deal 🪙 \(formatNumber(bet))", disabled: controller.state.coins < bet) { deal() }
                 }
+            } else {
+                actionButton("▶ Deal a hand — 🪙 \(formatNumber(bet))",
+                             disabled: busy || controller.state.coins < bet) { act { deal() } }
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(Theme.card)
         .cornerRadius(9)
+    }
+
+    /// Swallows rapid double-clicks: one action per 0.3s.
+    private func act(_ body: () -> Void) {
+        guard !busy else { return }
+        busy = true
+        body()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { busy = false }
     }
 
     private func cardRow(_ title: String, cards: [CasinoEngine.Card], hidden: Int, value: Int?) -> some View {
@@ -205,6 +224,7 @@ struct BlackjackView: View {
     private func deal() {
         guard controller.casinoTrySpend(bet) else { return }
         settled = false
+        controller.casinoFocus.send(true)
         hand = CasinoEngine.BlackjackGame(bet: bet, rng: &rng)
         message = "Hit, stand or double?"
         publishCards()
@@ -232,6 +252,9 @@ struct BlackjackView: View {
         guard let g = hand, g.finished, !settled else { return }
         settled = true
         controller.casinoAward(g.payout)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            controller.casinoFocus.send(false)
+        }
         switch g.outcome {
         case .playerBlackjack: message = "🃏 BLACKJACK! Won 🪙 \(formatNumber(g.payout - g.bet))"
         case .win: message = "🎉 You win 🪙 \(formatNumber(g.payout - g.bet))"
@@ -365,6 +388,7 @@ struct RouletteView: View {
     private func spin() {
         guard controller.casinoTrySpend(bet) else { return }
         spinning = true
+        controller.casinoFocus.send(true)
         let placed = currentBet
         Task { @MainActor in
             for _ in 0..<8 {
@@ -381,6 +405,9 @@ struct RouletteView: View {
                 ? "Ball lands \(result) (\(color)) — won 🪙 \(formatNumber(ret - bet))!"
                 : "Ball lands \(result) (\(color)) — house takes it"
             spinning = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                controller.casinoFocus.send(false)
+            }
         }
     }
 }
@@ -429,7 +456,8 @@ struct MahjongView: View {
                     .font(.system(size: 10.5, weight: .semibold, design: .rounded))
                     .foregroundColor(Theme.cream)
                     .multilineTextAlignment(.center)
-                mjButton("Deal 🪙 \(formatNumber(bet))", disabled: controller.state.coins < bet) { deal() }
+                mjButton("▶ Sit at the table — 🪙 \(formatNumber(bet))",
+                         disabled: controller.state.coins < bet) { deal() }
             }
         }
         .frame(maxWidth: .infinity)
@@ -480,7 +508,7 @@ struct MahjongView: View {
                 }
             }
         case .finished:
-            mjButton("Play again 🪙 \(formatNumber(bet))", disabled: controller.state.coins < bet) { deal() }
+            mjButton("▶ Play again — 🪙 \(formatNumber(bet))", disabled: controller.state.coins < bet) { deal() }
         }
     }
 
@@ -513,12 +541,17 @@ struct MahjongView: View {
     private func deal() {
         guard controller.casinoTrySpend(bet) else { return }
         settled = false
+        controller.casinoFocus.send(true)
         game = Mahjong.Game(rng: &rng)
         message = "Your turn — tap a tile to discard"
     }
 
+    @State private var busy = false
+
     private func mutate(_ change: (inout Mahjong.Game) -> Void) {
-        guard var g = game else { return }
+        guard !busy, var g = game else { return }
+        busy = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { busy = false }
         change(&g)
         game = g
         if case .finished(let outcome) = g.phase, !settled {
@@ -530,6 +563,9 @@ struct MahjongView: View {
             case .playerWinDiscard: message = "🀄 Mahjong! Won 🪙 \(formatNumber(ret - bet))"
             case .aiWin(let seat): message = "\(Self.aiFaces[seat - 1]) wins this round"
             case .wallExhausted: message = "Wall empty — draw, bet returned"
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                controller.casinoFocus.send(false)
             }
         } else if case .playerClaim = g.phase {
             message = "You can claim this tile!"

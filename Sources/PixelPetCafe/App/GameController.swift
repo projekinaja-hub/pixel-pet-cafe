@@ -16,6 +16,7 @@ final class GameController: ObservableObject {
     let blackjackDisplay = PassthroughSubject<(player: [(String, Bool)], dealer: [(String, Bool)], hole: Bool), Never>()
     let rouletteResult = PassthroughSubject<Int, Never>()
     let mahjongDiscards = PassthroughSubject<Int, Never>()
+    let casinoFocus = PassthroughSubject<Bool, Never>()
 
     private let persistence: Persistence
     private var timer: Timer?

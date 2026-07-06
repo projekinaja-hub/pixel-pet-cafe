@@ -71,6 +71,10 @@ final class CafeScene: SKScene {
         casinoLayer.zPosition = 1
         casinoLayer.isHidden = true
         addChild(casinoLayer)
+        let cam = SKCameraNode()
+        cam.position = CGPoint(x: 90, y: 60)
+        addChild(cam)
+        camera = cam
         let vig = SKSpriteNode(texture: SpriteLoader.texture("vignette"))
         vig.anchorPoint = .zero
         vig.position = .zero
@@ -103,6 +107,7 @@ final class CafeScene: SKScene {
         mode = newMode
         cafeLayer.isHidden = mode == .casino
         casinoLayer.isHidden = mode == .cafe
+        if mode == .cafe { focusTable(false) }
         currentBGKey = ""              // force background swap
         if mode == .casino { buildCasinoIfNeeded() }
         lastState.map { configure(with: $0) }
@@ -247,6 +252,22 @@ final class CafeScene: SKScene {
             pool.addChild(tile)
         }
         gameFocus.addChild(pool)
+    }
+
+    /// Glides the camera into the game table (and back out).
+    func focusTable(_ zoomIn: Bool) {
+        guard let cam = camera else { return }
+        cam.removeAllActions()
+        let move: SKAction
+        if zoomIn {
+            move = .group([.move(to: CGPoint(x: 122, y: 42), duration: 0.7),
+                           .scale(to: 0.62, duration: 0.7)])
+        } else {
+            move = .group([.move(to: CGPoint(x: 90, y: 60), duration: 0.6),
+                           .scale(to: 1.0, duration: 0.6)])
+        }
+        move.timingMode = .easeInEaseOut
+        cam.run(move)
     }
 
     /// Coin shower over the table when the player wins at the casino.

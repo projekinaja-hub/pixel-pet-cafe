@@ -256,8 +256,7 @@ enum Mahjong {
                         discard = nil
                         // claimed: this AI must now discard
                         let out = aiChooseDiscard(next, rng: &rng)
-                        hands[next].removeAll { $0 == out }
-                        restoreAllButOne(&hands[next], out)
+                        if let i = hands[next].firstIndex(of: out) { hands[next].remove(at: i) }
                         discards.append(out)
                         lastDiscardSeat = next
                         discard = out
@@ -319,9 +318,6 @@ enum Mahjong {
             return worst[Int.random(in: 0..<worst.count, using: &rng)]
         }
 
-        /// After an AI pong its hand lost 2 copies + gained none; helper keeps
-        /// count consistent when removeAll over-removed (defensive no-op).
-        private func restoreAllButOne(_ hand: inout [Tile], _ tile: Tile) {}
     }
 
     /// Coins returned for the (already deducted) bet.

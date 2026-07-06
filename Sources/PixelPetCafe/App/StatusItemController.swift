@@ -78,6 +78,10 @@ final class StatusItemController: NSObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] n in self?.scene.updateMahjongTable(discards: n) }
             .store(in: &cancellables)
+        controller.casinoFocus
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] zoom in self?.scene.focusTable(zoom) }
+            .store(in: &cancellables)
         controller.casinoWin
             .receive(on: DispatchQueue.main)
             .sink { [weak self] amount in
