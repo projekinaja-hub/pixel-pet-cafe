@@ -321,6 +321,7 @@ struct StyleTab: View {
 
     var body: some View {
         let owner = controller.state.owner
+        workModeSection
         VStack(spacing: 10) {
             HStack(spacing: 14) {
                 ZStack {
