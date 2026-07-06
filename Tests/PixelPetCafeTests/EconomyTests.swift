@@ -84,5 +84,7 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(formatNumber(56_780_000), "56.8M")
         XCTAssertEqual(formatNumber(3.2e9), "3.2B")
         XCTAssertEqual(formatNumber(7.5e12), "7.5T")
+        XCTAssertEqual(formatNumber(3.4e15), "3.4Qa")
+        XCTAssertEqual(formatNumber(2.25e18), "2.3Qi")
     }
 }

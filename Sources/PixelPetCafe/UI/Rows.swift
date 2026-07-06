@@ -79,7 +79,9 @@ struct CafeTab: View {
     @ObservedObject var controller: GameController
 
     private static let emoji = ["espresso": "☕", "grinder": "⚙️", "oven": "🔥", "decor": "🪴", "sound": "🎵"]
-    private static let cityEmoji = ["home": "🏡", "sakura": "🌸", "neon": "🌃"]
+    private static let cityEmoji = ["home": "🏡", "sakura": "🌸", "neon": "🌃", "seaside": "🌊",
+                                    "forest": "🌲", "desert": "🏜️", "snowy": "❄️", "sunset": "🌅",
+                                    "ember": "🌋", "royal": "👑", "cloud": "☁️", "moon": "🌕"]
 
     var body: some View {
         // locations
@@ -87,36 +89,44 @@ struct CafeTab: View {
             Text("Locations")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundColor(Theme.cream)
-            HStack(spacing: 5) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 3),
+                      alignment: .leading, spacing: 4) {
                 ForEach(Array(controller.state.cafes.enumerated()), id: \.offset) { i, cafe in
                     Button {
                         controller.switchCafe(i)
                     } label: {
                         Text("\(Self.cityEmoji[cafe.city] ?? "☕") \(Cities.def(cafe.city).name)")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
                             .foregroundColor(controller.state.activeCafe == i ? Theme.bg : Theme.dim)
-                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 5)
                             .background(controller.state.activeCafe == i ? Theme.gold : Theme.bg.opacity(0.5))
                             .cornerRadius(7)
                     }
                     .buttonStyle(.plain)
                 }
             }
-            ForEach(Cities.all, id: \.id) { city in
-                if !controller.state.ownsCity(city.id) {
-                    HStack {
-                        Text("\(Self.cityEmoji[city.id] ?? "") \(city.name)")
+            // only the next destination is on offer — one dream at a time
+            if let next = Cities.all.first(where: { !controller.state.ownsCity($0.id) }) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Next: \(Self.cityEmoji[next.id] ?? "") \(next.name)")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .foregroundColor(Theme.cream)
-                        Text(city.vibe + (city.rateBonus > 1 ? " · ×\(String(format: "%.1f", city.rateBonus)) customers" : "")
-                             + (city.priceBonus > 1 ? " · ×\(String(format: "%.1f", city.priceBonus)) prices" : ""))
+                        Text(next.vibe
+                             + (next.rateBonus > 1 ? " · ×\(String(format: "%.1f", next.rateBonus)) customers" : "")
+                             + (next.priceBonus > 1 ? " · ×\(String(format: "%.1f", next.priceBonus)) prices" : ""))
                             .font(.system(size: 9, design: .rounded))
                             .foregroundColor(Theme.dim)
-                        Spacer()
-                        CostButton(cost: city.cost,
-                                   affordable: controller.state.coins >= city.cost) {
-                            controller.buyCity(city.id)
-                        }
+                        Text("\(Cities.all.filter { !controller.state.ownsCity($0.id) }.count) destinations still undiscovered")
+                            .font(.system(size: 8, design: .rounded))
+                            .foregroundColor(Theme.dim.opacity(0.7))
+                    }
+                    Spacer()
+                    CostButton(cost: next.cost,
+                               affordable: controller.state.coins >= next.cost) {
+                        controller.buyCity(next.id)
                     }
                 }
             }
