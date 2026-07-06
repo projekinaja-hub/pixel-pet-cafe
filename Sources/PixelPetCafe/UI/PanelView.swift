@@ -118,62 +118,66 @@ struct PanelView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("🪙 \(formatNumber(controller.state.coins))")
-                .font(.system(size: 19, weight: .bold, design: .rounded))
-                .foregroundColor(Theme.gold)
-                .shadow(color: .black.opacity(0.5), radius: 1, y: 1)
-            Text("+\(formatNumber(controller.incomeEstimate * controller.workBoost))/s")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundColor(Theme.dim)
-            if controller.workBoost > 1.05 {
-                Text(String(format: "⚡%.1f×", controller.workBoost))
-                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+        VStack(spacing: 3) {
+            // money row — big and unobstructed
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("🪙 \(formatNumber(controller.state.coins))")
+                    .font(.system(size: 22, weight: .heavy, design: .rounded))
                     .foregroundColor(Theme.gold)
+                    .shadow(color: .black.opacity(0.5), radius: 1, y: 1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                Text("+\(formatNumber(controller.incomeEstimate * controller.workBoost))/s")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundColor(Theme.dim)
+                if controller.workBoost > 1.05 {
+                    Text(String(format: "⚡%.1f×", controller.workBoost))
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundColor(Theme.gold)
+                }
+                Spacer()
+                Button {
+                    controller.toggleMuted()
+                } label: {
+                    Image(systemName: controller.state.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(controller.state.muted ? Theme.dim : Theme.cream)
+                }
+                .buttonStyle(.plain)
+                .help(controller.state.muted ? "Unmute sounds" : "Mute all sounds")
             }
-            Spacer()
-            if let id = controller.state.activeEvent, let ev = Events.def(id),
-               let ends = controller.state.eventEndsAt, ends > Date() {
-                Text("\(ev.emoji) \(Int(ends.timeIntervalSinceNow))s")
-                    .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(Theme.gold)
-                    .help(ev.desc)
+            // status row — compact chips
+            HStack(spacing: 8) {
+                Text("💖 \(Int(controller.state.reputation))")
+                    .foregroundColor(controller.state.reputation < 30 ? Theme.danger : Theme.dim)
+                    .help("Reputation — happy sales build it, angry customers wreck it")
+                Text("🧽 \(Int(controller.state.cleanliness))%")
+                    .foregroundColor(controller.state.cleanliness < 40 ? Theme.danger : Theme.dim)
+                if controller.state.stars > 0 {
+                    Text("⭐ \(controller.state.stars)")
+                        .foregroundColor(Theme.cream)
+                }
+                if let id = controller.state.activeEvent, let ev = Events.def(id),
+                   let ends = controller.state.eventEndsAt, ends > Date() {
+                    Text("\(ev.emoji) \(ev.name) · \(Int(ends.timeIntervalSinceNow))s")
+                        .foregroundColor(Theme.gold)
+                        .help(ev.desc)
+                }
+                Spacer()
+                if controller.isClosed {
+                    Text("CLOSED")
+                        .font(.system(size: 9, weight: .heavy, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(Theme.danger).cornerRadius(4)
+                } else if controller.hasStockOut {
+                    Text("📦❗").help("Some menu items are out of ingredients")
+                }
             }
-            Text("💖 \(Int(controller.state.reputation))")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundColor(controller.state.reputation < 30 ? Theme.danger : Theme.dim)
-                .help("Reputation — happy sales build it, angry customers wreck it")
-            if controller.isClosed {
-                Text("CLOSED")
-                    .font(.system(size: 10, weight: .heavy, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Theme.danger).cornerRadius(5)
-            } else if controller.hasStockOut {
-                Text("📦❗")
-                    .font(.system(size: 12))
-                    .help("Some menu items are out of ingredients")
-            }
-            Text("🧽 \(Int(controller.state.cleanliness))%")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundColor(controller.state.cleanliness < 40 ? Theme.danger : Theme.dim)
-            if controller.state.stars > 0 {
-                Text("⭐ \(controller.state.stars)")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundColor(Theme.cream)
-            }
-            Button {
-                controller.toggleMuted()
-            } label: {
-                Image(systemName: controller.state.muted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .font(.system(size: 11))
-                    .foregroundColor(controller.state.muted ? Theme.dim : Theme.cream)
-            }
-            .buttonStyle(.plain)
-            .help(controller.state.muted ? "Unmute sounds" : "Mute all sounds")
+            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 7)
     }
 
     private var tabBar: some View {
