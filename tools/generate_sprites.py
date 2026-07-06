@@ -329,12 +329,24 @@ THEMES = {
                "sky": (24, 22, 48, 255), "accent": (94, 230, 224, 255)},
 }
 
+def _shade(col, f):
+    return (min(255, int(col[0] * f)), min(255, int(col[1] * f)),
+            min(255, int(col[2] * f)), 255)
+
 def background(tier, theme="home"):
     W, H = 180, 120
     th = THEMES[theme]
     wall = th["walls"][tier]
     wall_d = tuple(max(0, v - 24) for v in wall[:3]) + (255,)
     c = Canvas(W, H, wall)
+    # wall vertical gradient with dither (darker toward the floor)
+    for y in range(0, 58):
+        f = 1.09 - 0.24 * (y / 58)
+        for x in range(W):
+            if y > 34 and (x + y) % 2 == 0:
+                c.px[y][x] = _shade(wall, f - 0.03)
+            else:
+                c.px[y][x] = _shade(wall, f)
     # wainscot
     c.rect(0, 58, W, 14, WOOD_D)
     c.rect(0, 58, W, 2, INK)
@@ -342,13 +354,20 @@ def background(tier, theme="home"):
         c.vline(x, 60, 12, (100, 62, 36, 255))
     # floor
     floor_a = th["floors"][tier]
+    floor_shadow = _shade(floor_a, 0.72)
     floor_b = tuple(max(0, v - 22) for v in floor_a[:3]) + (255,)
     c.rect(0, 72, W, H - 72, floor_a)
     for y in range(72, H, 8):
         for x in range(0, W, 16):
             if ((x // 16) + (y // 8)) % 2 == 0:
                 c.rect(x, y, 16, 8, floor_b)
-        c.hline(0, y, W, (150, 108, 70, 255))
+        c.hline(0, y, W, _shade(floor_a, 0.62))
+    # floor shading: darker strip at the wall line + soft side falloff
+    c.rect(0, 72, W, 2, floor_shadow)
+    for y in range(72, H):
+        for x in list(range(0, 6)) + list(range(W - 6, W)):
+            if (x + y) % 2 == 0:
+                c.px[y][x] = _shade(c.px[y][x], 0.85)
     # window (left-center)
     c.rect(30, 12, 34, 38, INK)
     c.rect(32, 14, 30, 34, th["sky"])
@@ -370,6 +389,11 @@ def background(tier, theme="home"):
     c.rect(7, 26, 14, 18, SKY); c.rect(7, 26, 14, 1, INK); c.vline(7, 26, 18, INK); c.vline(20, 26, 18, INK); c.hline(7, 43, 14, INK)
     c.set(20, 50, GOLD)                                               # knob
     # counter (right)
+    c.rect(96, 82, 74, 3, None)
+    for x in range(96, 170):                                          # counter shadow
+        for y in range(80, 86):
+            if 0 <= y < H:
+                c.px[y][x] = _shade(c.px[y][x], 0.8 if (x + y) % 2 else 0.86)
     c.rect(96, 52, 74, 6, WOOD_L)                                     # countertop
     c.rect(96, 52, 74, 1, INK)
     c.rect(98, 58, 70, 22, WOOD)
@@ -389,12 +413,23 @@ def background(tier, theme="home"):
     for i, jc in enumerate(jars):
         c.rect(72 + i * 8, 14, 5, 6, jc)
         c.hline(72 + i * 8, 13, 5, INK)
-    # tables (floor)
+    # tables (floor) with shadows
     for tx in (36, 66):
+        for x in range(tx - 2, tx + 24):
+            for y in range(105, 109):
+                if 0 <= x < W and 0 <= y < H and (x + y) % 2 == 0:
+                    c.px[y][x] = _shade(c.px[y][x], 0.78)
         c.rect(tx, 88, 22, 4, WOOD_L)
         c.hline(tx, 88, 22, INK)
+        c.hline(tx, 91, 22, _shade(WOOD_L, 0.8))
         c.rect(tx + 9, 92, 4, 12, WOOD_D)
         c.rect(tx + 6, 104, 10, 2, WOOD_D)
+    # window light pooling on the floor
+    if theme != "neon":
+        for y in range(74, 96):
+            for x in range(26 + (y - 74), 62 + (y - 74)):
+                if 0 <= x < W and (x + y) % 2 == 0:
+                    c.px[y][x] = tuple(min(255, int(v * 1.22)) for v in c.px[y][x][:3]) + (255,)
     # tier 1+: rug, wall art
     if tier >= 1:
         c.rect(120, 96, 46, 16, (172, 96, 84, 255))
@@ -831,6 +866,30 @@ def roulette_wheel(size=30):
     c.set(int(r), 1, WHITE)                                # ball at top
     return c
 
+def char_shadow():
+    c = Canvas(14, 5)
+    for y in range(5):
+        for x in range(14):
+            dx, dy = (x - 6.5) / 7, (y - 2) / 2.4
+            d = dx * dx + dy * dy
+            if d < 1:
+                a = int(95 * (1 - d))
+                if a > 4:
+                    c.px[y][x] = (20, 10, 24, a)
+    return c
+
+def light_shaft():
+    c = Canvas(60, 70)
+    for y in range(70):
+        for x in range(60):
+            t = x - y * 0.45
+            if 6 < t < 40:
+                edge = min(t - 6, 40 - t) / 17
+                a = int(80 * max(0, min(1, edge)) * (1 - y / 80))
+                if a > 2:
+                    c.px[y][x] = (255, 240, 200, a)
+    return c
+
 def main_v4():
     count = 0
     glow().save("glow.png"); count += 1
@@ -842,6 +901,8 @@ def main_v4():
     d = dealer_sprite()
     d.save("dealer_0.png"); d.shifted_down().save("dealer_1.png"); count += 2
     roulette_wheel().save("wheel.png"); count += 1
+    char_shadow().save("shadow.png"); count += 1
+    light_shaft().save("shaft.png"); count += 1
     print(f"v4: generated {count} more sprites")
 
 def main():

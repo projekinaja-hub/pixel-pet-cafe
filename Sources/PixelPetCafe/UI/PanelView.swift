@@ -105,6 +105,7 @@ struct PanelView: View {
             Text("🪙 \(formatNumber(controller.state.coins))")
                 .font(.system(size: 19, weight: .bold, design: .rounded))
                 .foregroundColor(Theme.gold)
+                .shadow(color: .black.opacity(0.5), radius: 1, y: 1)
             Text("+\(formatNumber(controller.incomeEstimate * controller.workBoost))/s")
                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                 .foregroundColor(Theme.dim)

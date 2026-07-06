@@ -78,6 +78,22 @@ final class CafeScene: SKScene {
         vig.zPosition = 40
         vig.alpha = 0.85
         addChild(vig)
+        // drifting dust motes
+        for i in 0..<7 {
+            let mote = SKSpriteNode(color: NSColor(calibratedWhite: 1, alpha: 0.35),
+                                    size: CGSize(width: 1, height: 1))
+            mote.position = CGPoint(x: CGFloat.random(in: 10...170), y: CGFloat.random(in: 20...110))
+            mote.zPosition = 35
+            addChild(mote)
+            let drift = SKAction.repeatForever(.sequence([
+                .group([.moveBy(x: CGFloat.random(in: -14...14), y: CGFloat.random(in: -8...4),
+                                duration: 6 + Double(i)),
+                        .sequence([.fadeAlpha(to: 0.08, duration: 3), .fadeAlpha(to: 0.4, duration: 3)])]),
+                .group([.moveBy(x: CGFloat.random(in: -14...14), y: CGFloat.random(in: -4...8),
+                                duration: 6 + Double(i))]),
+            ]))
+            mote.run(drift)
+        }
     }
 
     // MARK: scene mode (café ⇄ casino room)
@@ -286,6 +302,22 @@ final class CafeScene: SKScene {
         background.size = CGSize(width: 180, height: 120)
         guard mode == .cafe else { return }
         cafeLayer.childNode(withName: "counterFront")?.removeFromParent()
+        cafeLayer.childNode(withName: "lightShaft")?.removeFromParent()
+        if state.cafe.city != "neon" {
+            let shaft = SKSpriteNode(texture: SpriteLoader.texture("shaft"))
+            shaft.name = "lightShaft"
+            shaft.size = shaft.texture!.size()
+            shaft.anchorPoint = CGPoint(x: 0, y: 1)
+            shaft.position = CGPoint(x: 26, y: 106)
+            shaft.zPosition = 22
+            shaft.blendMode = .add
+            shaft.alpha = 0.55
+            shaft.run(.repeatForever(.sequence([
+                .fadeAlpha(to: 0.35, duration: 4),
+                .fadeAlpha(to: 0.6, duration: 4),
+            ])))
+            cafeLayer.addChild(shaft)
+        }
         let counterRect = CGRect(x: 96.0 / 180, y: 40.0 / 120, width: 74.0 / 180, height: 28.0 / 120)
         let front = SKSpriteNode(texture: SKTexture(rect: counterRect, in: bgTexture))
         front.name = "counterFront"
@@ -426,6 +458,11 @@ final class CafeScene: SKScene {
         node.size = frames[0].size()
         node.anchorPoint = CGPoint(x: 0.5, y: 0)
         node.run(.repeatForever(.animate(with: frames, timePerFrame: 0.45)))
+        let shadow = SKSpriteNode(texture: SpriteLoader.texture("shadow"))
+        shadow.size = shadow.texture!.size()
+        shadow.position = CGPoint(x: 0, y: 0)
+        shadow.zPosition = -1
+        node.addChild(shadow)
         return node
     }
 
