@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Shared purchase row: icon, name + detail, cost button.
-struct PurchaseRow: View {
-    let emoji: String
+/// Shared purchase row: leading view, name + detail, cost button.
+struct PurchaseRow<Leading: View>: View {
+    let leading: Leading
     let name: String
     let subtitle: String
     let detail: String
@@ -12,7 +12,7 @@ struct PurchaseRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Text(emoji).font(.system(size: 20))
+            leading.frame(width: 26)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(name)
@@ -27,21 +27,32 @@ struct PurchaseRow: View {
                     .foregroundColor(Theme.dim)
             }
             Spacer()
-            Button(action: action) {
-                Text("🪙 \(formatNumber(cost))")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundColor(affordable ? Theme.bg : Theme.dim)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(affordable ? Theme.gold : Theme.card.opacity(0.6))
-                    .cornerRadius(7)
-            }
-            .buttonStyle(.plain)
-            .disabled(!affordable)
+            CostButton(cost: cost, affordable: affordable, action: action)
         }
         .padding(9)
         .background(Theme.card)
         .cornerRadius(9)
+    }
+}
+
+struct CostButton: View {
+    let cost: Double
+    let affordable: Bool
+    var label: String = ""
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text("\(label)🪙 \(formatNumber(cost))")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(affordable ? Theme.bg : Theme.dim)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(affordable ? Theme.gold : Theme.card.opacity(0.6))
+                .cornerRadius(7)
+        }
+        .buttonStyle(.plain)
+        .disabled(!affordable)
     }
 }
 
@@ -62,7 +73,7 @@ struct LockedRow: View {
     }
 }
 
-// MARK: tabs
+// MARK: Café tab (equipment + cleaning)
 
 struct CafeTab: View {
     @ObservedObject var controller: GameController
@@ -70,14 +81,35 @@ struct CafeTab: View {
     private static let emoji = ["espresso": "☕", "grinder": "⚙️", "oven": "🔥", "decor": "🪴", "sound": "🎵"]
 
     var body: some View {
+        if controller.state.cleanliness < 100 {
+            HStack {
+                Text("🧹 Sweep the café")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                Text("→ 100%")
+                    .font(.system(size: 10, design: .rounded))
+                    .foregroundColor(Theme.dim)
+                Spacer()
+                CostButton(cost: SalesEngine.sweepCost(controller.state),
+                           affordable: controller.state.coins >= SalesEngine.sweepCost(controller.state)) {
+                    controller.sweepAll()
+                }
+            }
+            .padding(9)
+            .background(Theme.card)
+            .cornerRadius(9)
+            Text("Tip: click stains in the café to spot-clean for free")
+                .font(.system(size: 9, design: .rounded))
+                .foregroundColor(Theme.dim)
+        }
         ForEach(Catalog.equipment, id: \.id) { def in
             let level = controller.state.equipmentLevels[def.id] ?? 0
             let cost = EconomyEngine.equipmentCost(def.id, controller.state)
             PurchaseRow(
-                emoji: Self.emoji[def.id] ?? "🧰",
+                leading: Text(Self.emoji[def.id] ?? "🧰").font(.system(size: 20)),
                 name: def.name,
                 subtitle: level > 0 ? "Lv \(level)" : "New",
-                detail: String(format: "×%.2f income per level", def.multPerLevel),
+                detail: String(format: "×%.2f prices & customers per level", def.multPerLevel),
                 cost: cost,
                 affordable: controller.state.coins >= cost
             ) { controller.buyEquipment(def.id) }
@@ -85,10 +117,10 @@ struct CafeTab: View {
     }
 }
 
+// MARK: Staff tab
+
 struct StaffTab: View {
     @ObservedObject var controller: GameController
-
-    private static let emoji = ["mocha": "🐱", "biscuit": "🐶", "poppy": "🐰", "juno": "🦊", "bo": "🐻", "earl": "🦉"]
 
     var body: some View {
         ForEach(Catalog.staff, id: \.id) { def in
@@ -97,10 +129,10 @@ struct StaffTab: View {
                 let cost = EconomyEngine.staffCost(def.id, controller.state)
                 let extra = def.id == "earl" ? " · +1h away cap/lv" : ""
                 PurchaseRow(
-                    emoji: Self.emoji[def.id] ?? "🐾",
+                    leading: PixelImage(name: "staff_\(def.id)_0", scale: 1.4),
                     name: def.name,
                     subtitle: level > 0 ? "\(def.role) · Lv \(level)" : "\(def.role) · Hire",
-                    detail: "+\(formatNumber(def.baseRate))/s per level\(extra)",
+                    detail: "+15% customer flow per level\(extra)",
                     cost: cost,
                     affordable: controller.state.coins >= cost
                 ) { controller.buyStaff(def.id) }
@@ -111,34 +143,7 @@ struct StaffTab: View {
     }
 }
 
-struct RecipesTab: View {
-    @ObservedObject var controller: GameController
-
-    private static let emoji = ["latte_art": "🎨", "croissant": "🥐", "matcha": "🍵", "affogato": "🍨",
-                                "cinnamon": "🥮", "cold_brew": "🧋", "tiramisu": "🍰", "honey_cake": "🍯"]
-
-    var body: some View {
-        ForEach(Catalog.recipes, id: \.id) { def in
-            if controller.state.unlockedRecipes.contains(def.id) {
-                HStack(spacing: 10) {
-                    Text(Self.emoji[def.id] ?? "🍽").font(.system(size: 18))
-                    Text(def.name)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.cream)
-                    Spacer()
-                    Text(String(format: "×%.2f", def.multiplier))
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.gold)
-                }
-                .padding(9)
-                .background(Theme.card)
-                .cornerRadius(9)
-            } else {
-                LockedRow(hint: "Secret recipe · 🪙 \(formatNumber(def.unlockAtLifetime)) lifetime")
-            }
-        }
-    }
-}
+// MARK: Renovate tab
 
 struct RenovateTab: View {
     @ObservedObject var controller: GameController
@@ -147,10 +152,10 @@ struct RenovateTab: View {
     var body: some View {
         let pending = EconomyEngine.prestigeStars(controller.state)
         VStack(spacing: 10) {
-            Text("⭐ \(controller.state.stars) stars · +\(controller.state.stars * 10)% income")
+            Text("⭐ \(controller.state.stars) stars · +\(controller.state.stars * 10)% income & customers")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundColor(Theme.cream)
-            Text("Renovating resets your café (coins, staff, gear, recipes)\nbut earns permanent stars. Each star: +10% income forever.")
+            Text("Renovating resets coins, staff, gear and stock —\nbut your custom menu, style and stars stay forever.")
                 .font(.system(size: 10, design: .rounded))
                 .foregroundColor(Theme.dim)
                 .multilineTextAlignment(.center)

@@ -16,13 +16,6 @@ struct EquipmentDef {
     let multPerLevel: Double    // income ×(multPerLevel^level)
 }
 
-struct RecipeDef {
-    let id: String
-    let name: String
-    let unlockAtLifetime: Double
-    let multiplier: Double
-}
-
 enum Catalog {
     static let staff: [StaffDef] = [
         StaffDef(id: "mocha",   name: "Mocha",   role: "Barista",     baseRate: 1,     baseCost: 15,        unlockAtLifetime: 0),
@@ -41,18 +34,7 @@ enum Catalog {
         EquipmentDef(id: "sound",    name: "Sound System",     baseCost: 450_000, multPerLevel: 1.20),
     ]
 
-    static let recipes: [RecipeDef] = [
-        RecipeDef(id: "latte_art",  name: "Latte Art",       unlockAtLifetime: 500,           multiplier: 1.10),
-        RecipeDef(id: "croissant",  name: "Croissant",       unlockAtLifetime: 5_000,         multiplier: 1.12),
-        RecipeDef(id: "matcha",     name: "Matcha Latte",    unlockAtLifetime: 40_000,        multiplier: 1.15),
-        RecipeDef(id: "affogato",   name: "Affogato",        unlockAtLifetime: 300_000,       multiplier: 1.15),
-        RecipeDef(id: "cinnamon",   name: "Cinnamon Roll",   unlockAtLifetime: 2_000_000,     multiplier: 1.18),
-        RecipeDef(id: "cold_brew",  name: "Cold Brew",       unlockAtLifetime: 15_000_000,    multiplier: 1.20),
-        RecipeDef(id: "tiramisu",   name: "Tiramisu",        unlockAtLifetime: 120_000_000,   multiplier: 1.22),
-        RecipeDef(id: "honey_cake", name: "Honey Cake",      unlockAtLifetime: 1_000_000_000, multiplier: 1.25),
-    ]
 
     static func staffDef(_ id: String) -> StaffDef? { staff.first { $0.id == id } }
     static func equipmentDef(_ id: String) -> EquipmentDef? { equipment.first { $0.id == id } }
-    static func recipeDef(_ id: String) -> RecipeDef? { recipes.first { $0.id == id } }
 }

@@ -29,8 +29,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demo.staffLevels = ["mocha": 3, "biscuit": 2, "poppy": 1, "juno": 1]
         demo.equipmentLevels = ["espresso": 6, "grinder": 1, "oven": 1, "decor": 1, "sound": 1]
         demo.stars = 12
+        demo.cleanliness = 55
+        demo.owner.species = "fox"
+        demo.owner.palette = "cream"
+        demo.owner.accessory = "cap"
         scene.configure(with: demo)
         scene.setActive(true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak scene] in
+            scene?.playSale(SaleEvent(itemIcon: "latte", itemName: "Latte", price: 15,
+                                      angry: false, customerSpecies: 0))
+            scene?.playSale(SaleEvent(itemIcon: "", itemName: "", price: 0,
+                                      angry: true, customerSpecies: 1))
+        }
         let skView = SKView(frame: NSRect(x: 0, y: 0, width: 360, height: 240))
         skView.presentScene(scene)
         let window = NSWindow(contentRect: skView.frame, styleMask: [.borderless],
@@ -39,7 +49,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         window.setFrameOrigin(NSPoint(x: -3000, y: -3000))
         window.orderBack(nil)
         snapshotWindow = window
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.2) {
             guard let tex = skView.texture(from: scene) else { exit(1) }
             let rep = NSBitmapImageRep(cgImage: tex.cgImage())
             try? rep.representation(using: .png, properties: [:])?

@@ -8,21 +8,31 @@ count. Click it to open the café: an animated SpriteKit scene on top, and the
 game below in four tabs — **Café** (equipment), **Staff**, **Recipes**, and
 **Renovate** (prestige).
 
-## Gameplay
+## Gameplay (v2 — living café)
 
-- **Earn** — staff generate coins every second: `Σ(level × rate) × equipment ×
-  recipes × (1 + 0.1 × ⭐)`.
-- **Hire** — six animal staff unlock as you earn: Mocha 🐱 (barista), Biscuit 🐶
-  (waiter), Poppy 🐰 (pâtissier), Juno 🦊 (cashier), Bo 🐻 (roaster), and Earl 🦉,
-  whose night shift extends your offline-earnings cap (+1h per level, 8h base).
-- **Recipes** — unlock automatically at lifetime-coin milestones; each is a
-  permanent income multiplier for the run.
+- **Customers, not numbers** — animal customers walk in through the door, order
+  off your menu (each species has taste preferences), pay, sit, and leave. More
+  staff, better gear, stars and a clean café all bring more customers.
+- **Ingredients** — every sale consumes stock (beans, milk, flour, matcha…).
+  Restock in the Stock tab; run dry and customers storm out angry. Out of stock
+  for 5 minutes → the café **closes**: dimmed lights, CLOSED sign, cobwebs.
+- **Your menu** — unlock built-in recipes at lifetime milestones, toggle them
+  on/off, or **invent your own**: name it, pick an icon and ingredients — the
+  price follows the recipe cost.
+- **Dirt** — sales dirty the café; stains appear in the scene. Click them to
+  spot-clean free, or pay to sweep everything. Filth scares customers away.
+- **Staff** — Mocha 🐱, Biscuit 🐶, Poppy 🐰, Juno 🦊, Bo 🐻 and Earl 🦉 (night
+  shift: +1h offline cap per level; 8h base).
+- **Style** — customize the owner (6 species × 4 fur colors × accessories),
+  name your café, and pick who greets you from the menu bar.
+- **Reactive menu bar buddy** — blinks and sips idle, bounces happily when you
+  grab a golden tip, sleeps (zzz) while closed, shows ❗ when stock runs out.
 - **Golden tips** — while the panel is open, a sparkling coin appears every few
   minutes; click it for 10 minutes of income.
-- **Renovate** — past 1M coins earned in a run, reset the café for permanent
-  ⭐ stars (+10% income each). The café decor visibly upgrades with stars.
-- **Offline earnings** — the café keeps earning while the app is closed or the
-  Mac sleeps, up to the cap; a toast shows the haul when you return.
+- **Renovate** — past 1M coins in a run, reset for permanent ⭐ stars (+10%
+  income & customers each). Decor upgrades visibly; custom menu & style stay.
+- **Offline earnings** — the café keeps selling while you're away (up to the
+  cap) — but only while ingredients last.
 
 ## Build & run
 
@@ -50,7 +60,8 @@ Launch-at-login (right-click menu) works when running from the `.app` bundle.
 Saves live at `~/Library/Application Support/PixelPetCafe/save.json` (atomic
 writes; corrupt saves are backed up aside, never lost).
 
-Design doc: `docs/superpowers/specs/2026-07-06-pixel-pet-cafe-design.md`.
+Design docs: `docs/superpowers/specs/2026-07-06-pixel-pet-cafe-design.md` (v1),
+`docs/superpowers/specs/2026-07-06-pixel-pet-cafe-v2-design.md` (living café).
 
 Dev hooks: `PPC_OPEN=1` opens the popover on launch; `PPC_SNAPSHOT=/path.png` /
 `PPC_SCENESHOT=/path.png` render the panel / scene to a PNG and exit.
