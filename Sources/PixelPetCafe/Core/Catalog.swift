@@ -28,11 +28,11 @@ enum Catalog {
     ]
 
     static let equipment: [EquipmentDef] = [
-        EquipmentDef(id: "espresso", name: "Espresso Machine", baseCost: 100,     multPerLevel: 1.25),
-        EquipmentDef(id: "grinder",  name: "Bean Grinder",     baseCost: 1_200,   multPerLevel: 1.20),
-        EquipmentDef(id: "oven",     name: "Stone Oven",       baseCost: 9_000,   multPerLevel: 1.22),
-        EquipmentDef(id: "decor",    name: "Cozy Decor",       baseCost: 60_000,  multPerLevel: 1.18),
-        EquipmentDef(id: "sound",    name: "Sound System",     baseCost: 450_000, multPerLevel: 1.20),
+        EquipmentDef(id: "espresso", name: "Espresso Machine", baseCost: 100,     multPerLevel: 1.10),
+        EquipmentDef(id: "grinder",  name: "Bean Grinder",     baseCost: 1_200,   multPerLevel: 1.09),
+        EquipmentDef(id: "oven",     name: "Stone Oven",       baseCost: 9_000,   multPerLevel: 1.09),
+        EquipmentDef(id: "decor",    name: "Cozy Decor",       baseCost: 60_000,  multPerLevel: 1.08),
+        EquipmentDef(id: "sound",    name: "Sound System",     baseCost: 450_000, multPerLevel: 1.08),
     ]
 
 

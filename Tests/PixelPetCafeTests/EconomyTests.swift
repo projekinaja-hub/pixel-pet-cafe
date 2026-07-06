@@ -6,8 +6,11 @@ final class EconomyTests: XCTestCase {
     // MARK: costs & buying
 
     func testCostCurveGeometric() {
-        XCTAssertEqual(EconomyEngine.cost(base: 100, level: 0), 100, accuracy: 1e-9)
-        XCTAssertEqual(EconomyEngine.cost(base: 100, level: 3), 100 * pow(1.15, 3), accuracy: 1e-9)
+        XCTAssertEqual(EconomyEngine.cost(base: 100, level: 0, growth: 1.18), 100, accuracy: 1e-9)
+        XCTAssertEqual(EconomyEngine.cost(base: 100, level: 3, growth: 1.18), 100 * pow(1.18, 3), accuracy: 1e-9)
+        var s = GameState.newGame()
+        s.equipmentLevels["espresso"] = 4
+        XCTAssertEqual(EconomyEngine.equipmentCost("espresso", s), 100 * pow(1.25, 4), accuracy: 1e-6)
     }
 
     func testBuyStaffSpendsCoinsAndLevels() {

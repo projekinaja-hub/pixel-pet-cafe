@@ -42,14 +42,14 @@ enum SalesEngine {
 
     static func priceMultiplier(_ s: GameState) -> Double {
         equipMultiplier(s) * (1 + 0.10 * Double(s.stars)) * s.city.priceBonus
-            * (1 + 0.02 * Double(s.staffLevels["juno"] ?? 0))
+            * min(1.5, 1 + 0.02 * Double(s.staffLevels["juno"] ?? 0))
     }
 
     /// Role bonuses: Mocha boosts drinks, Poppy boosts pastries (+4%/level).
     static func categoryBonus(_ category: ItemCategory, _ s: GameState) -> Double {
         switch category {
-        case .drink:  return 1 + 0.04 * Double(s.staffLevels["mocha"] ?? 0)
-        case .pastry: return 1 + 0.04 * Double(s.staffLevels["poppy"] ?? 0)
+        case .drink:  return min(2, 1 + 0.04 * Double(s.staffLevels["mocha"] ?? 0))
+        case .pastry: return min(2, 1 + 0.04 * Double(s.staffLevels["poppy"] ?? 0))
         case .special: return 1
         }
     }
@@ -62,8 +62,8 @@ enum SalesEngine {
     static func customerRate(_ s: GameState) -> Double {
         let staffSum = Catalog.staff.reduce(0) { $0 + (s.staffLevels[$1.id] ?? 0) }
         return baseRate
-            * (1 + 0.15 * Double(staffSum))
-            * equipMultiplier(s)
+            * (1 + 0.08 * Double(staffSum))
+            * pow(equipMultiplier(s), 0.5)      // gear helps flow, but gently
             * (0.3 + 0.7 * s.cleanliness / 100)
             * (1 + 0.10 * Double(s.stars))
             * s.city.rateBonus

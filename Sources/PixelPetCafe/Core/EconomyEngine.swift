@@ -4,24 +4,25 @@ import Foundation
 /// customer-driven — see SalesEngine.
 enum EconomyEngine {
     static let prestigeThreshold: Double = 1_000_000
-    static let costGrowth: Double = 1.15
+    static let staffCostGrowth: Double = 1.18
+    static let equipmentCostGrowth: Double = 1.25
     static let baseOfflineCap: TimeInterval = 8 * 3600
     static let earlOfflineBonusPerLevel: TimeInterval = 3600
 
     // MARK: costs
 
-    static func cost(base: Double, level: Int) -> Double {
-        base * pow(costGrowth, Double(level))
+    static func cost(base: Double, level: Int, growth: Double) -> Double {
+        base * pow(growth, Double(level))
     }
 
     static func staffCost(_ id: String, _ s: GameState) -> Double {
         guard let def = Catalog.staffDef(id) else { return .infinity }
-        return cost(base: def.baseCost, level: s.staffLevels[id] ?? 0)
+        return cost(base: def.baseCost, level: s.staffLevels[id] ?? 0, growth: staffCostGrowth)
     }
 
     static func equipmentCost(_ id: String, _ s: GameState) -> Double {
         guard let def = Catalog.equipmentDef(id) else { return .infinity }
-        return cost(base: def.baseCost, level: s.equipmentLevels[id] ?? 0)
+        return cost(base: def.baseCost, level: s.equipmentLevels[id] ?? 0, growth: equipmentCostGrowth)
     }
 
     @discardableResult
