@@ -657,6 +657,20 @@ ITEM_ICONS = {
 
 # ---------------------------------------------------------------- v2: bubbles + dirt
 
+def bubble_sad():
+    c = Canvas(16, 15)
+    bgc = (168, 178, 196, 255)
+    c.rect(1, 1, 14, 11, bgc)
+    c.hline(2, 0, 12, bgc)
+    c.set(1, 1, CLEAR); c.set(14, 1, CLEAR)
+    c.set(4, 12, bgc); c.set(5, 13, bgc)
+    # sad face
+    c.set(6, 4, INK); c.set(10, 4, INK)
+    c.hline(6, 8, 5, INK)
+    c.set(6, 9, INK); c.set(10, 7, INK)
+    c.set(12, 3, (140, 190, 235, 255))  # tear
+    return c
+
 def bubble(angry=False):
     c = Canvas(16, 15)
     bgc = (238, 120, 108, 255) if angry else WHITE
@@ -736,7 +750,8 @@ def main_v2():
         _icon(lambda c, d=draw: d(c)).save(f"ing_{iid}.png"); count += 1
     for iid, draw in ITEM_ICONS.items():
         _icon(lambda c, d=draw: d(c)).save(f"item_{iid}.png"); count += 1
-    bubble(False).save("bubble.png"); bubble(True).save("bubble_angry.png"); count += 2
+    bubble(False).save("bubble.png"); bubble(True).save("bubble_angry.png")
+    bubble_sad().save("bubble_sad.png"); count += 3
     dirt_stain().save("dirt_stain.png"); dirt_cup().save("dirt_cup.png")
     cobweb().save("cobweb.png"); closed_sign().save("closed_sign.png"); count += 4
     print(f"v2: generated {count} more sprites")

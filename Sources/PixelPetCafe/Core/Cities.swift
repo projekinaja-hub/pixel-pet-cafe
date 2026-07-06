@@ -7,6 +7,9 @@ struct CityDef {
     let cost: Double
     let rateBonus: Double    // × customer rate
     let priceBonus: Double   // × prices
+    var taste: [ItemCategory: Double] = [:]   // locals' category cravings
+
+    func tasteWeight(_ category: ItemCategory) -> Double { taste[category] ?? 1.0 }
 }
 
 enum Cities {
@@ -25,8 +28,25 @@ enum Cities {
         CityDef(id: "moon",    name: "Mare Café",     vibe: "Earthrise views 🌕",  cost: 800e12,   rateBonus: 2.0,  priceBonus: 2.2),
     ]
 
+    static let tastes: [String: [ItemCategory: Double]] = [
+        "home":    [:],
+        "sakura":  [.pastry: 1.5, .special: 1.2, .drink: 0.8],
+        "neon":    [.drink: 1.4, .special: 1.3, .pastry: 0.7],
+        "seaside": [.drink: 1.4, .pastry: 0.9],
+        "forest":  [.pastry: 1.5, .drink: 0.9],
+        "desert":  [.drink: 1.7, .pastry: 0.6],
+        "snowy":   [.drink: 1.5, .special: 1.3, .pastry: 0.8],
+        "sunset":  [.special: 1.5, .drink: 1.1, .pastry: 0.8],
+        "ember":   [.drink: 1.3, .special: 1.4, .pastry: 0.7],
+        "royal":   [.special: 1.8, .pastry: 1.1, .drink: 0.7],
+        "cloud":   [.pastry: 1.4, .special: 1.3, .drink: 0.9],
+        "moon":    [.special: 1.6, .drink: 1.2, .pastry: 0.9],
+    ]
+
     static func def(_ id: String) -> CityDef {
-        all.first { $0.id == id } ?? all[0]
+        var d = all.first { $0.id == id } ?? all[0]
+        d.taste = tastes[d.id] ?? [:]
+        return d
     }
 }
 

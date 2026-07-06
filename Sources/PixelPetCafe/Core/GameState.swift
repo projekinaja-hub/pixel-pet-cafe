@@ -30,6 +30,9 @@ struct GameState: Codable, Equatable {
     var reputation: Double = 50          // 0-100
     var adsActive: Bool = false
     var workMode: Bool = false
+    var menuTaste: [String: Int] = [:]   // item id -> taste level (0-10)
+    var salesCount: [String: Int] = [:]  // item id -> lifetime sales
+    var tasteKnown: [String] = []        // city ids with researched preferences
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -98,6 +101,7 @@ struct GameState: Codable, Equatable {
         case coins, lifetimeCoins, lifetimeCoinsThisRun, stars, lastSaved, muted
         case customItems, owner, barCharacter
         case cafes, activeCafe, reputation, adsActive, workMode
+        case menuTaste, salesCount, tasteKnown
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -117,6 +121,9 @@ struct GameState: Codable, Equatable {
         reputation = try c.decodeIfPresent(Double.self, forKey: .reputation) ?? 50
         adsActive = try c.decodeIfPresent(Bool.self, forKey: .adsActive) ?? false
         workMode = try c.decodeIfPresent(Bool.self, forKey: .workMode) ?? false
+        menuTaste = try c.decodeIfPresent([String: Int].self, forKey: .menuTaste) ?? [:]
+        salesCount = try c.decodeIfPresent([String: Int].self, forKey: .salesCount) ?? [:]
+        tasteKnown = try c.decodeIfPresent([String].self, forKey: .tasteKnown) ?? []
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -152,5 +159,8 @@ struct GameState: Codable, Equatable {
         try c.encode(reputation, forKey: .reputation)
         try c.encode(adsActive, forKey: .adsActive)
         try c.encode(workMode, forKey: .workMode)
+        try c.encode(menuTaste, forKey: .menuTaste)
+        try c.encode(salesCount, forKey: .salesCount)
+        try c.encode(tasteKnown, forKey: .tasteKnown)
     }
 }

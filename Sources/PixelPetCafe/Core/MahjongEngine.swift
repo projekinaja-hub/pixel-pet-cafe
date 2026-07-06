@@ -126,6 +126,7 @@ enum Mahjong {
         var discards: [Tile] = []    // shared pool, newest last
         var phase: Phase
         var lastDiscardSeat = -1
+        var lastDrawn: Tile?         // the tile the player just drew
 
         init<R: RandomNumberGenerator>(rng: inout R) {
             var w = Mahjong.freshWall(rng: &rng)
@@ -135,8 +136,10 @@ enum Mahjong {
             melds = [[], [], [], []]
             wall = w
             // player draws the first tile
-            hands[0].append(wall.removeLast())
+            let first = wall.removeLast()
+            hands[0].append(first)
             hands[0].sort()
+            lastDrawn = first
             phase = .playerDiscard
         }
 
@@ -150,6 +153,7 @@ enum Mahjong {
         mutating func playerDiscard<R: RandomNumberGenerator>(_ tile: Tile, rng: inout R) {
             guard case .playerDiscard = phase, let i = hands[0].firstIndex(of: tile) else { return }
             hands[0].remove(at: i)
+            lastDrawn = nil
             discards.append(tile)
             lastDiscardSeat = 0
             runAI(from: 1, pendingDiscard: tile, discardSeat: 0, rng: &rng)
@@ -165,6 +169,7 @@ enum Mahjong {
             guard case .playerClaim(let d, _) = phase, canPong(d) else { return }
             Mahjong.removeTiles(&hands[0], d, 2)
             melds[0].append(Meld(tiles: [d, d, d]))
+            lastDrawn = nil
             phase = .playerDiscard
             _ = rng
         }
@@ -176,6 +181,7 @@ enum Mahjong {
                 if let i = hands[0].firstIndex(of: t) { hands[0].remove(at: i) }
             }
             melds[0].append(Meld(tiles: run))
+            lastDrawn = nil
             phase = .playerDiscard
             _ = rng
         }
@@ -237,8 +243,10 @@ enum Mahjong {
                 if next == 0 {
                     // back to the player: draw a tile (discard passed everyone)
                     guard !wall.isEmpty else { phase = .finished(.wallExhausted); return }
-                    hands[0].append(wall.removeLast())
+                    let drawn = wall.removeLast()
+                    hands[0].append(drawn)
                     hands[0].sort()
+                    lastDrawn = drawn
                     phase = .playerDiscard
                     return
                 }

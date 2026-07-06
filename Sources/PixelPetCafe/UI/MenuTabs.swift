@@ -6,13 +6,19 @@ struct MenuTab: View {
     @ObservedObject var controller: GameController
     @State private var creating = false
 
+    private var bestSeller: String? {
+        controller.state.salesCount.max { $0.value < $1.value }?.key
+    }
+
     var body: some View {
+        TasteResearchRow(controller: controller)
         ForEach(MenuCatalog.items, id: \.id) { def in
             if controller.state.lifetimeCoins >= def.unlockAtLifetime {
                 MenuRow(controller: controller,
                         id: def.id, name: def.name, icon: def.icon,
-                        price: def.basePrice * SalesEngine.priceMultiplier(controller.state),
-                        ingredients: def.ingredients, deletable: false)
+                        category: def.category, basePrice: def.basePrice,
+                        ingredients: def.ingredients, deletable: false,
+                        isBestSeller: bestSeller == def.id)
             } else {
                 LockedRow(hint: "Secret recipe · 🪙 \(formatNumber(def.unlockAtLifetime)) lifetime")
             }
@@ -20,8 +26,9 @@ struct MenuTab: View {
         ForEach(controller.state.customItems, id: \.id) { item in
             MenuRow(controller: controller,
                     id: item.id, name: item.name, icon: item.icon,
-                    price: MenuCatalog.customPrice(item) * SalesEngine.priceMultiplier(controller.state),
-                    ingredients: item.ingredients, deletable: true)
+                    category: item.category, basePrice: MenuCatalog.customPrice(item),
+                    ingredients: item.ingredients, deletable: true,
+                    isBestSeller: bestSeller == item.id)
         }
         if creating {
             CustomItemForm(controller: controller, dismiss: { creating = false })
@@ -42,21 +49,74 @@ struct MenuTab: View {
     }
 }
 
+struct TasteResearchRow: View {
+    @ObservedObject var controller: GameController
+
+    var body: some View {
+        let city = controller.state.city
+        let known = controller.state.tasteKnown.contains(city.id)
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("🔎 \(city.name) tastes")
+                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                if known {
+                    Text(tasteSummary(city))
+                        .font(.system(size: 9.5, design: .rounded))
+                        .foregroundColor(Theme.gold)
+                } else {
+                    Text("Locals have their own cravings — run a tasting event to learn them")
+                        .font(.system(size: 9, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                }
+            }
+            Spacer()
+            if !known {
+                CostButton(cost: SalesEngine.researchCost(controller.state),
+                           affordable: controller.state.coins >= SalesEngine.researchCost(controller.state)) {
+                    controller.researchTaste()
+                }
+            }
+        }
+        .padding(8)
+        .background(Theme.card)
+        .cornerRadius(9)
+    }
+
+    private func tasteSummary(_ city: CityDef) -> String {
+        let names: [ItemCategory: String] = [.drink: "Drinks", .pastry: "Pastries", .special: "Specials"]
+        let parts = ItemCategory.allCases.compactMap { cat -> String? in
+            let w = city.tasteWeight(cat)
+            guard abs(w - 1) > 0.01 else { return nil }
+            return "\(names[cat]!) ×\(String(format: "%.1f", w))"
+        }
+        return parts.isEmpty ? "Balanced tastes — everything sells evenly" : parts.joined(separator: " · ")
+    }
+}
+
 struct MenuRow: View {
     @ObservedObject var controller: GameController
     let id: String
     let name: String
     let icon: String
-    let price: Double
+    let category: ItemCategory
+    let basePrice: Double
     let ingredients: [String: Int]
     let deletable: Bool
+    let isBestSeller: Bool
 
     private var enabled: Bool { controller.state.menuEnabled.contains(id) }
     private var servable: Bool {
         ingredients.allSatisfy { (controller.state.stock[$0.key] ?? 0) >= $0.value }
     }
+    private var resolved: ResolvedItem {
+        ResolvedItem(id: id, name: name, icon: icon, category: category,
+                     ingredients: ingredients, basePrice: basePrice, isCustom: deletable)
+    }
 
     var body: some View {
+        let taste = controller.state.menuTaste[id] ?? 0
+        let sold = controller.state.salesCount[id] ?? 0
         HStack(spacing: 8) {
             PixelImage(name: "item_\(icon)", scale: 2)
             VStack(alignment: .leading, spacing: 2) {
@@ -64,6 +124,11 @@ struct MenuRow: View {
                     Text(name)
                         .font(.system(size: 12.5, weight: .bold, design: .rounded))
                         .foregroundColor(enabled ? Theme.cream : Theme.dim)
+                    if isBestSeller && sold > 0 {
+                        Text("★ popular")
+                            .font(.system(size: 8.5, weight: .heavy, design: .rounded))
+                            .foregroundColor(Theme.gold)
+                    }
                     if !servable && enabled {
                         Text("out of stock!")
                             .font(.system(size: 9, weight: .bold, design: .rounded))
@@ -76,10 +141,33 @@ struct MenuRow: View {
                             .font(.system(size: 9, design: .rounded))
                             .foregroundColor(Theme.dim)
                     }
+                    if sold > 0 {
+                        Text("· sold \(formatNumber(Double(sold)))")
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundColor(Theme.dim)
+                    }
+                }
+                HStack(spacing: 2) {
+                    Text(taste > 0 ? String(repeating: "★", count: min(taste, 10)) : "☆ basic recipe")
+                        .font(.system(size: 8))
+                        .foregroundColor(taste > 0 ? Theme.gold : Theme.dim)
+                    if taste < SalesEngine.maxTaste {
+                        Button {
+                            controller.upgradeTaste(id)
+                        } label: {
+                            Text("improve 🪙\(formatNumber(SalesEngine.tasteUpgradeCost(resolved, controller.state)))")
+                                .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                                .foregroundColor(controller.state.coins >= SalesEngine.tasteUpgradeCost(resolved, controller.state) ? Theme.bg : Theme.dim)
+                                .padding(.horizontal, 5).padding(.vertical, 2)
+                                .background(controller.state.coins >= SalesEngine.tasteUpgradeCost(resolved, controller.state) ? Theme.gold.opacity(0.9) : Theme.bg.opacity(0.5))
+                                .cornerRadius(4)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
             }
             Spacer()
-            Text("🪙 \(formatNumber(price))")
+            Text("🪙 \(formatNumber(SalesEngine.price(resolved, controller.state)))")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundColor(Theme.gold)
             if deletable {

@@ -52,9 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak scene] in
             if scene?.mode == .casino { scene?.playCasinoWin(500) }
             scene?.playSale(SaleEvent(itemIcon: "latte", itemName: "Latte", price: 15,
-                                      angry: false, customerSpecies: 0))
+                                      mood: .happy, customerSpecies: 0))
             scene?.playSale(SaleEvent(itemIcon: "", itemName: "", price: 0,
-                                      angry: true, customerSpecies: 1))
+                                      mood: .angry, customerSpecies: 1))
         }
         let skView = SKView(frame: NSRect(x: 0, y: 0, width: 360, height: 240))
         skView.presentScene(scene)

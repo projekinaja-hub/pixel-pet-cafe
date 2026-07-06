@@ -203,6 +203,9 @@ final class GameController: ObservableObject {
         state.menuEnabled.removeAll { $0 == id }
     }
 
+    func upgradeTaste(_ id: String) { SalesEngine.upgradeTaste(id, &state) }
+    func researchTaste() { SalesEngine.researchTaste(&state) }
+
     func setOwner(_ owner: OwnerConfig) { state.owner = owner }
     func setBarCharacter(_ id: String) { state.barCharacter = id }
 

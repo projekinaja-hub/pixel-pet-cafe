@@ -422,8 +422,10 @@ struct MahjongView: View {
     @State private var settled = false
     @State private var message = "4 melds + a pair wins · self-draw 3× · off a discard 2.5×"
     @State private var rng = SystemRandomNumberGenerator()
+    @State private var selected: Mahjong.Tile?
 
     private static let aiFaces = ["🐱", "🐻", "🐰"]
+    private static let seatNames = ["You", "🐱 Momo", "🐻 Baxter", "🐰 Lily"]
 
     var body: some View {
         VStack(spacing: 8) {
@@ -441,8 +443,34 @@ struct MahjongView: View {
                 }
                 if !g.discards.isEmpty {
                     HStack(spacing: 1) {
-                        ForEach(Array(g.discards.suffix(12).enumerated()), id: \.offset) { _, t in
+                        let recent = Array(g.discards.suffix(11))
+                        ForEach(Array(recent.enumerated()), id: \.offset) { i, t in
                             tileFace(t, size: 13)
+                                .overlay(RoundedRectangle(cornerRadius: 3)
+                                    .stroke(i == recent.count - 1 ? Theme.gold : .clear, lineWidth: 1.5))
+                        }
+                        if g.lastDiscardSeat >= 0 {
+                            Text("← \(Self.seatNames[g.lastDiscardSeat])")
+                                .font(.system(size: 8.5, design: .rounded))
+                                .foregroundColor(Theme.dim)
+                        }
+                        Spacer()
+                    }
+                }
+                if !g.melds[0].isEmpty {
+                    HStack(spacing: 5) {
+                        Text("Your melds:")
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundColor(Theme.dim)
+                        ForEach(g.melds[0]) { meld in
+                            HStack(spacing: 1) {
+                                ForEach(Array(meld.tiles.enumerated()), id: \.offset) { _, t in
+                                    tileFace(t, size: 12)
+                                }
+                            }
+                            .padding(2)
+                            .background(Color(red: 0.2, green: 0.4, blue: 0.28).opacity(0.6))
+                            .cornerRadius(4)
                         }
                         Spacer()
                     }
@@ -477,16 +505,29 @@ struct MahjongView: View {
                 if g.playerCanWinNow {
                     mjButton("🀄 WIN — Self-draw!") { mutate { $0.playerDeclareWin() } }
                 }
-                Text("Tap a tile to discard · melds \(g.melds[0].count)")
+                Text(selected == nil ? "Tap a tile, tap again to discard" : "Tap again to discard — or pick another")
                     .font(.system(size: 9, design: .rounded))
                     .foregroundColor(Theme.dim)
-                let hand = g.hands[0]
-                LazyVGrid(columns: Array(repeating: GridItem(.fixed(24), spacing: 3), count: 7), spacing: 4) {
-                    ForEach(Array(hand.enumerated()), id: \.offset) { _, t in
-                        Button { mutate { $0.playerDiscard(t, rng: &rng) } } label: {
-                            tileFace(t, size: 20)
+                // hand: 13 sorted tiles, freshly drawn tile set apart on the right
+                var handTiles = g.hands[0]
+                let drawn: Mahjong.Tile? = g.lastDrawn
+                let _ = drawn.map { d in
+                    if let i = handTiles.firstIndex(of: d) { handTiles.remove(at: i) }
+                }
+                HStack(spacing: 0) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(23), spacing: 2), count: 7), spacing: 3) {
+                        ForEach(Array(handTiles.enumerated()), id: \.offset) { _, t in
+                            handTile(t)
                         }
-                        .buttonStyle(.plain)
+                    }
+                    if let d = drawn {
+                        VStack(spacing: 1) {
+                            Text("drew")
+                                .font(.system(size: 7, design: .rounded))
+                                .foregroundColor(Theme.gold)
+                            handTile(d)
+                        }
+                        .padding(.leading, 6)
                     }
                 }
             }
@@ -504,12 +545,31 @@ struct MahjongView: View {
                     ForEach(g.chowOptions(d), id: \.id) { low in
                         mjButton("Chow \(low.rank)-\(low.rank + 2)") { mutate { $0.playerChow(low, rng: &rng) } }
                     }
-                    mjButton("Pass") { mutate { $0.playerPass(rng: &rng) } }
+                    mjButton("Pass") { mutateSlow { $0.playerPass(rng: &rng) } }
                 }
             }
         case .finished:
             mjButton("▶ Play again — 🪙 \(formatNumber(bet))", disabled: controller.state.coins < bet) { deal() }
         }
+    }
+
+    /// Tap once to select, tap again to discard — no accidental throws.
+    private func handTile(_ t: Mahjong.Tile) -> some View {
+        Button {
+            if selected == t {
+                selected = nil
+                mutateSlow { $0.playerDiscard(t, rng: &rng) }
+            } else {
+                selected = t
+            }
+        } label: {
+            tileFace(t, size: 19)
+                .overlay(RoundedRectangle(cornerRadius: 3)
+                    .stroke(selected == t ? Theme.gold : .clear, lineWidth: 2))
+                .offset(y: selected == t ? -3 : 0)
+                .animation(.easeOut(duration: 0.12), value: selected)
+        }
+        .buttonStyle(.plain)
     }
 
     private func canClaimWin(_ g: Mahjong.Game, _ d: Mahjong.Tile) -> Bool {
@@ -547,6 +607,17 @@ struct MahjongView: View {
     }
 
     @State private var busy = false
+
+    /// Actions where opponents respond: show a beat of "table is playing…".
+    private func mutateSlow(_ change: @escaping (inout Mahjong.Game) -> Void) {
+        guard !busy, game != nil else { return }
+        busy = true
+        message = "· · · the table plays · · ·"
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            busy = false
+            mutate(change)
+        }
+    }
 
     private func mutate(_ change: (inout Mahjong.Game) -> Void) {
         guard !busy, var g = game else { return }

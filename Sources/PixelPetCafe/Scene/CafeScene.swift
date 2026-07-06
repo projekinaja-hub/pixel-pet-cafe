@@ -260,7 +260,12 @@ final class CafeScene: SKScene {
         cam.removeAllActions()
         let move: SKAction
         if zoomIn {
-            move = .group([.move(to: CGPoint(x: 122, y: 42), duration: 0.7),
+            let target: CGPoint
+            switch casinoGame {
+            case .slots: target = CGPoint(x: 57, y: 58)       // the slot machines
+            default: target = CGPoint(x: 122, y: 42)          // the felt table
+            }
+            move = .group([.move(to: target, duration: 0.7),
                            .scale(to: 0.62, duration: 0.7)])
         } else {
             move = .group([.move(to: CGPoint(x: 90, y: 60), duration: 0.6),
@@ -505,7 +510,7 @@ final class CafeScene: SKScene {
         customer.run(toCounter) { [weak self, weak customer] in
             guard let self, let customer else { return }
             self.showBubble(over: customer, event: event)
-            if event.angry {
+            if event.mood == .angry || event.mood == .sadLeave {
                 customer.run(.sequence([
                     .wait(forDuration: 1.4),
                     .move(to: Self.doorPoint, duration: 1.6),
@@ -527,11 +532,17 @@ final class CafeScene: SKScene {
     }
 
     private func showBubble(over node: SKSpriteNode, event: SaleEvent) {
-        let bubble = SKSpriteNode(texture: SpriteLoader.texture(event.angry ? "bubble_angry" : "bubble"))
+        let texName: String
+        switch event.mood {
+        case .angry: texName = "bubble_angry"
+        case .sadLeave, .settled: texName = "bubble_sad"
+        case .happy: texName = "bubble"
+        }
+        let bubble = SKSpriteNode(texture: SpriteLoader.texture(texName))
         bubble.size = bubble.texture!.size()
         bubble.position = CGPoint(x: 4, y: 24)
         bubble.zPosition = 2
-        if !event.angry {
+        if event.mood == .happy {
             let icon = SKSpriteNode(texture: SpriteLoader.texture("item_\(event.itemIcon)"))
             icon.size = icon.texture!.size()
             icon.position = CGPoint(x: -1, y: 2)

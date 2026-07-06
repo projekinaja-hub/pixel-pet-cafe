@@ -1,11 +1,19 @@
 import Foundation
 
+enum CustomerMood: Equatable {
+    case happy       // got what they wanted
+    case settled     // wanted item unavailable, took something else
+    case sadLeave    // wanted item unavailable, walked out
+    case angry       // nothing servable at all
+}
+
 struct SaleEvent: Equatable {
     let itemIcon: String
     let itemName: String
-    let price: Double        // 0 when angry
-    let angry: Bool
+    let price: Double        // 0 when no sale
+    let mood: CustomerMood
     let customerSpecies: Int // 0..2, picks the customer sprite
+    var angry: Bool { mood == .angry }
 }
 
 /// Deterministic RNG for testable simulation (SplitMix64).
@@ -73,6 +81,54 @@ enum SalesEngine {
 
     static func price(_ item: ResolvedItem, _ s: GameState) -> Double {
         item.basePrice * priceMultiplier(s) * categoryBonus(item.category, s)
+            * (1 + 0.06 * Double(s.menuTaste[item.id] ?? 0))
+    }
+
+    // MARK: menu taste upgrades
+
+    static let maxTaste = 10
+
+    static func tasteUpgradeCost(_ item: ResolvedItem, _ s: GameState) -> Double {
+        let level = s.menuTaste[item.id] ?? 0
+        return (item.basePrice * 60 * pow(1.9, Double(level))).rounded()
+    }
+
+    @discardableResult
+    static func upgradeTaste(_ itemId: String, _ s: inout GameState) -> Bool {
+        guard let item = MenuCatalog.resolve(s).first(where: { $0.id == itemId })
+                ?? allItems(s).first(where: { $0.id == itemId }),
+              (s.menuTaste[itemId] ?? 0) < maxTaste else { return false }
+        let cost = tasteUpgradeCost(item, s)
+        guard s.coins >= cost else { return false }
+        s.coins -= cost
+        s.menuTaste[itemId, default: 0] += 1
+        return true
+    }
+
+    static func allItems(_ s: GameState) -> [ResolvedItem] {
+        MenuCatalog.items
+            .filter { s.lifetimeCoins >= $0.unlockAtLifetime }
+            .map { ResolvedItem(id: $0.id, name: $0.name, icon: $0.icon, category: $0.category,
+                                ingredients: $0.ingredients, basePrice: $0.basePrice, isCustom: false) }
+        + s.customItems.map { ResolvedItem(id: $0.id, name: $0.name, icon: $0.icon, category: $0.category,
+                                           ingredients: $0.ingredients, basePrice: MenuCatalog.customPrice($0), isCustom: true) }
+    }
+
+    // MARK: taste research (reveal a city's cravings)
+
+    static func researchCost(_ s: GameState) -> Double {
+        max(100, (incomeEstimate(s) * 1800).rounded())   // ~30 min of income
+    }
+
+    @discardableResult
+    static func researchTaste(_ s: inout GameState) -> Bool {
+        let city = s.cafe.city
+        guard !s.tasteKnown.contains(city) else { return false }
+        let cost = researchCost(s)
+        guard s.coins >= cost else { return false }
+        s.coins -= cost
+        s.tasteKnown.append(city)
+        return true
     }
 
     static func servable(_ s: GameState) -> [ResolvedItem] {
@@ -136,26 +192,54 @@ enum SalesEngine {
         return events
     }
 
+    /// Weight for how much this customer craves an item: city taste × species
+    /// preference × how refined the recipe is.
+    static func desireWeight(_ item: ResolvedItem, species: Int, _ s: GameState) -> Double {
+        s.city.tasteWeight(item.category)
+            * (item.category == preferences[species] ? 2.0 : 1.0)
+            * (1 + 0.10 * Double(s.menuTaste[item.id] ?? 0))
+    }
+
+    private static func pickWeighted<R: RandomNumberGenerator>(
+        _ options: [(ResolvedItem, Double)], rng: inout R
+    ) -> ResolvedItem {
+        let total = options.reduce(0) { $0 + $1.1 }
+        var roll = Double.random(in: 0..<total, using: &rng)
+        for (item, w) in options {
+            if roll < w { return item }
+            roll -= w
+        }
+        return options[0].0
+    }
+
     private static func serveCustomer<R: RandomNumberGenerator>(
         _ s: inout GameState, now: Date, rng: inout R
     ) -> SaleEvent {
         let species = Int.random(in: 0...2, using: &rng)
-        let options = servable(s)
-        guard !options.isEmpty else {
+        let inStock = servable(s)
+        guard !inStock.isEmpty else {
             s.reputation = max(0, s.reputation - 2)   // word gets around
-            return SaleEvent(itemIcon: "", itemName: "", price: 0, angry: true, customerSpecies: species)
+            return SaleEvent(itemIcon: "", itemName: "", price: 0, mood: .angry, customerSpecies: species)
         }
-        // preference: preferred category counts double
-        let preferred = preferences[species]
-        var weighted: [(ResolvedItem, Double)] = options.map { ($0, $0.category == preferred ? 2.0 : 1.0) }
-        let total = weighted.reduce(0) { $0 + $1.1 }
-        var roll = Double.random(in: 0..<total, using: &rng)
-        var chosen = weighted[0].0
-        for (item, w) in weighted {
-            if roll < w { chosen = item; break }
-            roll -= w
+        // the customer desires a specific item off the FULL menu
+        let menu = MenuCatalog.resolve(s)
+        let desired = pickWeighted(menu.map { ($0, desireWeight($0, species: species, s)) }, rng: &rng)
+        let desiredAvailable = inStock.contains { $0.id == desired.id }
+
+        var chosen = desired
+        var mood = CustomerMood.happy
+        if !desiredAvailable {
+            // half settle for something else, half leave disappointed
+            if Bool.random(using: &rng) {
+                chosen = pickWeighted(inStock.map { ($0, desireWeight($0, species: species, s)) }, rng: &rng)
+                mood = .settled
+                s.reputation = max(0, s.reputation - 0.3)
+            } else {
+                s.reputation = max(0, s.reputation - 1)
+                return SaleEvent(itemIcon: desired.icon, itemName: desired.name, price: 0,
+                                 mood: .sadLeave, customerSpecies: species)
+            }
         }
-        weighted = []
         // serve: consume + earn + dirty up (Bo sometimes roasts for free)
         if Double.random(in: 0..<1, using: &rng) >= freeSaleChance(s) {
             for (ing, qty) in chosen.ingredients {
@@ -167,11 +251,19 @@ enum SalesEngine {
         s.lifetimeCoins += earned
         s.lifetimeCoinsThisRun += earned
         s.cleanliness = max(0, s.cleanliness - dirtPerSale)
-        s.reputation = min(100, s.reputation + 0.05)
+        s.salesCount[chosen.id, default: 0] += 1
+        if mood == .happy {
+            // satisfaction: refined recipes and matching cravings build fame
+            let sat = 60.0
+                + 4 * Double(s.menuTaste[chosen.id] ?? 0)
+                + 25 * (s.city.tasteWeight(chosen.category) - 1)
+                + 0.15 * (s.cleanliness - 50)
+            s.reputation = min(100, s.reputation + max(0.02, (sat - 55) / 250))
+        }
         s.lastSaleAt = now
         unlockNewMenuItems(&s)
         return SaleEvent(itemIcon: chosen.icon, itemName: chosen.name, price: earned,
-                         angry: false, customerSpecies: species)
+                         mood: mood, customerSpecies: species)
     }
 
     static func unlockNewMenuItems(_ s: inout GameState) {
