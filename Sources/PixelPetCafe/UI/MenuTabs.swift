@@ -258,19 +258,19 @@ struct StyleTab: View {
             styleRow(title: "Species", options: OwnerConfig.speciesOptions, selected: owner.species) { sp in
                 var o = owner; o.species = sp; controller.setOwner(o)
             } label: { sp in
-                AnyView(PixelImage(name: "owner_\(sp)_\(owner.palette)_0", scale: 1.6))
+                AnyView(PixelImage(name: "owner_\(sp)_\(owner.palette)_0", scale: 1.7))
             }
             styleRow(title: "Fur", options: OwnerConfig.paletteOptions, selected: owner.palette) { pal in
                 var o = owner; o.palette = pal; controller.setOwner(o)
             } label: { pal in
-                AnyView(PixelImage(name: "bar_\(owner.species)_\(pal)_0", scale: 1.6))
+                AnyView(PixelImage(name: "bar_\(owner.species)_\(pal)_0", scale: 1.7))
             }
             styleRow(title: "Accessory", options: OwnerConfig.accessoryOptions, selected: owner.accessory) { acc in
                 var o = owner; o.accessory = acc; controller.setOwner(o)
             } label: { acc in
                 acc == "none"
-                    ? AnyView(Text("✕").font(.system(size: 14)).foregroundColor(Theme.dim).frame(width: 26, height: 26))
-                    : AnyView(PixelImage(name: "acc_\(acc)", scale: 1.6))
+                    ? AnyView(Text("✕").font(.system(size: 14)).foregroundColor(Theme.dim))
+                    : AnyView(PixelImage(name: "acc_\(acc)", scale: 1.7))
             }
         }
         .padding(10)
@@ -285,7 +285,8 @@ struct StyleTab: View {
             Text("Who greets you from the menu bar")
                 .font(.system(size: 9.5, design: .rounded))
                 .foregroundColor(Theme.dim)
-            HStack(spacing: 6) {
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(42), spacing: 5), count: 7),
+                      alignment: .leading, spacing: 5) {
                 barChoice("owner", icon: "bar_\(owner.species)_\(owner.palette)_0")
                 ForEach(Catalog.staff, id: \.id) { def in
                     if (controller.state.staffLevels[def.id] ?? 0) > 0 {
@@ -325,8 +326,8 @@ struct StyleTab: View {
 
     private func barChoice(_ id: String, icon: String) -> some View {
         Button { controller.setBarCharacter(id) } label: {
-            PixelImage(name: icon, scale: 2)
-                .padding(4)
+            PixelImage(name: icon, scale: 1.8)
+                .frame(width: 42, height: 40)
                 .background(controller.state.barCharacter == id ? Theme.gold.opacity(0.4) : Theme.bg.opacity(0.5))
                 .cornerRadius(7)
         }
@@ -340,11 +341,12 @@ struct StyleTab: View {
             Text(title)
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
                 .foregroundColor(Theme.dim)
-            HStack(spacing: 5) {
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(46), spacing: 5), count: 6),
+                      alignment: .leading, spacing: 5) {
                 ForEach(options, id: \.self) { opt in
                     Button { pick(opt) } label: {
                         label(opt)
-                            .padding(3)
+                            .frame(width: 46, height: 42)
                             .background(selected == opt ? Theme.gold.opacity(0.4) : Theme.bg.opacity(0.5))
                             .cornerRadius(6)
                     }

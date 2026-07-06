@@ -34,7 +34,16 @@ struct PixelImage: View {
 struct PanelView: View {
     @ObservedObject var controller: GameController
     let scene: CafeScene
-    @State private var tab: PanelTab = .menu
+    @State private var tab: PanelTab
+
+    init(controller: GameController, scene: CafeScene) {
+        self.controller = controller
+        self.scene = scene
+        // dev hook: PPC_TAB=style|casino|... opens on a specific tab
+        let initial = ProcessInfo.processInfo.environment["PPC_TAB"]
+            .flatMap { key in PanelTab.allCases.first { "\($0)" == key } } ?? .menu
+        _tab = State(initialValue: initial)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -62,10 +71,12 @@ struct PanelView: View {
                     }
                 }
                 .padding(10)
+                .frame(width: 360)
             }
             .frame(height: 236)
         }
-        .frame(width: 360, height: 544)
+        .frame(width: 360, height: 544, alignment: .top)
+        .clipped()
         .background(panelTint)
         .onAppear {
             scene.setMode(tab == .casino ? .casino : .cafe)
