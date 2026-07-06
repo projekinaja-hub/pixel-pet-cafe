@@ -391,22 +391,50 @@ struct StyleTab: View {
     }
 
     var workModeSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("⚡ Work Mode")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundColor(Theme.cream)
-                Text("Typing on your Mac boosts customers up to ×2.5 (counts keystrokes only,\nnever reads them — needs Accessibility permission)")
-                    .font(.system(size: 9, design: .rounded))
-                    .foregroundColor(Theme.dim)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("⚡ Work Mode")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.cream)
+                    Text("Typing anywhere on your Mac boosts customers up to ×2.5.\nCounts keystrokes only — never reads what you type.")
+                        .font(.system(size: 9, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                }
+                Spacer()
+                Toggle("", isOn: Binding(
+                    get: { controller.state.workMode },
+                    set: { _ in controller.toggleWorkMode() }))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .labelsHidden()
             }
-            Spacer()
-            Toggle("", isOn: Binding(
-                get: { controller.state.workMode },
-                set: { _ in controller.toggleWorkMode() }))
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .labelsHidden()
+            if controller.state.workMode {
+                if controller.axTrusted {
+                    Text("✓ listening — type fast and watch the ☕ steam & ⚡ in the menu bar")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundColor(Color(red: 0.55, green: 0.85, blue: 0.55))
+                } else {
+                    HStack(spacing: 6) {
+                        Text("⚠️ macOS permission needed to hear typing in other apps")
+                            .font(.system(size: 9, weight: .semibold, design: .rounded))
+                            .foregroundColor(Theme.danger)
+                        Button("Open Settings") {
+                            NSWorkspace.shared.open(URL(string:
+                                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.bg)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(Theme.gold)
+                        .cornerRadius(5)
+                    }
+                    Text("System Settings → Privacy & Security → Accessibility → enable Pixel Pet Café.\nAfter the game updates, macOS may require re-enabling it (toggle off & on).")
+                        .font(.system(size: 8.5, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                }
+            }
         }
         .padding(10)
         .background(Theme.card)

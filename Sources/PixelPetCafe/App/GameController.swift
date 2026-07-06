@@ -29,6 +29,7 @@ final class GameController: ObservableObject {
     private var localKeyMonitor: Any?
     private var keystrokes: [Date] = []
     @Published private(set) var workBoost: Double = 1
+    @Published private(set) var axTrusted: Bool = AXIsProcessTrusted()
 
     var incomeEstimate: Double { SalesEngine.incomeEstimate(state) }
     var isClosed: Bool { SalesEngine.isClosed(state) }
@@ -109,6 +110,12 @@ final class GameController: ObservableObject {
     }
 
     private func updateWorkBoost(now: Date) {
+        // trust can be granted while running — pick it up and (re)attach
+        let trusted = AXIsProcessTrusted()
+        if trusted != axTrusted { axTrusted = trusted }
+        if state.workMode, trusted, keyMonitor == nil {
+            startKeyMonitor()
+        }
         guard state.workMode, keyMonitor != nil else {
             if workBoost != 1 { workBoost = 1 }
             return

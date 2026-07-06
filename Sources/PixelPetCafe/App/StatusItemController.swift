@@ -246,6 +246,11 @@ final class StatusItemController: NSObject {
         mute.state = controller.state.muted ? .on : .off
         menu.addItem(mute)
 
+        let work = NSMenuItem(title: "Work Mode ⚡ (typing boost)", action: #selector(toggleWork), keyEquivalent: "")
+        work.target = self
+        work.state = controller.state.workMode ? .on : .off
+        menu.addItem(work)
+
         let login = NSMenuItem(title: "Launch at Login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self
         login.state = SMAppService.mainApp.status == .enabled ? .on : .off
@@ -261,6 +266,8 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func toggleMute() { controller.toggleMuted() }
+
+    @objc private func toggleWork() { controller.toggleWorkMode() }
 
     @objc private func toggleLogin() {
         // Only effective when running from the .app bundle (tools/make_app.sh).
