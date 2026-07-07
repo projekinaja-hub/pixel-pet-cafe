@@ -71,6 +71,9 @@ struct GameState: Codable, Equatable {
     var lastSaleAt: Date? {
         get { cafe.lastSaleAt } set { cafe.lastSaleAt = newValue }
     }
+    var tables: Int {
+        get { cafe.tables } set { cafe.tables = newValue }
+    }
 
     var casinoUnlocked: Bool { lifetimeCoins >= CasinoEngine.unlockAtLifetime }
     func ownsCity(_ id: String) -> Bool { cafes.contains { $0.city == id } }

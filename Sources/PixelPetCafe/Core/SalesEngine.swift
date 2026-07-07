@@ -5,6 +5,7 @@ enum CustomerMood: Equatable {
     case settled     // wanted item unavailable, took something else
     case sadLeave    // wanted item unavailable, walked out
     case angry       // nothing servable at all
+    case noTable     // wanted to dine in, every table was taken
 }
 
 struct SaleEvent: Equatable {
@@ -14,6 +15,7 @@ struct SaleEvent: Equatable {
     let mood: CustomerMood
     let customerSpecies: Int // 0..2, picks the customer sprite
     var bigSpender: Bool = false   // rare 10× whale
+    var dineIn: Bool = false       // sits at a table vs. grabs and goes
     var angry: Bool { mood == .angry }
 }
 
@@ -224,14 +226,35 @@ enum SalesEngine {
         return options[0].0
     }
 
+    /// Share of customers who want to sit rather than grab and go.
+    static let dineInShare = 0.45
+    /// Minutes a dine-in party occupies a table before it turns over.
+    static let tableDwellMinutes = 0.75
+
+    /// Chance a dine-in customer finds a free table right now, given how many
+    /// tables the café has versus how much dine-in demand is arriving.
+    static func tableAvailability(_ s: GameState) -> Double {
+        let capacityPerMinute = Double(s.tables) / tableDwellMinutes
+        let demandPerMinute = customerRate(s) * 60 * dineInShare
+        guard demandPerMinute > 0 else { return 1 }
+        return min(1, capacityPerMinute / demandPerMinute)
+    }
+
     private static func serveCustomer<R: RandomNumberGenerator>(
         _ s: inout GameState, now: Date, rng: inout R
     ) -> SaleEvent {
         let species = Int.random(in: 0...2, using: &rng)
+        let wantsDineIn = Double.random(in: 0..<1, using: &rng) < dineInShare
+        if wantsDineIn, Double.random(in: 0..<1, using: &rng) >= tableAvailability(s) {
+            s.reputation = max(0, s.reputation - 0.4)   // fixable by buying tables, so a lighter hit
+            return SaleEvent(itemIcon: "", itemName: "", price: 0, mood: .noTable,
+                             customerSpecies: species, dineIn: true)
+        }
         let inStock = servable(s)
         guard !inStock.isEmpty else {
             s.reputation = max(0, s.reputation - 2)   // word gets around
-            return SaleEvent(itemIcon: "", itemName: "", price: 0, mood: .angry, customerSpecies: species)
+            return SaleEvent(itemIcon: "", itemName: "", price: 0, mood: .angry,
+                             customerSpecies: species, dineIn: wantsDineIn)
         }
         // the customer desires a specific item off the FULL menu
         let menu = MenuCatalog.resolve(s)
@@ -249,7 +272,7 @@ enum SalesEngine {
             } else {
                 s.reputation = max(0, s.reputation - 1)
                 return SaleEvent(itemIcon: desired.icon, itemName: desired.name, price: 0,
-                                 mood: .sadLeave, customerSpecies: species)
+                                 mood: .sadLeave, customerSpecies: species, dineIn: wantsDineIn)
             }
         }
         // serve: consume + earn + dirty up (Bo sometimes roasts for free)
@@ -277,7 +300,7 @@ enum SalesEngine {
         s.lastSaleAt = now
         unlockNewMenuItems(&s)
         return SaleEvent(itemIcon: chosen.icon, itemName: chosen.name, price: earned,
-                         mood: mood, customerSpecies: species, bigSpender: whale)
+                         mood: mood, customerSpecies: species, bigSpender: whale, dineIn: wantsDineIn)
     }
 
     static func unlockNewMenuItems(_ s: inout GameState) {

@@ -171,6 +171,24 @@ struct CafeTab: View {
         .padding(9)
         .background(Theme.card)
         .cornerRadius(9)
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("🪑 Seating — \(controller.state.tables) tables")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                Text("~\(Int(SalesEngine.tableAvailability(controller.state) * 100))% of dine-in guests get a seat right now")
+                    .font(.system(size: 9, design: .rounded))
+                    .foregroundColor(SalesEngine.tableAvailability(controller.state) < 0.6 ? Theme.danger : Theme.dim)
+            }
+            Spacer()
+            CostButton(cost: EconomyEngine.tableCost(controller.state),
+                       affordable: controller.state.coins >= EconomyEngine.tableCost(controller.state)) {
+                controller.buyTable()
+            }
+        }
+        .padding(9)
+        .background(Theme.card)
+        .cornerRadius(9)
         if controller.state.cleanliness < 100 {
             HStack {
                 Text("🧹 Sweep the café")

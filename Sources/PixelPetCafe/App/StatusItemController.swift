@@ -74,7 +74,7 @@ final class StatusItemController: NSObject {
                 } else {
                     switch event.mood {
                     case .happy, .settled: SoundPlayer.shared.play("coin", minGap: 1.2)
-                    case .sadLeave: SoundPlayer.shared.play("sad", minGap: 2)
+                    case .sadLeave, .noTable: SoundPlayer.shared.play("sad", minGap: 2)
                     case .angry: SoundPlayer.shared.play("angry", minGap: 2)
                     }
                 }

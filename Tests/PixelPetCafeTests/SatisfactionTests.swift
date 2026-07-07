@@ -27,6 +27,7 @@ final class SatisfactionTests: XCTestCase {
             case .sadLeave: sad += 1; XCTAssertEqual(e.price, 0)
             case .happy: happy += 1
             case .angry: XCTFail("espresso was servable — no one should be angry")
+            case .noTable: break   // seating gate is a separate mechanic from stock
             }
         }
         XCTAssertGreaterThan(settled, 0, "some latte-lovers should settle for espresso")

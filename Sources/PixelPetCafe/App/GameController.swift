@@ -265,6 +265,10 @@ final class GameController: ObservableObject {
         if SalesEngine.sweepAll(&state) { soundRequest.send("sweep") }
     }
 
+    func buyTable() {
+        if EconomyEngine.buyTable(&state) { soundRequest.send("buy") }
+    }
+
     func toggleMenuItem(_ id: String) {
         if let i = state.menuEnabled.firstIndex(of: id) {
             if state.menuEnabled.count > 1 { state.menuEnabled.remove(at: i) }  // never empty menu

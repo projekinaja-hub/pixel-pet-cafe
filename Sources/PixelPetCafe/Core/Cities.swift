@@ -51,7 +51,7 @@ enum Cities {
 }
 
 /// One café location. The active café is the only one operating.
-struct CafeState: Codable, Equatable {
+struct CafeState: Equatable {
     var city: String = "home"
     var staffLevels: [String: Int] = [:]
     var equipmentLevels: [String: Int] = [:]
@@ -60,12 +60,47 @@ struct CafeState: Codable, Equatable {
     var cleanliness: Double = 100
     var customerProgress: Double = 0
     var lastSaleAt: Date?
+    var tables: Int = 2
 
     static func fresh(city: String) -> CafeState {
         var c = CafeState()
         c.city = city
         c.staffLevels = ["mocha": 1]
         c.stock = GameState.starterStock
+        c.tables = 2
         return c
+    }
+}
+
+extension CafeState: Codable {
+    enum CodingKeys: String, CodingKey {
+        case city, staffLevels, equipmentLevels, stock, menuEnabled
+        case cleanliness, customerProgress, lastSaleAt, tables
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        city = try c.decodeIfPresent(String.self, forKey: .city) ?? "home"
+        staffLevels = try c.decodeIfPresent([String: Int].self, forKey: .staffLevels) ?? [:]
+        equipmentLevels = try c.decodeIfPresent([String: Int].self, forKey: .equipmentLevels) ?? [:]
+        stock = try c.decodeIfPresent([String: Int].self, forKey: .stock) ?? [:]
+        menuEnabled = try c.decodeIfPresent([String].self, forKey: .menuEnabled) ?? []
+        cleanliness = try c.decodeIfPresent(Double.self, forKey: .cleanliness) ?? 100
+        customerProgress = try c.decodeIfPresent(Double.self, forKey: .customerProgress) ?? 0
+        lastSaleAt = try c.decodeIfPresent(Date.self, forKey: .lastSaleAt)
+        tables = try c.decodeIfPresent(Int.self, forKey: .tables) ?? 2
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(city, forKey: .city)
+        try c.encode(staffLevels, forKey: .staffLevels)
+        try c.encode(equipmentLevels, forKey: .equipmentLevels)
+        try c.encode(stock, forKey: .stock)
+        try c.encode(menuEnabled, forKey: .menuEnabled)
+        try c.encode(cleanliness, forKey: .cleanliness)
+        try c.encode(customerProgress, forKey: .customerProgress)
+        try c.encodeIfPresent(lastSaleAt, forKey: .lastSaleAt)
+        try c.encode(tables, forKey: .tables)
     }
 }

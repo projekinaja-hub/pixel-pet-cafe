@@ -25,6 +25,21 @@ enum EconomyEngine {
         return cost(base: def.baseCost, level: s.equipmentLevels[id] ?? 0, growth: equipmentCostGrowth)
     }
 
+    /// Extra seating: each table added lets one more dine-in guest be served
+    /// at once instead of turned away.
+    static func tableCost(_ s: GameState) -> Double {
+        cost(base: 500, level: s.tables - 2, growth: 1.6)
+    }
+
+    @discardableResult
+    static func buyTable(_ s: inout GameState) -> Bool {
+        let c = tableCost(s)
+        guard s.coins >= c else { return false }
+        s.coins -= c
+        s.tables += 1
+        return true
+    }
+
     @discardableResult
     static func buyStaff(_ id: String, _ s: inout GameState) -> Bool {
         let c = staffCost(id, s)

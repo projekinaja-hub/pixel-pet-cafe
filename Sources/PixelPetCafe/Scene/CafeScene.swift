@@ -75,7 +75,7 @@ final class CafeScene: SKScene {
                                      size: CGSize(width: 180, height: 120))
         warmGrade.anchorPoint = .zero
         warmGrade.position = .zero
-        warmGrade.zPosition = 2
+        warmGrade.zPosition = 24   // above staff/customers so the grade covers everyone, not just the background
         warmGrade.blendMode = .multiply
         warmGrade.alpha = 0.09
         cafeLayer.addChild(warmGrade)
@@ -677,7 +677,7 @@ final class CafeScene: SKScene {
             if event.bigSpender {
                 self.sparkle(at: customer.position, color: NSColor(calibratedRed: 1, green: 0.85, blue: 0.4, alpha: 1))
             }
-            if event.mood == .angry || event.mood == .sadLeave {
+            if event.mood == .angry || event.mood == .sadLeave || event.mood == .noTable || !event.dineIn {
                 customer.run(.sequence([
                     .wait(forDuration: 1.4),
                     .move(to: Self.doorPoint, duration: 1.6),
@@ -702,7 +702,7 @@ final class CafeScene: SKScene {
         let texName: String
         switch event.mood {
         case .angry: texName = "bubble_angry"
-        case .sadLeave, .settled: texName = "bubble_sad"
+        case .sadLeave, .settled, .noTable: texName = "bubble_sad"
         case .happy: texName = "bubble"
         }
         let bubble = SKSpriteNode(texture: SpriteLoader.texture(texName))
