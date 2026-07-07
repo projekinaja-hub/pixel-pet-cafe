@@ -63,7 +63,7 @@ final class CafeScene: SKScene {
     override init() {
         super.init(size: CGSize(width: 180, height: 120))
         scaleMode = .aspectFit
-        backgroundColor = NSColor(calibratedRed: 0.16, green: 0.13, blue: 0.15, alpha: 1)
+        backgroundColor = NSColor(calibratedRed: 0.22, green: 0.19, blue: 0.20, alpha: 1)
         background.anchorPoint = .zero
         background.position = .zero
         background.zPosition = 0
@@ -77,7 +77,7 @@ final class CafeScene: SKScene {
         warmGrade.position = .zero
         warmGrade.zPosition = 24   // above staff/customers so the grade covers everyone, not just the background
         warmGrade.blendMode = .multiply
-        warmGrade.alpha = 0.09
+        warmGrade.alpha = 0.04
         cafeLayer.addChild(warmGrade)
         // ambient glow pooling over the counter, where the espresso machine lives
         let counterGlow = SKSpriteNode(texture: SpriteLoader.texture("glow"))
@@ -105,7 +105,7 @@ final class CafeScene: SKScene {
         vig.position = .zero
         vig.size = CGSize(width: 180, height: 120)
         vig.zPosition = 40
-        vig.alpha = 0.45
+        vig.alpha = 0.2
         addChild(vig)
         // drifting dust motes
         for i in 0..<7 {
@@ -439,7 +439,6 @@ final class CafeScene: SKScene {
             phase = "night"; tint = NSColor(calibratedRed: 0.14, green: 0.16, blue: 0.42, alpha: 1)
             alpha = 0.42; windowColor = NSColor(calibratedRed: 0.06, green: 0.07, blue: 0.22, alpha: 0.65)
         }
-        guard phase != lastTimePhase else { return }
         lastTimePhase = phase
         timeTint.run(.group([.colorize(with: tint, colorBlendFactor: 1, duration: 2.5),
                              .fadeAlpha(to: alpha, duration: 2.5)]))
@@ -596,10 +595,15 @@ final class CafeScene: SKScene {
     }
 
     private func configureClosed(_ closed: Bool) {
+        if !closed {
+            // always force-clear stray overlays, even if bookkeeping is stale
+            cafeLayer.childNode(withName: "closedOverlay")?.removeFromParent()
+        }
         guard closed != configuredClosed else { return }
         configuredClosed = closed
         if closed {
             let overlay = SKNode()
+            overlay.name = "closedOverlay"
             overlay.zPosition = 30
             let dim = SKSpriteNode(color: NSColor(calibratedRed: 0.05, green: 0.04, blue: 0.09, alpha: 0.45),
                                    size: CGSize(width: 180, height: 120))
