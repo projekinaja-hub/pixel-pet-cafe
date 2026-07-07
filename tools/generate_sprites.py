@@ -569,6 +569,20 @@ def background(tier, theme="home"):
         c.set(134, 41, GOLD); c.set(135, 41, GOLD)
     return c
 
+def table_extra():
+    """standalone café table + shadow, for tables bought beyond the baked-in pair."""
+    c = Canvas(26, 20, CLEAR)
+    for x in range(2, 26):
+        for y in range(15, 19):
+            if (x + y) % 2 == 0:
+                c.set(x, y, (0, 0, 0, 60))
+    c.rect(2, 2, 22, 4, WOOD_L)
+    c.hline(2, 2, 22, INK)
+    c.hline(2, 5, 22, _shade(WOOD_L, 0.8))
+    c.rect(11, 6, 4, 10, WOOD_D)
+    c.rect(8, 16, 10, 2, WOOD_D)
+    return c
+
 # ---------------------------------------------------------------- main
 
 
@@ -1286,6 +1300,7 @@ def main():
         for t in range(3):
             fn(t).save(f"equip_{eid}_{t}.png"); count += 1
     tip_coin().save("tip.png"); recipe_bubble().save("recipe_bubble.png"); count += 2
+    table_extra().save("table_extra.png"); count += 1
     for f in range(4):
         baricon(f).save(f"baricon_{f}.png"); count += 1
     for t in range(3):

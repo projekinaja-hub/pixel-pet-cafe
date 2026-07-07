@@ -35,10 +35,19 @@ final class CafeScene: SKScene {
     private var configuredOwnerKey = ""
     private var configuredDirt = -1
     private var configuredClosed = false
+    private var configuredExtraTables = -1
+    private var tableNodes: [SKSpriteNode] = []
+    private var currentSeatPoints = CafeScene.seatPoints
 
     private static let doorPoint = CGPoint(x: 14, y: 32)
     private static let counterPoint = CGPoint(x: 104, y: 42)
     private static let seatPoints = [CGPoint(x: 44, y: 34), CGPoint(x: 74, y: 34), CGPoint(x: 96, y: 22)]
+    /// Slots for tables bought beyond the two baked into the background art
+    /// (a back row, further from the viewer). (tablePos, seatPos) pairs.
+    private static let extraTableSpots: [(table: CGPoint, seat: CGPoint)] = [
+        (CGPoint(x: 36, y: 46), CGPoint(x: 44, y: 50)),
+        (CGPoint(x: 66, y: 46), CGPoint(x: 74, y: 50)),
+    ]
     private static let dirtSpots: [CGPoint] = [
         CGPoint(x: 52, y: 12), CGPoint(x: 92, y: 8), CGPoint(x: 34, y: 26),
         CGPoint(x: 120, y: 16), CGPoint(x: 70, y: 40),
@@ -374,6 +383,7 @@ final class CafeScene: SKScene {
         configureStaff(state)
         configureEquipment(state)
         configureOwner(state)
+        configureTables(state)
         configureDirt(state)
         configureClosed(SalesEngine.isClosed(state))
         applyTimeOfDay()
@@ -562,6 +572,30 @@ final class CafeScene: SKScene {
         node.run(bob)
     }
 
+    /// The two tables baked into the background art cover `tables == 2` (the
+    /// starting default). Every table bought beyond that spawns a real extra
+    /// table sprite in the back row, up to the number of slots we have room for.
+    private func configureTables(_ state: GameState) {
+        let extra = min(max(0, state.tables - 2), Self.extraTableSpots.count)
+        guard extra != configuredExtraTables else { return }
+        configuredExtraTables = extra
+        tableNodes.forEach { $0.removeFromParent() }
+        tableNodes.removeAll()
+        for i in 0..<extra {
+            let spot = Self.extraTableSpots[i]
+            let node = SKSpriteNode(texture: SpriteLoader.texture("table_extra"))
+            node.texture.map { node.size = $0.size() }
+            node.anchorPoint = CGPoint(x: 0.5, y: 0)
+            node.position = spot.table
+            node.zPosition = 5
+            node.alpha = 0
+            cafeLayer.addChild(node)
+            node.run(.fadeIn(withDuration: 0.5))
+            tableNodes.append(node)
+        }
+        currentSeatPoints = Self.seatPoints + Self.extraTableSpots.prefix(extra).map { $0.seat }
+    }
+
     private func configureDirt(_ state: GameState) {
         let count = SalesEngine.dirtSpots(state)
         guard count != configuredDirt else { return }
@@ -687,7 +721,7 @@ final class CafeScene: SKScene {
                     .removeFromParent(),
                 ])) { [weak self] in self?.activeCustomers -= 1 }
             } else {
-                let seat = Self.seatPoints[Int.random(in: 0..<Self.seatPoints.count)]
+                let seat = currentSeatPoints[Int.random(in: 0..<currentSeatPoints.count)]
                 customer.run(.sequence([
                     .wait(forDuration: 1.6),
                     .move(to: seat, duration: 1.8),
