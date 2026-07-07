@@ -25,14 +25,22 @@ enum EconomyEngine {
         return cost(base: def.baseCost, level: s.equipmentLevels[id] ?? 0, growth: equipmentCostGrowth)
     }
 
+    /// The café floor only has room to actually draw this many tables (2 baked
+    /// into the background art + 2 back-row slots). Bigger dining rooms —
+    /// unlocked by expanding to more cities — are a future upgrade; capping
+    /// here keeps "tables bought" always matching a table you can see.
+    static func maxTables(_ s: GameState) -> Int { 4 }
+
     /// Extra seating: each table added lets one more dine-in guest be served
     /// at once instead of turned away.
     static func tableCost(_ s: GameState) -> Double {
-        cost(base: 500, level: s.tables - 2, growth: 1.6)
+        guard s.tables < maxTables(s) else { return .infinity }
+        return cost(base: 500, level: s.tables - 2, growth: 1.6)
     }
 
     @discardableResult
     static func buyTable(_ s: inout GameState) -> Bool {
+        guard s.tables < maxTables(s) else { return false }
         let c = tableCost(s)
         guard s.coins >= c else { return false }
         s.coins -= c

@@ -43,6 +43,15 @@ final class SeatingTests: XCTestCase {
         XCTAssertGreaterThan(EconomyEngine.tableCost(s), cost0)
     }
 
+    func testTablesAreCappedAtWhatTheRoomCanActuallyShow() {
+        var s = GameState.newGame()
+        s.coins = 1_000_000
+        while EconomyEngine.buyTable(&s) {}
+        XCTAssertEqual(s.tables, EconomyEngine.maxTables(s))
+        XCTAssertEqual(EconomyEngine.tableCost(s), .infinity)
+        XCTAssertFalse(EconomyEngine.buyTable(&s))
+    }
+
     func testOldSaveWithoutTablesFieldDecodesWithDefault() throws {
         let json = """
         {"city": "home", "staffLevels": {"mocha": 1}, "stock": {}, "menuEnabled": []}
