@@ -77,7 +77,7 @@ final class CafeScene: SKScene {
         warmGrade.position = .zero
         warmGrade.zPosition = 2
         warmGrade.blendMode = .multiply
-        warmGrade.alpha = 0.16
+        warmGrade.alpha = 0.09
         cafeLayer.addChild(warmGrade)
         // ambient glow pooling over the counter, where the espresso machine lives
         let counterGlow = SKSpriteNode(texture: SpriteLoader.texture("glow"))
@@ -105,7 +105,7 @@ final class CafeScene: SKScene {
         vig.position = .zero
         vig.size = CGSize(width: 180, height: 120)
         vig.zPosition = 40
-        vig.alpha = 0.85
+        vig.alpha = 0.45
         addChild(vig)
         // drifting dust motes
         for i in 0..<7 {
