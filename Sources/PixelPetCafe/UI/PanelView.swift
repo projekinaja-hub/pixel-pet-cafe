@@ -103,7 +103,7 @@ struct PanelView: View {
                 .padding(10)
                 .frame(width: 360)
             }
-            .frame(height: 236)
+            .frame(maxHeight: .infinity)
         }
         .frame(width: 360, height: 544, alignment: .top)
         .clipped()
