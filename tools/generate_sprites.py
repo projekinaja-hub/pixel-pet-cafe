@@ -364,11 +364,98 @@ THEMES = {
     "cloud":  {"walls": [(216, 226, 246, 255), (208, 218, 242, 255), (198, 208, 238, 255)],
                "floors": [(236, 240, 250, 255), (228, 232, 246, 255), (212, 218, 238, 255)],
                "sky": (176, 208, 248, 255), "accent": (255, 226, 150, 255)},
+    "moon":   {"walls": [(70, 66, 90, 255), (64, 60, 86, 255), (56, 52, 78, 255)],
+               "floors": [(48, 44, 66, 255), (42, 40, 60, 255), (36, 34, 52, 255)],
+               "sky": (18, 16, 36, 255), "accent": (150, 180, 230, 255)},
 }
 
 def _shade(col, f):
     return (min(255, int(col[0] * f)), min(255, int(col[1] * f)),
             min(255, int(col[2] * f)), 255)
+
+def _disk(c, cx, cy, r, color):
+    """small filled circle, for suns/moons/planets."""
+    for yy in range(cy - r, cy + r + 1):
+        for xx in range(cx - r, cx + r + 1):
+            if (xx - cx) ** 2 + (yy - cy) ** 2 <= r * r + r * 0.5:
+                c.set(xx, yy, color)
+
+def _triangle(c, cx, base_y, height, half_w, color):
+    """upward triangle silhouette (mountain/volcano cone), base at base_y."""
+    for i in range(height):
+        yy = base_y - i
+        ww = max(1, round(half_w * (1 - i / height)))
+        c.rect(cx - ww, yy, ww * 2, 1, color)
+
+def _window_scene(c, theme):
+    """distinct outdoor view per café theme, drawn inside the window pane
+    (x 32-61, y 14-47), BEFORE the mullion cross-bars are redrawn on top."""
+    if theme == "neon":  # moon + stars over a distant city skyline
+        c.rect(38, 18, 4, 4, (240, 236, 210, 255))
+        c.set(52, 20, WHITE); c.set(57, 26, WHITE); c.set(44, 28, WHITE)
+        for tx, tw, th_ in ((34, 4, 10), (40, 3, 15), (45, 5, 8), (52, 4, 13), (57, 3, 9)):
+            c.rect(tx, 47 - th_, tw, th_, (40, 36, 60, 255))
+            for wy in range(47 - th_ + 2, 45, 3):
+                c.set(tx + 1, wy, (94, 230, 224, 255))
+    elif theme == "sakura":  # blossom branch
+        c.rect(36, 20, 22, 2, (120, 82, 60, 255))
+        for px, py in ((38, 18), (44, 17), (50, 19), (56, 18), (41, 22), (53, 23)):
+            c.set(px, py, (244, 168, 186, 255)); c.set(px + 1, py, (238, 150, 170, 255))
+    elif theme == "seaside":  # beach horizon, sun, sailboat, gull
+        c.rect(32, 34, 30, 13, (90, 160, 200, 255))
+        c.hline(32, 34, 30, (60, 130, 175, 255))
+        _disk(c, 40, 20, 3, (255, 235, 150, 255))
+        c.vline(54, 29, 6, (80, 60, 50, 255))
+        for i, yy in enumerate(range(28, 33)):
+            c.hline(54 - i, yy, i + 1, (250, 250, 245, 255))
+        c.set(46, 22, INK); c.set(48, 22, INK)
+    elif theme == "forest":  # treehouse view: canopy overhead, trunks below
+        for x in range(32, 62, 3):
+            c.rect(x, 14, 3, 6 + (2 if (x // 3) % 2 == 0 else 0), (90, 140, 80, 255))
+        for tx in (36, 50, 58):
+            c.vline(tx, 30, 17, (70, 50, 38, 255))
+            c.vline(tx + 1, 30, 17, (60, 42, 32, 255))
+        _disk(c, 46, 26, 3, (255, 240, 180, 255))
+    elif theme == "desert":  # dunes, big sun, cactus silhouette
+        _disk(c, 46, 20, 4, (255, 214, 120, 255))
+        c.rect(32, 38, 30, 9, (214, 168, 110, 255))
+        for x in range(32, 62):
+            if (x // 5) % 2 == 0:
+                c.vline(x, 36, 3, (190, 146, 92, 255))
+        c.vline(40, 30, 10, (90, 110, 70, 255))
+        c.hline(38, 34, 2, (90, 110, 70, 255)); c.hline(42, 32, 2, (90, 110, 70, 255))
+    elif theme == "snowy":  # snow-capped mountains, falling snow
+        _triangle(c, 40, 46, 16, 10, (205, 215, 230, 255))
+        _triangle(c, 52, 46, 12, 8, (188, 200, 220, 255))
+        c.set(40, 31, WHITE); c.set(39, 32, WHITE); c.set(41, 32, WHITE)
+        for px, py in ((35, 18), (50, 22), (58, 16), (37, 26), (55, 30)):
+            c.set(px, py, WHITE)
+    elif theme == "sunset":  # low warm sun, band, birds
+        c.rect(32, 30, 30, 17, (250, 180, 120, 255))
+        _disk(c, 47, 32, 5, (255, 220, 140, 255))
+        for bx, by in ((38, 20), (44, 18), (52, 21)):
+            c.set(bx, by, INK); c.set(bx - 1, by + 1, INK); c.set(bx + 1, by + 1, INK)
+    elif theme == "ember":  # volcano cone with glowing crater + rising sparks
+        _triangle(c, 47, 46, 20, 12, (80, 50, 48, 255))
+        c.rect(43, 17, 8, 3, (255, 140, 60, 255))
+        for px, py in ((40, 24), (52, 20), (46, 16), (58, 28)):
+            c.set(px, py, (255, 160, 70, 255))
+    elif theme == "royal":  # castle towers with flags against a purple sky
+        c.rect(34, 26, 6, 20, (80, 60, 110, 255)); c.rect(33, 22, 8, 4, (80, 60, 110, 255))
+        c.rect(48, 20, 6, 26, (80, 60, 110, 255)); c.rect(47, 16, 8, 4, (80, 60, 110, 255))
+        c.set(36, 20, (250, 210, 110, 255)); c.set(50, 14, (250, 210, 110, 255))
+    elif theme == "cloud":  # sky-city view: bright sun above a sea of clouds
+        _disk(c, 44, 18, 3, (255, 250, 220, 255))
+        for cx, cy in ((38, 36), (50, 40), (44, 30), (56, 34)):
+            c.rect(cx - 3, cy, 7, 3, WHITE); c.rect(cx - 1, cy - 2, 4, 2, WHITE)
+    elif theme == "moon":  # starfield, earthrise
+        for px, py in ((34, 18), (40, 22), (56, 16), (50, 28), (37, 30), (58, 24)):
+            c.set(px, py, WHITE)
+        _disk(c, 50, 34, 6, (90, 140, 200, 255))
+        _disk(c, 49, 33, 2, (120, 170, 140, 255))
+    else:  # home + default: soft clouds
+        c.set(38, 18, WHITE); c.set(39, 18, WHITE); c.set(40, 19, WHITE)
+        c.set(54, 24, WHITE); c.set(55, 24, WHITE)
 
 def background(tier, theme="home"):
     W, H = 180, 120
@@ -408,17 +495,8 @@ def background(tier, theme="home"):
     # window (left-center)
     c.rect(30, 12, 34, 38, INK)
     c.rect(32, 14, 30, 34, th["sky"])
-    c.vline(46, 14, 34, INK); c.hline(32, 30, 30, INK)
-    if theme == "neon":  # moon + stars
-        c.rect(38, 18, 4, 4, (240, 236, 210, 255))
-        c.set(52, 20, WHITE); c.set(57, 26, WHITE); c.set(44, 28, WHITE)
-    elif theme == "sakura":  # blossom branch
-        c.rect(36, 20, 22, 2, (120, 82, 60, 255))
-        for px, py in ((38, 18), (44, 17), (50, 19), (56, 18), (41, 22), (53, 23)):
-            c.set(px, py, (244, 168, 186, 255)); c.set(px + 1, py, (238, 150, 170, 255))
-    else:
-        c.set(38, 18, WHITE); c.set(39, 18, WHITE); c.set(40, 19, WHITE)   # cloud
-        c.set(54, 24, WHITE); c.set(55, 24, WHITE)
+    _window_scene(c, theme)
+    c.vline(46, 14, 34, INK); c.hline(32, 30, 30, INK)                # mullion, crisp on top
     c.rect(28, 50, 38, 3, WOOD)                                       # sill
     # door (far left)
     c.rect(4, 22, 20, 50, WOOD)
