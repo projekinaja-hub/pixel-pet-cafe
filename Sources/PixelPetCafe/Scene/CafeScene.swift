@@ -70,15 +70,6 @@ final class CafeScene: SKScene {
         addChild(background)
         cafeLayer.zPosition = 1
         addChild(cafeLayer)
-        // warm cozy color grade — a soft amber wash over the café only
-        let warmGrade = SKSpriteNode(color: NSColor(calibratedRed: 1, green: 0.75, blue: 0.42, alpha: 1),
-                                     size: CGSize(width: 180, height: 120))
-        warmGrade.anchorPoint = .zero
-        warmGrade.position = .zero
-        warmGrade.zPosition = 24   // above staff/customers so the grade covers everyone, not just the background
-        warmGrade.blendMode = .multiply
-        warmGrade.alpha = 0.04
-        cafeLayer.addChild(warmGrade)
         // ambient glow pooling over the counter, where the espresso machine lives
         let counterGlow = SKSpriteNode(texture: SpriteLoader.texture("glow"))
         counterGlow.position = CGPoint(x: 128, y: 66)
@@ -100,13 +91,7 @@ final class CafeScene: SKScene {
         cam.position = CGPoint(x: 90, y: 60)
         addChild(cam)
         camera = cam
-        let vig = SKSpriteNode(texture: SpriteLoader.texture("vignette"))
-        vig.anchorPoint = .zero
-        vig.position = .zero
-        vig.size = CGSize(width: 180, height: 120)
-        vig.zPosition = 40
-        vig.alpha = 0.2
-        addChild(vig)
+
         // drifting dust motes
         for i in 0..<7 {
             let mote = SKSpriteNode(color: NSColor(calibratedWhite: 1, alpha: 0.35),
