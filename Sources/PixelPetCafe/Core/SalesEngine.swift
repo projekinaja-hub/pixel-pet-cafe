@@ -178,14 +178,25 @@ enum SalesEngine {
     // MARK: live tick
 
     /// `boost` multiplies the customer flow (work-mode typing boost).
+    ///
+    /// Every owned café earns every tick, not just the one on screen —
+    /// only the café you're currently viewing gets its events returned for
+    /// animation; the rest sell quietly in the background. Ads are a single
+    /// chain-wide campaign, so their cost/effect is computed once against
+    /// the whole chain's income rather than per café.
     static func tick<R: RandomNumberGenerator>(
         _ s: inout GameState, dt: TimeInterval, now: Date = Date(), boost: Double = 1,
         rng: inout R
     ) -> [SaleEvent] {
         guard dt > 0 else { return [] }
-        managerRestock(&s)
+        let viewedCafe = s.activeCafe
         if s.adsActive {
-            let cost = 0.25 * incomeEstimate(s) * dt
+            var totalIncome = 0.0
+            for i in s.cafes.indices {
+                s.activeCafe = i
+                totalIncome += incomeEstimate(s)
+            }
+            let cost = 0.25 * totalIncome * dt
             if s.coins >= cost, cost > 0 {
                 s.coins -= cost
                 s.reputation = min(100, s.reputation + 0.005 * dt)
@@ -193,6 +204,20 @@ enum SalesEngine {
                 s.adsActive = false     // campaign ends when you can't pay
             }
         }
+        var viewedEvents: [SaleEvent] = []
+        for i in s.cafes.indices {
+            s.activeCafe = i
+            let events = tickOneCafe(&s, dt: dt, now: now, boost: i == viewedCafe ? boost : 1, rng: &rng)
+            if i == viewedCafe { viewedEvents = events }
+        }
+        s.activeCafe = viewedCafe
+        return viewedEvents
+    }
+
+    private static func tickOneCafe<R: RandomNumberGenerator>(
+        _ s: inout GameState, dt: TimeInterval, now: Date, boost: Double, rng: inout R
+    ) -> [SaleEvent] {
+        managerRestock(&s)
         if isClosed(s, now: now) {
             s.reputation = max(0, s.reputation - 0.01 * dt)
         }
@@ -312,11 +337,22 @@ enum SalesEngine {
 
     // MARK: offline bulk sim
 
-    /// Simulates the away window: customers served round-robin across servable
-    /// items until stock runs out or the time cap is reached. Mutates stock,
-    /// coins, cleanliness. Returns the haul.
+    /// Simulates the away window across every owned café — customers served
+    /// round-robin across servable items until stock runs out or the time cap
+    /// is reached. Mutates stock, coins, cleanliness. Returns the total haul.
     static func offlineSim(_ s: inout GameState, elapsed: TimeInterval) -> Double {
         guard elapsed > 0 else { return 0 }
+        let viewedCafe = s.activeCafe
+        var totalHaul = 0.0
+        for i in s.cafes.indices {
+            s.activeCafe = i
+            totalHaul += offlineSimOneCafe(&s, elapsed: elapsed)
+        }
+        s.activeCafe = viewedCafe
+        return totalHaul
+    }
+
+    private static func offlineSimOneCafe(_ s: inout GameState, elapsed: TimeInterval) -> Double {
         let window = min(elapsed, EconomyEngine.offlineCap(s))
         managerRestock(&s)
         var customers = Int(customerRate(s) * window)

@@ -166,6 +166,38 @@ final class V3Tests: XCTestCase {
         XCTAssertEqual(s.equipmentLevels["oven"], 3)            // home UNTOUCHED
     }
 
+    func testAllOwnedCafesEarnEverySingleTickNotJustTheViewedOne() {
+        var s = GameState.newGame()
+        s.coins = 100_000
+        s.stock = ["beans": 10_000, "milk": 10_000, "flour": 10_000, "sugar": 10_000]
+        s.cafes.append(CafeState.fresh(city: "sakura"))
+        s = s.normalized()
+        s.cafes[1].stock = ["beans": 10_000, "milk": 10_000, "flour": 10_000, "sugar": 10_000]
+        s.cafes[1].staffLevels = ["mocha": 30, "poppy": 30, "juno": 30]
+        s.activeCafe = 0                         // viewing home; sakura is in the background
+        var rng = SeededGenerator(seed: 7)
+        let sakuraStockBefore = s.cafes[1].stock
+        for _ in 0..<300 { _ = SalesEngine.tick(&s, dt: 1.0, rng: &rng) }
+        XCTAssertNotEqual(s.cafes[1].stock, sakuraStockBefore, "the un-viewed sakura café should still be selling")
+        XCTAssertEqual(s.activeCafe, 0, "tick must restore the viewed café index when it's done")
+    }
+
+    func testOfflineSimCreditsEveryOwnedCafe() {
+        var s = GameState.newGame()
+        s.stock = ["beans": 10_000, "milk": 10_000, "flour": 10_000, "sugar": 10_000]
+        s.staffLevels["mocha"] = 5
+        s.cafes.append(CafeState.fresh(city: "sakura"))
+        s = s.normalized()
+        s.cafes[1].stock = ["beans": 10_000, "milk": 10_000, "flour": 10_000, "sugar": 10_000]
+        s.cafes[1].staffLevels["mocha"] = 5
+        s.activeCafe = 0
+        let sakuraStockBefore = s.cafes[1].stock
+        let haul = SalesEngine.offlineSim(&s, elapsed: 600)
+        XCTAssertGreaterThan(haul, 0)
+        XCTAssertNotEqual(s.cafes[1].stock, sakuraStockBefore, "sakura should also sell while away")
+        XCTAssertEqual(s.activeCafe, 0)
+    }
+
     func testRoleBonuses() {
         var s = GameState.newGame()
         s.stock = ["beans": 10]

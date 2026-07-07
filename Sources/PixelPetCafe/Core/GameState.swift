@@ -11,8 +11,10 @@ struct OwnerConfig: Codable, Equatable {
     static let accessoryOptions = ["none", "bow", "cap", "glasses", "scarf"]
 }
 
-/// Entire savable game state. v3: multiple cafés (one per city); only the
-/// active café operates. Passthrough accessors keep the engines café-agnostic.
+/// Entire savable game state. v3: multiple cafés (one per city); every owned
+/// café earns simultaneously (SalesEngine.tick/offlineSim loop over all of
+/// them) — `activeCafe` only selects which one is on screen right now.
+/// Passthrough accessors keep the engines café-agnostic.
 /// Decoding is backward compatible with v1/v2 saves (root café fields).
 struct GameState: Codable, Equatable {
     var coins: Double = 0
