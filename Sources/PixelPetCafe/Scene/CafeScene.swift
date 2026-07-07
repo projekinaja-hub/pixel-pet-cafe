@@ -556,6 +556,10 @@ final class CafeScene: SKScene {
             .moveTo(x: 30, duration: 4.5), .wait(forDuration: 3),
         ]))
         node.run(wander)
+        let bob = SKAction.repeatForever(.sequence([
+            .moveBy(x: 0, y: 2, duration: 0.4), .moveBy(x: 0, y: -2, duration: 0.4),
+        ]))
+        node.run(bob)
     }
 
     private func configureDirt(_ state: GameState) {
@@ -628,6 +632,15 @@ final class CafeScene: SKScene {
                 .moveTo(x: 76, duration: 2.6), .wait(forDuration: 1.2),
             ]))
             node.run(patrol)
+        } else {
+            // stationed staff: a visible "at work" bob + lean at the counter/station,
+            // so they read as busy even when no customer is currently being served.
+            let work = SKAction.repeatForever(.sequence([
+                .group([.moveBy(x: 0, y: 2.5, duration: 0.35), .scaleX(to: 1.04, y: 0.96, duration: 0.35)]),
+                .group([.moveBy(x: 0, y: -2.5, duration: 0.35), .scaleX(to: 1, y: 1, duration: 0.35)]),
+                .wait(forDuration: Double.random(in: 0.3...0.9)),
+            ]))
+            node.run(.sequence([.wait(forDuration: Double.random(in: 0...0.8)), work]))
         }
     }
 
