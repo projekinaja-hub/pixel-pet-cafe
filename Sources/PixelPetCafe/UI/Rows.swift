@@ -182,9 +182,16 @@ struct CafeTab: View {
             }
             Spacer()
             if controller.state.tables >= EconomyEngine.maxTables(controller.state) {
-                Text("Room is full")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(Theme.dim)
+                if EconomyEngine.maxTables(controller.state) < 6 {
+                    Text("Own \(EconomyEngine.citiesForBiggerCafe) cities to expand")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                        .multilineTextAlignment(.trailing)
+                } else {
+                    Text("Room is full")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                }
             } else {
                 CostButton(cost: EconomyEngine.tableCost(controller.state),
                            affordable: controller.state.coins >= EconomyEngine.tableCost(controller.state)) {

@@ -52,6 +52,19 @@ final class SeatingTests: XCTestCase {
         XCTAssertFalse(EconomyEngine.buyTable(&s))
     }
 
+    func testOwningSeveralCitiesUnlocksTwoMoreTables() {
+        var s = GameState.newGame()
+        s.coins = 10_000_000
+        XCTAssertEqual(EconomyEngine.maxTables(s), 4)
+        while EconomyEngine.buyTable(&s) {}
+        XCTAssertEqual(s.tables, 4)
+        for city in ["sakura", "neon", "seaside"] { s.cafes.append(CafeState.fresh(city: city)) }
+        XCTAssertEqual(s.cafes.count, EconomyEngine.citiesForBiggerCafe)
+        XCTAssertEqual(EconomyEngine.maxTables(s), 6)
+        while EconomyEngine.buyTable(&s) {}
+        XCTAssertEqual(s.tables, 6)
+    }
+
     func testOldSaveWithoutTablesFieldDecodesWithDefault() throws {
         let json = """
         {"city": "home", "staffLevels": {"mocha": 1}, "stock": {}, "menuEnabled": []}

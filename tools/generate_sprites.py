@@ -380,6 +380,20 @@ def _disk(c, cx, cy, r, color):
             if (xx - cx) ** 2 + (yy - cy) ** 2 <= r * r + r * 0.5:
                 c.set(xx, yy, color)
 
+def _line(c, x0, y0, x1, y1, color):
+    steps = max(abs(x1 - x0), abs(y1 - y0))
+    for i in range(steps + 1):
+        t = i / steps if steps else 0
+        c.set(round(x0 + (x1 - x0) * t), round(y0 + (y1 - y0) * t), color)
+
+def _dashed_line(c, x0, y0, x1, y1, color, phase=0):
+    steps = max(abs(x1 - x0), abs(y1 - y0))
+    for i in range(steps + 1):
+        if (i + phase) % 2 != 0:
+            continue
+        t = i / steps if steps else 0
+        c.set(round(x0 + (x1 - x0) * t), round(y0 + (y1 - y0) * t), color)
+
 def _triangle(c, cx, base_y, height, half_w, color):
     """upward triangle silhouette (mountain/volcano cone), base at base_y."""
     for i in range(height):
@@ -581,6 +595,20 @@ def table_extra():
     c.hline(2, 5, 22, _shade(WOOD_L, 0.8))
     c.rect(11, 6, 4, 10, WOOD_D)
     c.rect(8, 16, 10, 2, WOOD_D)
+    return c
+
+def bar_stool():
+    """counter-side stool, for seating expanded past the floor tables."""
+    c = Canvas(14, 18, CLEAR)
+    for x in range(1, 14):
+        for y in range(15, 17):
+            if (x + y) % 2 == 0:
+                c.set(x, y, (0, 0, 0, 55))
+    c.rect(2, 2, 10, 3, WOOD_L)
+    c.hline(2, 2, 10, INK)
+    c.hline(2, 4, 10, _shade(WOOD_L, 0.8))
+    c.vline(4, 5, 9, WOOD_D); c.vline(9, 5, 9, WOOD_D)
+    c.hline(3, 10, 8, WOOD_D)                     # foot rail
     return c
 
 # ---------------------------------------------------------------- main
@@ -812,16 +840,18 @@ def dirt_cup():
     return c
 
 def cobweb():
-    c = Canvas(14, 14)
-    w = (230, 230, 235, 150)
-    for i in range(14):
-        c.set(i, 0, w) if i % 2 == 0 else None
-        c.set(0, i, w) if i % 2 == 0 else None
-    for i in range(0, 12, 2):
-        c.set(i, 12 - i, w)
-    for r in (4, 8):
-        for i in range(0, r + 1, 2):
-            c.set(i, r - i, w)
+    """corner web: angled radial spokes (avoiding the bare edges, so rings
+    read as diagonal web strands rather than a solid stair-step bracket) plus
+    dashed concentric capture-spiral rings connecting them."""
+    c = Canvas(18, 18, CLEAR)
+    w = (225, 225, 232, 220)
+    spokes = [(17, 3), (15, 9), (9, 15), (3, 17)]
+    for ex, ey in spokes:
+        _line(c, 0, 0, ex, ey, w)
+    for idx, frac in enumerate((0.4, 0.7, 0.98)):
+        pts = [(round(ex * frac), round(ey * frac)) for ex, ey in spokes]
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+            _dashed_line(c, x0, y0, x1, y1, w, phase=idx)
     return c
 
 def closed_sign():
@@ -1301,6 +1331,7 @@ def main():
             fn(t).save(f"equip_{eid}_{t}.png"); count += 1
     tip_coin().save("tip.png"); recipe_bubble().save("recipe_bubble.png"); count += 2
     table_extra().save("table_extra.png"); count += 1
+    bar_stool().save("bar_stool.png"); count += 1
     for f in range(4):
         baricon(f).save(f"baricon_{f}.png"); count += 1
     for t in range(3):

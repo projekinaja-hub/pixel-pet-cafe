@@ -25,11 +25,14 @@ enum EconomyEngine {
         return cost(base: def.baseCost, level: s.equipmentLevels[id] ?? 0, growth: equipmentCostGrowth)
     }
 
-    /// The café floor only has room to actually draw this many tables (2 baked
-    /// into the background art + 2 back-row slots). Bigger dining rooms —
-    /// unlocked by expanding to more cities — are a future upgrade; capping
-    /// here keeps "tables bought" always matching a table you can see.
-    static func maxTables(_ s: GameState) -> Int { 4 }
+    /// The café floor has room for 2 baked-in tables + 2 back-row tables (4).
+    /// Owning several cities unlocks counter-side bar stools for 2 more seats
+    /// (6) — a real "bigger business, bigger café" progression tied to
+    /// expansion, not an invisible number with nothing to look at.
+    static let citiesForBiggerCafe = 4
+    static func maxTables(_ s: GameState) -> Int {
+        s.cafes.count >= citiesForBiggerCafe ? 6 : 4
+    }
 
     /// Extra seating: each table added lets one more dine-in guest be served
     /// at once instead of turned away.
