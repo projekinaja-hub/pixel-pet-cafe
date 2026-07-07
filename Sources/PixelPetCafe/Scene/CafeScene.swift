@@ -391,6 +391,90 @@ final class CafeScene: SKScene {
         configureOwner(state)
         configureDirt(state)
         configureClosed(SalesEngine.isClosed(state))
+        applyTimeOfDay()
+        updateWeather(state)
+    }
+
+    // MARK: real-world day/night cycle
+
+    private lazy var timeTint: SKSpriteNode = {
+        let n = SKSpriteNode(color: .clear, size: CGSize(width: 180, height: 120))
+        n.anchorPoint = .zero
+        n.position = .zero
+        n.zPosition = 25
+        n.blendMode = .alpha
+        cafeLayer.addChild(n)
+        return n
+    }()
+
+    /// Window pane, y-up scene coords matching the door/window baked into the
+    /// background art (image rect x30-64, row12-50 → scene y 70-108).
+    private lazy var windowTint: SKSpriteNode = {
+        let n = SKSpriteNode(color: .clear, size: CGSize(width: 32, height: 36))
+        n.position = CGPoint(x: 47, y: 89)
+        n.zPosition = 3
+        n.blendMode = .alpha
+        cafeLayer.addChild(n)
+        return n
+    }()
+
+    private var lastTimePhase = ""
+
+    private func applyTimeOfDay() {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let phase: String
+        let tint: NSColor
+        let alpha: CGFloat
+        let windowColor: NSColor
+        switch hour {
+        case 5..<7:
+            phase = "dawn"; tint = NSColor(calibratedRed: 1, green: 0.65, blue: 0.55, alpha: 1)
+            alpha = 0.16; windowColor = NSColor(calibratedRed: 1, green: 0.72, blue: 0.5, alpha: 0.35)
+        case 7..<17:
+            phase = "day"; tint = .clear; alpha = 0; windowColor = .clear
+        case 17..<20:
+            phase = "dusk"; tint = NSColor(calibratedRed: 0.85, green: 0.42, blue: 0.55, alpha: 1)
+            alpha = 0.22; windowColor = NSColor(calibratedRed: 0.75, green: 0.35, blue: 0.5, alpha: 0.4)
+        default:
+            phase = "night"; tint = NSColor(calibratedRed: 0.14, green: 0.16, blue: 0.42, alpha: 1)
+            alpha = 0.42; windowColor = NSColor(calibratedRed: 0.06, green: 0.07, blue: 0.22, alpha: 0.65)
+        }
+        guard phase != lastTimePhase else { return }
+        lastTimePhase = phase
+        timeTint.run(.group([.colorize(with: tint, colorBlendFactor: 1, duration: 2.5),
+                             .fadeAlpha(to: alpha, duration: 2.5)]))
+        windowTint.run(.group([.colorize(with: windowColor, colorBlendFactor: 1, duration: 2.5),
+                              .fadeAlpha(to: windowColor == .clear ? 0 : 1, duration: 2.5)]))
+    }
+
+    // MARK: weather (rain event)
+
+    private var rainNodes: [SKSpriteNode] = []
+    private var rainActive = false
+
+    private func updateWeather(_ state: GameState) {
+        let shouldRain = Events.isActive("rain", state)
+        guard shouldRain != rainActive else { return }
+        rainActive = shouldRain
+        if shouldRain {
+            for _ in 0..<18 {
+                let drop = SKSpriteNode(color: NSColor(calibratedRed: 0.75, green: 0.85, blue: 1, alpha: 0.55),
+                                        size: CGSize(width: 1, height: 5))
+                drop.position = CGPoint(x: CGFloat.random(in: 0...180), y: CGFloat.random(in: 0...120))
+                drop.zPosition = 26
+                let dropHeight = CGFloat.random(in: 90...130)
+                let fall = SKAction.repeatForever(.sequence([
+                    .moveBy(x: 0, y: -dropHeight, duration: Double.random(in: 0.7...1.1)),
+                    .moveBy(x: 0, y: dropHeight, duration: 0),
+                ]))
+                drop.run(fall)
+                cafeLayer.addChild(drop)
+                rainNodes.append(drop)
+            }
+        } else {
+            rainNodes.forEach { $0.removeFromParent() }
+            rainNodes.removeAll()
+        }
     }
 
     private var currentBGKey = ""
