@@ -220,12 +220,15 @@ final class GameController: ObservableObject {
     func casinoTrySpend(_ amount: Double) -> Bool {
         guard amount > 0, state.coins >= amount else { return false }
         state.coins -= amount
+        state.casinoWagered += amount
         return true
     }
 
     func casinoAward(_ amount: Double) {
         guard amount > 0 else { return }
         state.coins += amount
+        state.casinoWon += amount
+        state.casinoBiggestWin = max(state.casinoBiggestWin, amount)
         casinoWin.send(amount)
     }
 

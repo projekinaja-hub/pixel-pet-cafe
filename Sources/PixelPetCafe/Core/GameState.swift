@@ -37,6 +37,9 @@ struct GameState: Codable, Equatable {
     var eventEndsAt: Date?
     var lastCriticVerdict: Bool?
     var achievements: [String] = []
+    var casinoWagered: Double = 0
+    var casinoWon: Double = 0
+    var casinoBiggestWin: Double = 0
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -107,6 +110,7 @@ struct GameState: Codable, Equatable {
         case cafes, activeCafe, reputation, adsActive, workMode
         case menuTaste, salesCount, tasteKnown
         case activeEvent, eventEndsAt, lastCriticVerdict, achievements
+        case casinoWagered, casinoWon, casinoBiggestWin
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -133,6 +137,9 @@ struct GameState: Codable, Equatable {
         eventEndsAt = try c.decodeIfPresent(Date.self, forKey: .eventEndsAt)
         lastCriticVerdict = try c.decodeIfPresent(Bool.self, forKey: .lastCriticVerdict)
         achievements = try c.decodeIfPresent([String].self, forKey: .achievements) ?? []
+        casinoWagered = try c.decodeIfPresent(Double.self, forKey: .casinoWagered) ?? 0
+        casinoWon = try c.decodeIfPresent(Double.self, forKey: .casinoWon) ?? 0
+        casinoBiggestWin = try c.decodeIfPresent(Double.self, forKey: .casinoBiggestWin) ?? 0
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -175,5 +182,8 @@ struct GameState: Codable, Equatable {
         try c.encodeIfPresent(eventEndsAt, forKey: .eventEndsAt)
         try c.encodeIfPresent(lastCriticVerdict, forKey: .lastCriticVerdict)
         try c.encode(achievements, forKey: .achievements)
+        try c.encode(casinoWagered, forKey: .casinoWagered)
+        try c.encode(casinoWon, forKey: .casinoWon)
+        try c.encode(casinoBiggestWin, forKey: .casinoBiggestWin)
     }
 }
