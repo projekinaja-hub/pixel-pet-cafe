@@ -3,7 +3,20 @@ import SwiftUI
 
 enum PanelTab: String, CaseIterable {
     case menu = "Menu", stock = "Stock", staff = "Staff"
-    case cafe = "Café", style = "Style", casino = "🎰", renovate = "⭐"
+    case cafe = "Café", style = "Style", casino = "Casino", renovate = "Renovate"
+
+    /// SF Symbol per tab — replaces raw emoji with a consistent icon set.
+    var symbol: String {
+        switch self {
+        case .menu: return "fork.knife"
+        case .stock: return "shippingbox.fill"
+        case .staff: return "person.2.fill"
+        case .cafe: return "cup.and.saucer.fill"
+        case .style: return "paintbrush.pointed.fill"
+        case .casino: return "suit.spade.fill"
+        case .renovate: return "star.fill"
+        }
+    }
 }
 
 enum Theme {
@@ -200,23 +213,38 @@ struct PanelView: View {
     }
 
     private var tabBar: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 2) {
             ForEach(PanelTab.allCases, id: \.self) { t in
+                let active = tab == t
                 Button {
-                    tab = t
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) { tab = t }
                 } label: {
-                    Text(t.rawValue)
-                        .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                        .foregroundColor(tab == t ? Theme.bg : Theme.dim)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(tab == t ? Theme.gold : Theme.card)
-                        .cornerRadius(6)
+                    VStack(spacing: 2) {
+                        Image(systemName: t.symbol)
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(t.rawValue)
+                            .font(.system(size: 8, weight: .bold, design: .rounded))
+                    }
+                    .foregroundColor(active ? Theme.bg : Theme.dim)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(active ? Theme.gold : Color.clear)
+                            .shadow(color: active ? Theme.gold.opacity(0.45) : .clear, radius: 4, y: 1)
+                    )
+                    .scaleEffect(active ? 1.0 : 0.94)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .frame(maxWidth: .infinity)
+        .padding(4)
+        .background(
+            RoundedRectangle(cornerRadius: 11)
+                .fill(Theme.card.opacity(0.7))
+                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.white.opacity(0.04), lineWidth: 1))
+        )
+        .padding(.horizontal, 10)
         .padding(.vertical, 6)
     }
 }

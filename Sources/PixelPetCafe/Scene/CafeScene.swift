@@ -70,6 +70,26 @@ final class CafeScene: SKScene {
         addChild(background)
         cafeLayer.zPosition = 1
         addChild(cafeLayer)
+        // warm cozy color grade — a soft amber wash over the café only
+        let warmGrade = SKSpriteNode(color: NSColor(calibratedRed: 1, green: 0.75, blue: 0.42, alpha: 1),
+                                     size: CGSize(width: 180, height: 120))
+        warmGrade.anchorPoint = .zero
+        warmGrade.position = .zero
+        warmGrade.zPosition = 2
+        warmGrade.blendMode = .multiply
+        warmGrade.alpha = 0.16
+        cafeLayer.addChild(warmGrade)
+        // ambient glow pooling over the counter, where the espresso machine lives
+        let counterGlow = SKSpriteNode(texture: SpriteLoader.texture("glow"))
+        counterGlow.position = CGPoint(x: 128, y: 66)
+        counterGlow.setScale(1.15)
+        counterGlow.zPosition = 3
+        counterGlow.blendMode = .add
+        counterGlow.alpha = 0.22
+        counterGlow.run(.repeatForever(.sequence([
+            .fadeAlpha(to: 0.14, duration: 2.4), .fadeAlpha(to: 0.26, duration: 2.4),
+        ])))
+        cafeLayer.addChild(counterGlow)
         casinoLayer.zPosition = 1
         casinoLayer.isHidden = true
         addChild(casinoLayer)
@@ -396,10 +416,11 @@ final class CafeScene: SKScene {
             shaft.position = CGPoint(x: 26, y: 106)
             shaft.zPosition = 22
             shaft.blendMode = .add
-            shaft.alpha = 0.55
+            shaft.setScale(1.3)
+            shaft.alpha = 0.8
             shaft.run(.repeatForever(.sequence([
-                .fadeAlpha(to: 0.35, duration: 4),
-                .fadeAlpha(to: 0.6, duration: 4),
+                .fadeAlpha(to: 0.55, duration: 4),
+                .fadeAlpha(to: 0.85, duration: 4),
             ])))
             cafeLayer.addChild(shaft)
         }

@@ -69,15 +69,23 @@ enum SalesEngine {
         min(0.5, 0.02 * Double(s.staffLevels["bo"] ?? 0))
     }
 
+    /// Convex floor curve: a neglected café shouldn't coast on "half customers
+    /// no matter what" — reputation/cleanliness in the gutter should read as
+    /// genuinely dead, not just quieter.
+    private static func realismFactor(_ x: Double, floor: Double, power: Double) -> Double {
+        let t = max(0, min(1, x / 100))
+        return floor + (1 - floor) * pow(t, power)
+    }
+
     static func customerRate(_ s: GameState) -> Double {
         let staffSum = Catalog.staff.reduce(0) { $0 + (s.staffLevels[$1.id] ?? 0) }
         return baseRate
             * (1 + 0.08 * Double(staffSum))
             * pow(equipMultiplier(s), 0.5)      // gear helps flow, but gently
-            * (0.3 + 0.7 * s.cleanliness / 100)
+            * realismFactor(s.cleanliness, floor: 0.08, power: 1.2)
             * (1 + 0.10 * Double(s.stars))
             * s.city.rateBonus
-            * (0.5 + s.reputation / 100)
+            * realismFactor(s.reputation, floor: 0.05, power: 1.3)
             * (s.adsActive ? 1.8 : 1.0)
             * (Events.isActive("rush", s) ? 2.0 : 1.0)
             * (Events.isActive("rain", s) ? 0.7 : 1.0)
