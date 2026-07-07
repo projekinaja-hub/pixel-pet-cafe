@@ -149,6 +149,23 @@ final class V3Tests: XCTestCase {
         XCTAssertEqual(SalesEngine.price(item, s), homePrice * 1.5, accuracy: 1e-6)
     }
 
+    func testRenovateOnlyResetsActiveCafe() {
+        var s = GameState.newGame()
+        s.staffLevels["biscuit"] = 5              // home café, built up
+        s.equipmentLevels["oven"] = 3
+        s.cafes.append(CafeState.fresh(city: "sakura"))
+        s.activeCafe = 1
+        s.staffLevels["poppy"] = 4                // sakura café, built up separately
+        s.lifetimeCoinsThisRun = EconomyEngine.prestigeThreshold * 4
+        XCTAssertTrue(EconomyEngine.canRenovate(s))
+        EconomyEngine.renovate(&s)                // renovating while AT sakura
+        XCTAssertEqual(s.staffLevels["poppy", default: 0], 0)   // sakura reset
+        XCTAssertEqual(s.staffLevels["mocha"], 1)               // starter restored
+        s.activeCafe = 0
+        XCTAssertEqual(s.staffLevels["biscuit"], 5)             // home UNTOUCHED
+        XCTAssertEqual(s.equipmentLevels["oven"], 3)            // home UNTOUCHED
+    }
+
     func testRoleBonuses() {
         var s = GameState.newGame()
         s.stock = ["beans": 10]

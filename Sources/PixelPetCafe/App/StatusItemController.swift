@@ -59,6 +59,7 @@ final class StatusItemController: NSObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
+                self.refreshIcon()
                 self.updateTitle(self.controller.state)
             }
             .store(in: &cancellables)
@@ -141,12 +142,6 @@ final class StatusItemController: NSObject {
         RunLoop.main.add(t, forMode: .common)
         iconTimer = t
 
-        controller.$workBoost
-            .receive(on: DispatchQueue.main)
-            .map { _ in () }
-            .sink { [weak self] in self?.refreshIcon() }
-            .store(in: &cancellables)
-
         // dev hook: PPC_OPEN=1 opens the popover on launch (for screenshots)
         if ProcessInfo.processInfo.environment["PPC_OPEN"] == "1" {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
@@ -219,15 +214,36 @@ final class StatusItemController: NSObject {
         statusItem.button?.image = icons[frame]
     }
 
+    /// Small pixel icon (Sprites/icon_<name>.png) as an inline attachment,
+    /// baseline-nudged to sit level with the menu bar text — no emoji.
+    private func iconAttachment(_ name: String, size: CGFloat = 11) -> NSAttributedString {
+        guard let image = loadIcon("icon_\(name)") else { return NSAttributedString() }
+        let attachment = NSTextAttachment()
+        attachment.image = image
+        attachment.bounds = CGRect(x: 0, y: -3, width: size, height: size)
+        return NSAttributedString(attachment: attachment)
+    }
+
     private func updateTitle(_ state: GameState) {
-        let warning = SalesEngine.hasStockOut(state) ? "❗" : ""
-        // fixed-width segments so the menu bar never jitters as digits change
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+        let out = NSMutableAttributedString(string: " ", attributes: [.font: font])
+        if SalesEngine.hasStockOut(state) {
+            out.append(iconAttachment("warn"))
+            out.append(NSAttributedString(string: " ", attributes: [.font: font]))
+        }
+        out.append(iconAttachment("coin"))
+        // fixed-width segment so the menu bar never jitters as digits change
         var num = formatNumber(state.coins)
         while num.count < 6 { num = "\u{2007}" + num }     // figure-space pad
-        let boost = state.workMode ? String(format: " ⚡%.1f×", controller.workBoost) : ""
-        statusItem.button?.attributedTitle = NSAttributedString(
-            string: " \(warning)\(num)\(boost)",
-            attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)])
+        out.append(NSAttributedString(string: " \(num)", attributes: [.font: font]))
+        if state.workMode {
+            out.append(NSAttributedString(string: " ", attributes: [.font: font]))
+            out.append(iconAttachment("bolt", size: 9))
+            out.append(NSAttributedString(
+                string: String(format: "%.1f×", controller.workBoost),
+                attributes: [.font: font]))
+        }
+        statusItem.button?.attributedTitle = out
     }
 
     private func restartIconTimer(interval: TimeInterval) {

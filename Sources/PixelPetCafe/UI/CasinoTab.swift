@@ -626,15 +626,7 @@ struct MahjongView: View {
     }
 
     private func tileFace(_ t: Mahjong.Tile, size: CGFloat) -> some View {
-        Text(t.glyph)
-            .font(.system(size: size * 1.15))
-            .foregroundColor(.black)
-            .frame(width: size + 6, height: size + 10)
-            .background(
-                LinearGradient(colors: [Color.white, Color(white: 0.88)],
-                               startPoint: .top, endPoint: .bottom))
-            .cornerRadius(4)
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.black.opacity(0.25), lineWidth: 0.6))
+        PixelImage(name: t.spriteIcon, scale: size / 18)
             .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
     }
 

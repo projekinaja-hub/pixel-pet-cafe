@@ -58,8 +58,11 @@ enum EconomyEngine {
 
     static func canRenovate(_ s: GameState) -> Bool { prestigeStars(s) >= 1 }
 
-    /// Resets the run (coins, staff, equipment, stock, cleanliness) for stars.
-    /// Keeps: lifetime total, custom items, owner style, bar character, settings.
+    /// Resets ONLY the café you're renovating (coins spent there, staff, gear,
+    /// stock, cleanliness) for stars. Every other café you own is untouched —
+    /// you keep building them up independently.
+    /// Keeps globally: lifetime total, custom items, owner style, bar character,
+    /// settings, and every other café's contents.
     static func renovate(_ s: inout GameState) {
         guard canRenovate(s) else { return }
         s.stars += prestigeStars(s)
@@ -70,11 +73,9 @@ enum EconomyEngine {
         let menu = MenuCatalog.items
             .filter { s.lifetimeCoins >= $0.unlockAtLifetime }
             .map(\.id) + s.customItems.map(\.id)
-        for i in s.cafes.indices {                        // cities stay owned,
-            var fresh = CafeState.fresh(city: s.cafes[i].city)   // contents reset
-            fresh.menuEnabled = menu
-            s.cafes[i] = fresh
-        }
+        var fresh = CafeState.fresh(city: s.cafe.city)
+        fresh.menuEnabled = menu
+        s.cafe = fresh
     }
 
     // MARK: golden tip

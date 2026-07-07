@@ -17,23 +17,10 @@ enum Mahjong {
             a.suit == b.suit ? a.rank < b.rank : a.suit < b.suit
         }
 
-        /// Unicode mahjong glyph.
-        var glyph: String {
-            let scalar: Int
-            switch suit {
-            case 0: scalar = 0x1F006 + rank        // 🀇..🀏 characters
-            case 1: scalar = 0x1F018 + rank        // 🀙..🀡 dots
-            case 2: scalar = 0x1F00F + rank        // 🀐..🀘 bamboo
-            default:
-                switch rank {
-                case 1...4: scalar = 0x1EFFF + rank    // 🀀..🀃 winds
-                case 5: scalar = 0x1F004               // 🀄 red
-                case 6: scalar = 0x1F005               // 🀅 green
-                default: scalar = 0x1F006              // 🀆 white
-                }
-            }
-            return String(UnicodeScalar(scalar)!)
-        }
+        /// Pixel sprite id (Sprites/mjtile_<suit>_<rank>.png) — hand-drawn tile
+        /// faces render crisp and centered, unlike system mahjong glyphs which
+        /// have wildly inconsistent font metrics across platforms.
+        var spriteIcon: String { "mjtile_\(suit)_\(rank)" }
     }
 
     static func freshWall<R: RandomNumberGenerator>(rng: inout R) -> [Tile] {

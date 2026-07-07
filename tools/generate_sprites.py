@@ -1054,6 +1054,120 @@ def map_pin(kind):
     c.hline(2, 0, 5, INK)
     return c
 
+
+# ---------------------------------------------------------------- v5: mahjong tiles
+
+PIXFONT = {
+    "1": [".#.", "##.", ".#.", ".#.", "###"],
+    "2": ["##.", "..#", ".#.", "#..", "###"],
+    "3": ["##.", "..#", ".#.", "..#", "##."],
+    "4": ["#.#", "#.#", "###", "..#", "..#"],
+    "5": ["###", "#..", "##.", "..#", "##."],
+    "6": [".##", "#..", "##.", "#.#", ".#."],
+    "7": ["###", "..#", ".#.", "#..", "#.."],
+    "8": [".#.", "#.#", ".#.", "#.#", ".#."],
+    "9": [".#.", "#.#", ".##", "..#", "##."],
+    "E": ["###", "#..", "##.", "#..", "###"],
+    "S": [".##", "#..", ".#.", "..#", "##."],
+    "W": ["#.#", "#.#", "#.#", "###", "#.#"],
+    "N": ["#..#", "##.#", "#.##", "#..#", "#..#"],
+}
+
+def draw_char(c, ch, ox, oy, color, scale=2):
+    for ry, row in enumerate(PIXFONT[ch]):
+        for rx, cell in enumerate(row):
+            if cell == "#":
+                c.rect(ox + rx * scale, oy + ry * scale, scale, scale, color)
+
+def mahjong_tile(suit, rank):
+    W, H = 18, 24
+    c = Canvas(W, H)
+    for y in range(H):
+        f = 1.0 - 0.05 * (y / H)
+        for x in range(W):
+            c.px[y][x] = _shade((250, 248, 244), f) if 1 <= x < W - 1 and 1 <= y < H - 1 else CLEAR
+    c.hline(1, 1, W - 2, INK); c.hline(1, H - 2, W - 2, INK)
+    c.vline(1, 1, H - 2, INK); c.vline(W - 2, 1, H - 2, INK)
+    c.hline(2, 2, W - 4, (255, 255, 255, 255))   # top glint
+
+    if suit == 3:
+        if rank <= 4:
+            letter = "ENWS"[rank - 1] if rank != 3 else "W"
+            letter = {1: "E", 2: "S", 3: "W", 4: "N"}[rank]
+            draw_char(c, letter, 4, 8, (46, 62, 110, 255), scale=2)
+        elif rank == 5:  # red dragon
+            c.rect(6, 8, 6, 8, (196, 60, 54, 255))
+            c.rect(8, 6, 2, 12, (196, 60, 54, 255))
+        elif rank == 6:  # green dragon
+            for i in range(4):
+                c.rect(5 + i * 2, 7 + i, 3, 2, (70, 140, 82, 255))
+        else:            # white dragon: blank tile, double blue frame
+            c.hline(3, 4, W - 6, (74, 108, 168, 255)); c.hline(3, H - 5, W - 6, (74, 108, 168, 255))
+            c.vline(3, 4, H - 8, (74, 108, 168, 255)); c.vline(W - 4, 4, H - 8, (74, 108, 168, 255))
+        return c
+
+    suit_color = [(180, 64, 56, 255), (58, 96, 168, 255), (64, 132, 78, 255)][suit]
+    digit = str(rank)
+    draw_char(c, digit, 5, 3, suit_color, scale=2)
+    if suit == 0:      # characters: calligraphy strokes
+        c.hline(5, 16, 8, suit_color); c.hline(6, 18, 6, suit_color)
+    elif suit == 1:    # dots: pip cluster sized by rank
+        pts = [(9, 17)] if rank <= 3 else [(6, 15), (12, 15), (9, 19)] if rank <= 6 else [(6, 14), (12, 14), (6, 19), (12, 19), (9, 16)]
+        for (px, py) in pts[:min(len(pts), 5)]:
+            c.rect(px - 1, py - 1, 2, 2, suit_color)
+    else:              # bamboo: vertical stick count
+        n = min(rank, 5)
+        span = 12
+        step = span // max(1, n - 1) if n > 1 else 0
+        start = 9 - (step * (n - 1)) // 2 if n > 1 else 9
+        for i in range(n):
+            x = start + i * step if n > 1 else 9
+            c.vline(x, 14, 6, suit_color)
+    return c
+
+def coin_icon():
+    c = Canvas(11, 11)
+    c.rect(2, 1, 7, 9, GOLD)
+    c.vline(1, 2, 7, GOLD); c.vline(9, 2, 7, GOLD)
+    c.hline(2, 0, 7, GOLD_D); c.hline(2, 10, 7, GOLD_D)
+    c.set(1, 2, GOLD_D); c.set(9, 2, GOLD_D); c.set(1, 8, GOLD_D); c.set(9, 8, GOLD_D)
+    c.rect(4, 3, 3, 5, GOLD_D)
+    c.set(3, 2, (255, 224, 140, 255)); c.set(4, 1, (255, 224, 140, 255))   # glint
+    return c
+
+def warn_icon():
+    c = Canvas(11, 11)
+    pts = []
+    for y in range(2, 10):
+        half = (y - 2) // 2 + 1
+        for x in range(5 - half, 6 + half):
+            c.set(x, y, (232, 150, 40, 255))
+    c.vline(5, 3, 3, (40, 26, 14, 255))
+    c.set(5, 7, (40, 26, 14, 255))
+    return c
+
+def bolt_icon():
+    c = Canvas(11, 11)
+    col = (255, 214, 60, 255)
+    pts = [(6,0),(5,1),(6,1),(4,2),(5,2),(3,3),(4,3),(5,4),(6,4),(4,5),
+           (5,5),(6,5),(5,6),(6,7),(5,8),(4,9),(3,10)]
+    for (x,y) in pts:
+        c.set(x, y, col)
+    return c
+
+def main_v5():
+    count = 0
+    for suit in range(3):
+        for rank in range(1, 10):
+            mahjong_tile(suit, rank).save(f"mjtile_{suit}_{rank}.png"); count += 1
+    for rank in range(1, 8):
+        mahjong_tile(3, rank).save(f"mjtile_3_{rank}.png"); count += 1
+    coin_icon().save("icon_coin.png")
+    warn_icon().save("icon_warn.png")
+    bolt_icon().save("icon_bolt.png")
+    count += 3
+    print(f"v5: generated {count} mahjong tile + menu bar icon sprites")
+
 def main_v4():
     count = 0
     glow().save("glow.png"); count += 1
@@ -1100,6 +1214,7 @@ def main():
     print(f"generated {count} sprites -> {os.path.abspath(OUT)}")
     main_v2()
     main_v4()
+    main_v5()
 
 if __name__ == "__main__":
     main()
