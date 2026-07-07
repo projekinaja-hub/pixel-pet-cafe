@@ -1125,14 +1125,17 @@ def mahjong_tile(suit, rank):
             c.vline(x, 14, 6, suit_color)
     return c
 
-def coin_icon():
+def coin_icon(alert=False):
     c = Canvas(11, 11)
-    c.rect(2, 1, 7, 9, GOLD)
-    c.vline(1, 2, 7, GOLD); c.vline(9, 2, 7, GOLD)
-    c.hline(2, 0, 7, GOLD_D); c.hline(2, 10, 7, GOLD_D)
-    c.set(1, 2, GOLD_D); c.set(9, 2, GOLD_D); c.set(1, 8, GOLD_D); c.set(9, 8, GOLD_D)
-    c.rect(4, 3, 3, 5, GOLD_D)
-    c.set(3, 2, (255, 224, 140, 255)); c.set(4, 1, (255, 224, 140, 255))   # glint
+    fill = (224, 90, 70, 255) if alert else GOLD
+    fill_d = (176, 58, 46, 255) if alert else GOLD_D
+    c.rect(2, 1, 7, 9, fill)
+    c.vline(1, 2, 7, fill); c.vline(9, 2, 7, fill)
+    c.hline(2, 0, 7, fill_d); c.hline(2, 10, 7, fill_d)
+    c.set(1, 2, fill_d); c.set(9, 2, fill_d); c.set(1, 8, fill_d); c.set(9, 8, fill_d)
+    c.rect(4, 3, 3, 5, fill_d)
+    c.set(3, 2, (255, 224, 140, 255) if not alert else (255, 180, 160, 255))
+    c.set(4, 1, (255, 224, 140, 255) if not alert else (255, 180, 160, 255))
     return c
 
 def warn_icon():
@@ -1163,9 +1166,10 @@ def main_v5():
     for rank in range(1, 8):
         mahjong_tile(3, rank).save(f"mjtile_3_{rank}.png"); count += 1
     coin_icon().save("icon_coin.png")
+    coin_icon(alert=True).save("icon_coin_alert.png")
     warn_icon().save("icon_warn.png")
     bolt_icon().save("icon_bolt.png")
-    count += 3
+    count += 4
     print(f"v5: generated {count} mahjong tile + menu bar icon sprites")
 
 def main_v4():

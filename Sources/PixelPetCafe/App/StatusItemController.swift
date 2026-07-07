@@ -160,10 +160,29 @@ final class StatusItemController: NSObject {
         return "bar_\(state.owner.species)_\(state.owner.palette)"
     }
 
-    private func loadIcon(_ name: String) -> NSImage? {
+    /// Loads a pixel-art PNG and bakes an extra nearest-neighbor 2x pixel
+    /// representation alongside the original, so Retina displays render the
+    /// crisp blocky pixels instead of smoothing them into a blurry mess —
+    /// AppKit picks whichever representation matches the screen's backing
+    /// scale automatically.
+    private func loadIcon(_ name: String, pointSize: CGFloat = 18) -> NSImage? {
         guard let url = Bundle.module.url(forResource: name, withExtension: "png", subdirectory: "Sprites"),
-              let image = NSImage(contentsOf: url) else { return nil }
-        image.size = NSSize(width: 18, height: 18)
+              let rep1x = NSBitmapImageRep(data: try! Data(contentsOf: url)) else { return nil }
+        rep1x.size = NSSize(width: pointSize, height: pointSize)
+        let image = NSImage(size: NSSize(width: pointSize, height: pointSize))
+        image.addRepresentation(rep1x)
+        let w = rep1x.pixelsWide * 2, h = rep1x.pixelsHigh * 2
+        if let rep2x = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: w, pixelsHigh: h,
+                                        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                                        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) {
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep2x)
+            NSGraphicsContext.current?.imageInterpolation = .none
+            rep1x.draw(in: NSRect(x: 0, y: 0, width: CGFloat(w), height: CGFloat(h)))
+            NSGraphicsContext.restoreGraphicsState()
+            rep2x.size = NSSize(width: pointSize, height: pointSize)
+            image.addRepresentation(rep2x)
+        }
         return image
     }
 
@@ -216,32 +235,29 @@ final class StatusItemController: NSObject {
 
     /// Small pixel icon (Sprites/icon_<name>.png) as an inline attachment,
     /// baseline-nudged to sit level with the menu bar text — no emoji.
-    private func iconAttachment(_ name: String, size: CGFloat = 11) -> NSAttributedString {
-        guard let image = loadIcon("icon_\(name)") else { return NSAttributedString() }
+    private func iconAttachment(_ name: String, size: CGFloat = 12) -> NSAttributedString {
+        guard let image = loadIcon("icon_\(name)", pointSize: size) else { return NSAttributedString() }
         let attachment = NSTextAttachment()
         attachment.image = image
-        attachment.bounds = CGRect(x: 0, y: -3, width: size, height: size)
+        attachment.bounds = CGRect(x: 0, y: -2.5, width: size, height: size)
         return NSAttributedString(attachment: attachment)
     }
 
+    /// One icon, one number — the alert state is a color change on the coin
+    /// itself rather than a second glyph, and the boost suffix only appears
+    /// while a real boost is active instead of reserving space at rest.
     private func updateTitle(_ state: GameState) {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
         let out = NSMutableAttributedString(string: " ", attributes: [.font: font])
-        if SalesEngine.hasStockOut(state) {
-            out.append(iconAttachment("warn"))
-            out.append(NSAttributedString(string: " ", attributes: [.font: font]))
-        }
-        out.append(iconAttachment("coin"))
+        out.append(iconAttachment(SalesEngine.hasStockOut(state) ? "coin_alert" : "coin"))
         // fixed-width segment so the menu bar never jitters as digits change
         var num = formatNumber(state.coins)
         while num.count < 6 { num = "\u{2007}" + num }     // figure-space pad
         out.append(NSAttributedString(string: " \(num)", attributes: [.font: font]))
-        if state.workMode {
-            out.append(NSAttributedString(string: " ", attributes: [.font: font]))
-            out.append(iconAttachment("bolt", size: 9))
+        if state.workMode, controller.workBoost > 1.1 {
             out.append(NSAttributedString(
-                string: String(format: "%.1f×", controller.workBoost),
-                attributes: [.font: font]))
+                string: String(format: "  %.1f×", controller.workBoost),
+                attributes: [.font: font, .foregroundColor: NSColor.systemYellow]))
         }
         statusItem.button?.attributedTitle = out
     }
