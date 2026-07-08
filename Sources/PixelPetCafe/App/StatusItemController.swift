@@ -175,8 +175,16 @@ final class StatusItemController: NSObject {
     /// AppKit picks whichever representation matches the screen's backing
     /// scale automatically.
     private func loadIcon(_ name: String, pointSize: CGFloat = 18) -> NSImage? {
+        // This fires on every icon-refresh tick (menu bar buddy animation,
+        // coin/alert swap...) for as long as the app is open — a transient
+        // disk read hiccup here must never take the whole app down, so a
+        // failed read just skips this one frame instead of crashing
+        // (this was a `try!` that force-crashed the whole app on any read
+        // failure; a long play session gave it enough ticks to eventually
+        // hit one).
         guard let url = Bundle.module.url(forResource: name, withExtension: "png", subdirectory: "Sprites"),
-              let rep1x = NSBitmapImageRep(data: try! Data(contentsOf: url)) else { return nil }
+              let data = try? Data(contentsOf: url),
+              let rep1x = NSBitmapImageRep(data: data) else { return nil }
         rep1x.size = NSSize(width: pointSize, height: pointSize)
         let image = NSImage(size: NSSize(width: pointSize, height: pointSize))
         image.addRepresentation(rep1x)
