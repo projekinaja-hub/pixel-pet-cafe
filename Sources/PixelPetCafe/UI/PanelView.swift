@@ -49,6 +49,7 @@ struct PanelView: View {
     @ObservedObject var controller: GameController
     let scene: CafeScene
     @State private var tab: PanelTab
+    @State private var showDashboard: Bool
 
     init(controller: GameController, scene: CafeScene) {
         self.controller = controller
@@ -57,6 +58,9 @@ struct PanelView: View {
         let initial = ProcessInfo.processInfo.environment["PPC_TAB"]
             .flatMap { key in PanelTab.allCases.first { "\($0)" == key } } ?? .menu
         _tab = State(initialValue: initial)
+        // dev hook: PPC_DASHBOARD=1 opens the café health dashboard on launch,
+        // for offscreen PPC_SNAPSHOT verification.
+        _showDashboard = State(initialValue: ProcessInfo.processInfo.environment["PPC_DASHBOARD"] == "1")
     }
 
     var body: some View {
@@ -85,6 +89,16 @@ struct PanelView: View {
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.gold.opacity(0.6), lineWidth: 1))
                     .padding(.top, 10)
                     .transition(.opacity)
+                }
+                // Entry point for the "how's my café doing" dashboard — lives
+                // in this same proven overlay layer as AwayToast/banner above,
+                // top-leading so it never collides with their centered content.
+                VStack {
+                    HStack {
+                        DashboardEntryButton { showDashboard = true }
+                        Spacer()
+                    }
+                    Spacer()
                 }
             }
             header
@@ -124,6 +138,11 @@ struct PanelView: View {
         }
         .onChange(of: tab) { newTab in
             scene.setMode(newTab == .casino ? .casino : .cafe)
+        }
+        .overlay {
+            if showDashboard {
+                DashboardOverlay(controller: controller) { showDashboard = false }
+            }
         }
     }
 
