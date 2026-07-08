@@ -71,6 +71,36 @@ enum SalesEngine {
         min(0.5, 0.02 * Double(s.staffLevels["bo"] ?? 0))
     }
 
+    /// A more upgraded café burns through ingredients faster per sale, not just
+    /// more often — busier equipment, bigger portions. +2% ingredients per
+    /// average equipment level, so spending keeps pace with the earnings those
+    /// same upgrades unlock (a fresh café — avg level 0 — is unaffected).
+    static func consumptionMultiplier(_ s: GameState) -> Double {
+        let ids = Catalog.equipment.map(\.id)
+        let avgLevel = Double(ids.reduce(0) { $0 + (s.equipmentLevels[$1] ?? 0) }) / Double(ids.count)
+        return 1 + 0.02 * avgLevel
+    }
+
+    /// Consumes `qty * consumptionMultiplier` per ingredient, rounding
+    /// probabilistically (rather than always ceiling) so low-quantity recipes
+    /// don't jump straight to double consumption the moment the multiplier
+    /// ticks above 1 — the fractional part is the *chance* of the extra unit.
+    private static func consume<R: RandomNumberGenerator>(
+        _ ingredients: [String: Int], _ s: inout GameState, rng: inout R
+    ) {
+        let mult = consumptionMultiplier(s)
+        for (ing, qty) in ingredients {
+            let exact = Double(qty) * mult
+            var amount = Int(exact)
+            let frac = exact - Double(amount)
+            // Skip the RNG draw entirely when there's no fractional part (mult == 1,
+            // i.e. a fresh café with no equipment) so unrelated seeded tests that
+            // don't care about consumption scaling see byte-identical RNG streams.
+            if frac > 0, Double.random(in: 0..<1, using: &rng) < frac { amount += 1 }
+            s.stock[ing, default: 0] -= amount
+        }
+    }
+
     /// Convex floor curve: a neglected café shouldn't coast on "half customers
     /// no matter what" — reputation/cleanliness in the gutter should read as
     /// genuinely dead, not just quieter.
@@ -356,9 +386,7 @@ enum SalesEngine {
         }
         // serve: consume + earn + dirty up (Bo sometimes roasts for free)
         if Double.random(in: 0..<1, using: &rng) >= freeSaleChance(s) {
-            for (ing, qty) in chosen.ingredients {
-                s.stock[ing, default: 0] -= qty
-            }
+            consume(chosen.ingredients, &s, rng: &rng)
         }
         // 2% of customers are big spenders paying 10× — the core-loop jackpot
         let whale = Double.random(in: 0..<1, using: &rng) < 0.02
@@ -419,9 +447,12 @@ enum SalesEngine {
                 if servable(s).isEmpty { break }
                 continue
             }
+            let mult = consumptionMultiplier(s)
             for item in options {
                 guard customers > 0 else { break }
-                for (ing, qty) in item.ingredients { s.stock[ing, default: 0] -= qty }
+                for (ing, qty) in item.ingredients {
+                    s.stock[ing, default: 0] -= Int((Double(qty) * mult).rounded())
+                }
                 haul += price(item, s)
                 customers -= 1
                 safety -= 1

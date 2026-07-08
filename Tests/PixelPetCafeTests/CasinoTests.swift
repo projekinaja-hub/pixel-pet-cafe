@@ -210,6 +210,36 @@ final class V3Tests: XCTestCase {
         XCTAssertEqual(s.activeCafe, 0)
     }
 
+    func testHigherEquipmentBurnsIngredientsFasterPerSale() {
+        var base = GameState.newGame()
+        base.coins = 1e9
+        base.stock = ["beans": 100_000]   // only espresso is servable: deterministic single-ingredient path
+        var upgraded = base
+        for id in ["espresso", "grinder", "oven", "decor", "sound"] { upgraded.equipmentLevels[id] = 3 }
+        XCTAssertEqual(SalesEngine.consumptionMultiplier(base), 1, accuracy: 1e-9)
+        XCTAssertEqual(SalesEngine.consumptionMultiplier(upgraded), 1.06, accuracy: 1e-9)
+
+        // normalize by event count (not call count) so a higher customerRate from
+        // the same equipment levels can't skew the per-sale consumption signal
+        func avgBeansPerEvent(_ start: GameState, seed: UInt64) -> Double {
+            var copy = start
+            var rng = SeededGenerator(seed: seed)
+            var events = 0, spent = 0
+            for _ in 0..<2000 {
+                copy.customerProgress = 1
+                if (copy.stock["beans"] ?? 0) < 10 { copy.stock["beans"] = 100_000 }
+                let before = copy.stock["beans"] ?? 0
+                let evts = SalesEngine.tick(&copy, dt: 0.001, rng: &rng)
+                spent += before - (copy.stock["beans"] ?? 0)
+                events += evts.count
+            }
+            return events > 0 ? Double(spent) / Double(events) : 0
+        }
+        let baseAvg = avgBeansPerEvent(base, seed: 5)
+        let upgradedAvg = avgBeansPerEvent(upgraded, seed: 5)
+        XCTAssertGreaterThan(upgradedAvg, baseAvg, "a more-upgraded café should burn more beans per sale on average")
+    }
+
     func testRoleBonuses() {
         var s = GameState.newGame()
         s.stock = ["beans": 10]
