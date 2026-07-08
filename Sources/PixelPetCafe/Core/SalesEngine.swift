@@ -219,8 +219,9 @@ enum SalesEngine {
         rng: inout R
     ) -> [SaleEvent] {
         guard dt > 0 else { return [] }
-        // Market prices are chain-wide (not per café), so drift once per tick
-        // rather than once per owned café.
+        // Calendar and market prices are both chain-wide (not per café), so
+        // advance/drift once per tick rather than once per owned café.
+        GameCalendar.advance(&s, now: now)
         MarketEngine.drift(&s, dt: dt, rng: &rng)
         let viewedCafe = s.activeCafe
         if s.adsActive {
@@ -293,7 +294,10 @@ enum SalesEngine {
     ) {
         guard dt > 0 else { return }
         let alpha = min(1, dt / consumptionTimeConstant)
-        let managerTarget = Double(10 * (s.staffLevels["marble"] ?? 0))
+        // Shares managerRestock's own target so the buffer floor and the
+        // manager's actual restock goal can never fight each other into a
+        // buy/spoil loop.
+        let managerFloor = Double(managerTarget(s))
         for ing in MenuCatalog.ingredients {
             let before = stockBeforeServing[ing.id] ?? 0
             let after = s.stock[ing.id] ?? 0
@@ -303,7 +307,7 @@ enum SalesEngine {
             ema = ema * (1 - alpha) + rate * alpha
             s.cafe.consumptionEMA[ing.id] = ema
 
-            let buffer = max(spoilageMinBuffer, max(managerTarget, ema * spoilageBufferSeconds))
+            let buffer = max(spoilageMinBuffer, max(managerFloor, ema * spoilageBufferSeconds))
             let current = Double(s.stock[ing.id] ?? 0)
             guard current > buffer else { continue }
             let excess = current - buffer
@@ -424,6 +428,10 @@ enum SalesEngine {
     /// is reached. Mutates stock, coins, cleanliness. Returns the total haul.
     static func offlineSim(_ s: inout GameState, elapsed: TimeInterval) -> Double {
         guard elapsed > 0 else { return 0 }
+        // Calendar tracks real wall-clock time regardless of the offline
+        // earnings cap below, so a multi-day gap still lands on the right
+        // season even though the earnings catch-up window is bounded.
+        GameCalendar.advance(&s)
         let viewedCafe = s.activeCafe
         var totalHaul = 0.0
         for i in s.cafes.indices {
@@ -469,19 +477,32 @@ enum SalesEngine {
 
     // MARK: manager (Marble) auto-restock
 
-    /// Keeps every ingredient stocked at ≥ 10 × Marble's level, buying 25-packs
-    /// with the player's coins.
+    /// Marble's restock target: `refillThreshold` (0...1, player-configurable,
+    /// default 1.0) of the café's storage cap — never above the cap, so the
+    /// cap is a hard upper bound on what the manager will ever hold. Requires
+    /// at least one level of Marble hired (level only gates whether the
+    /// manager acts at all; the target itself no longer scales with level).
+    static func managerTarget(_ s: GameState) -> Int {
+        guard (s.staffLevels["marble"] ?? 0) > 0 else { return 0 }
+        let cap = EconomyEngine.storageCap(s)
+        return min(cap, Int((Double(cap) * s.cafe.refillThreshold).rounded()))
+    }
+
+    /// Keeps every ingredient stocked up to `managerTarget`, buying up to
+    /// 25-unit packs at a time with the player's coins, never past the target
+    /// (which itself never exceeds the storage cap).
     static func managerRestock(_ s: inout GameState) {
-        let level = s.staffLevels["marble"] ?? 0
-        guard level > 0 else { return }
-        let target = 10 * level
+        let target = managerTarget(s)
+        guard target > 0 else { return }
         for ing in MenuCatalog.ingredients {
             var safety = 40
             while (s.stock[ing.id] ?? 0) < target, safety > 0 {
-                let cost = MenuCatalog.livePackCost(ing.id, units: 25, s)
+                let units = min(25, target - (s.stock[ing.id] ?? 0))
+                guard units > 0 else { break }
+                let cost = MenuCatalog.livePackCost(ing.id, units: units, s)
                 guard s.coins >= cost else { return }
                 s.coins -= cost
-                s.stock[ing.id, default: 0] += 25
+                s.stock[ing.id, default: 0] += units
                 safety -= 1
             }
         }
@@ -496,9 +517,13 @@ enum SalesEngine {
             * (Events.isActive("supplier", s) ? 0.5 : 1.0)
     }
 
-    /// Buys a pack of 25 or 100 units. Returns false if unaffordable.
+    /// Buys a pack of 25 or 100 units. Returns false if unaffordable, or if
+    /// the pack wouldn't fit under the café's storage cap — no partial fills,
+    /// the whole pack must fit (buy storage first).
     @discardableResult
     static func buyPack(_ ingredient: String, units: Int, _ s: inout GameState) -> Bool {
+        let cap = EconomyEngine.storageCap(s)
+        guard (s.stock[ingredient] ?? 0) + units <= cap else { return false }
         let cost = packPrice(ingredient, units: units, s)
         guard s.coins >= cost, cost > 0 else { return false }
         s.coins -= cost

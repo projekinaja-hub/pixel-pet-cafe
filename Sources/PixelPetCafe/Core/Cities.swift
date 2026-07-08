@@ -64,6 +64,13 @@ struct CafeState: Equatable {
     /// Ingredient id -> smoothed units-consumed-per-second (rolling EMA), used
     /// to size the spoilage buffer so normal buffer-stocking never spoils.
     var consumptionEMA: [String: Double] = [:]
+    /// Pantry upgrade level — see EconomyEngine.storageCap. Same numeric cap
+    /// applies to every ingredient's stock in this café (not a shared pool).
+    var storageLevel: Int = 0
+    /// Fraction (0...1) of the storage cap Marble's auto-restock tries to
+    /// keep every ingredient topped up to. Defaults to 1.0 (top off
+    /// completely) to match the pre-cap behavior every existing save saw.
+    var refillThreshold: Double = 1.0
 
     static func fresh(city: String) -> CafeState {
         var c = CafeState()
@@ -79,6 +86,7 @@ extension CafeState: Codable {
     enum CodingKeys: String, CodingKey {
         case city, staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt, tables, consumptionEMA
+        case storageLevel, refillThreshold
     }
 
     init(from decoder: Decoder) throws {
@@ -93,6 +101,8 @@ extension CafeState: Codable {
         lastSaleAt = try c.decodeIfPresent(Date.self, forKey: .lastSaleAt)
         tables = try c.decodeIfPresent(Int.self, forKey: .tables) ?? 2
         consumptionEMA = try c.decodeIfPresent([String: Double].self, forKey: .consumptionEMA) ?? [:]
+        storageLevel = try c.decodeIfPresent(Int.self, forKey: .storageLevel) ?? 0
+        refillThreshold = try c.decodeIfPresent(Double.self, forKey: .refillThreshold) ?? 1.0
     }
 
     func encode(to encoder: Encoder) throws {
@@ -107,5 +117,7 @@ extension CafeState: Codable {
         try c.encodeIfPresent(lastSaleAt, forKey: .lastSaleAt)
         try c.encode(tables, forKey: .tables)
         try c.encode(consumptionEMA, forKey: .consumptionEMA)
+        try c.encode(storageLevel, forKey: .storageLevel)
+        try c.encode(refillThreshold, forKey: .refillThreshold)
     }
 }

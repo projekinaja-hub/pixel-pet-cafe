@@ -16,7 +16,7 @@ struct OwnerConfig: Codable, Equatable {
 /// them) — `activeCafe` only selects which one is on screen right now.
 /// Passthrough accessors keep the engines café-agnostic.
 /// Decoding is backward compatible with v1/v2 saves (root café fields).
-struct GameState: Codable, Equatable {
+struct GameState: Codable {
     var coins: Double = 0
     var lifetimeCoins: Double = 0
     var lifetimeCoinsThisRun: Double = 0
@@ -48,9 +48,17 @@ struct GameState: Codable, Equatable {
     var marketPrices: [String: Double] = [:]     // ingredient id -> live unit price
     var priceHistory: [String: [Double]] = [:]   // ingredient id -> recent price samples (sparkline)
     // v5: shared contract for the calendar/seasons system — see Season.swift.
-    // Stub default (.spring); the real calendar-driven computation replaces
-    // this, but the type/field name is the stable handle everything else reads.
+    // Real value now: GameCalendar.advance derives it every tick from
+    // `calendarStartedAt`. Default stays .spring so a value read before the
+    // first tick (or an old save) is still sane.
     var season: Season = .spring
+    /// Anchor for the in-game calendar (see Calendar.swift): the current day
+    /// is elapsed-real-time-since-this-date / GameCalendar.dayLength, mirroring
+    /// how offlineSim already derives its catch-up window from elapsed time
+    /// rather than accumulated ticks. Set once, implicitly, the moment a
+    /// GameState value is first constructed (newGame() included) and never
+    /// touched again — old saves missing it default to "now" on load.
+    var calendarStartedAt: Date = Date()
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -85,6 +93,14 @@ struct GameState: Codable, Equatable {
     var tables: Int {
         get { cafe.tables } set { cafe.tables = newValue }
     }
+    var storageLevel: Int {
+        get { cafe.storageLevel } set { cafe.storageLevel = newValue }
+    }
+    /// Fraction (0...1) of the storage cap Marble tries to keep every
+    /// ingredient topped up to.
+    var refillThreshold: Double {
+        get { cafe.refillThreshold } set { cafe.refillThreshold = newValue }
+    }
 
     var casinoUnlocked: Bool { lifetimeCoins >= CasinoEngine.unlockAtLifetime }
     func ownsCity(_ id: String) -> Bool { cafes.contains { $0.city == id } }
@@ -109,6 +125,7 @@ struct GameState: Codable, Equatable {
                     .map(\.id) + s.customItems.map(\.id)
             }
             s.cafes[i].cleanliness = min(100, max(0, s.cafes[i].cleanliness))
+            s.cafes[i].refillThreshold = min(1, max(0, s.cafes[i].refillThreshold))
         }
         s.reputation = min(100, max(0, s.reputation))
         for ing in MenuCatalog.ingredients {
@@ -129,7 +146,7 @@ struct GameState: Codable, Equatable {
         case menuTaste, salesCount, tasteKnown
         case activeEvent, eventEndsAt, lastCriticVerdict, achievements
         case casinoWagered, casinoWon, casinoBiggestWin, casinoJackpotPot
-        case marketPrices, priceHistory, season
+        case marketPrices, priceHistory, season, calendarStartedAt
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -163,6 +180,7 @@ struct GameState: Codable, Equatable {
         marketPrices = try c.decodeIfPresent([String: Double].self, forKey: .marketPrices) ?? [:]
         priceHistory = try c.decodeIfPresent([String: [Double]].self, forKey: .priceHistory) ?? [:]
         season = try c.decodeIfPresent(Season.self, forKey: .season) ?? .spring
+        calendarStartedAt = try c.decodeIfPresent(Date.self, forKey: .calendarStartedAt) ?? Date()
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -212,5 +230,44 @@ struct GameState: Codable, Equatable {
         try c.encode(marketPrices, forKey: .marketPrices)
         try c.encode(priceHistory, forKey: .priceHistory)
         try c.encode(season, forKey: .season)
+        try c.encode(calendarStartedAt, forKey: .calendarStartedAt)
+    }
+}
+
+extension GameState: Equatable {
+    /// Excludes `calendarStartedAt` from equality — like `lastSaved`, it's a
+    /// wall-clock construction-time anchor, not gameplay state. Two
+    /// otherwise-identical states built moments apart (e.g. two separate
+    /// `GameState.newGame()` calls in a test) shouldn't compare unequal just
+    /// because their anchors differ by a few milliseconds.
+    static func == (lhs: GameState, rhs: GameState) -> Bool {
+        lhs.coins == rhs.coins
+            && lhs.lifetimeCoins == rhs.lifetimeCoins
+            && lhs.lifetimeCoinsThisRun == rhs.lifetimeCoinsThisRun
+            && lhs.stars == rhs.stars
+            && lhs.lastSaved == rhs.lastSaved
+            && lhs.muted == rhs.muted
+            && lhs.customItems == rhs.customItems
+            && lhs.owner == rhs.owner
+            && lhs.barCharacter == rhs.barCharacter
+            && lhs.cafes == rhs.cafes
+            && lhs.activeCafe == rhs.activeCafe
+            && lhs.reputation == rhs.reputation
+            && lhs.adsActive == rhs.adsActive
+            && lhs.workMode == rhs.workMode
+            && lhs.menuTaste == rhs.menuTaste
+            && lhs.salesCount == rhs.salesCount
+            && lhs.tasteKnown == rhs.tasteKnown
+            && lhs.activeEvent == rhs.activeEvent
+            && lhs.eventEndsAt == rhs.eventEndsAt
+            && lhs.lastCriticVerdict == rhs.lastCriticVerdict
+            && lhs.achievements == rhs.achievements
+            && lhs.casinoWagered == rhs.casinoWagered
+            && lhs.casinoWon == rhs.casinoWon
+            && lhs.casinoBiggestWin == rhs.casinoBiggestWin
+            && lhs.casinoJackpotPot == rhs.casinoJackpotPot
+            && lhs.marketPrices == rhs.marketPrices
+            && lhs.priceHistory == rhs.priceHistory
+            && lhs.season == rhs.season
     }
 }
