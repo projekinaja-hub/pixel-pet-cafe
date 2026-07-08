@@ -189,6 +189,9 @@ enum SalesEngine {
         rng: inout R
     ) -> [SaleEvent] {
         guard dt > 0 else { return [] }
+        // Market prices are chain-wide (not per café), so drift once per tick
+        // rather than once per owned café.
+        MarketEngine.drift(&s, dt: dt, rng: &rng)
         let viewedCafe = s.activeCafe
         if s.adsActive {
             var totalIncome = 0.0
@@ -223,12 +226,63 @@ enum SalesEngine {
         }
         s.customerProgress += customerRate(s) * boost * dt
         var events: [SaleEvent] = []
+        let stockBeforeServing = s.stock
         while s.customerProgress >= 1 {
             s.customerProgress -= 1
             events.append(serveCustomer(&s, now: now, rng: &rng))
             if events.count >= 20 { s.customerProgress = 0; break }  // sanity cap per tick
         }
+        updateConsumptionAndSpoilage(&s, stockBeforeServing: stockBeforeServing, dt: dt)
         return events
+    }
+
+    // MARK: spoilage
+
+    /// How quickly the per-ingredient consumption estimate reacts to new
+    /// data — a ~60s time constant so a single busy or quiet tick doesn't
+    /// swing the buffer around.
+    static let consumptionTimeConstant: TimeInterval = 60
+    /// Stock below this is never spoiled, no matter how idle the café is —
+    /// keeps early-game starter stock and casual buffer-stocking safe.
+    static let spoilageMinBuffer = 150.0
+    /// Buffer sized as this many seconds' worth of recent consumption (15
+    /// minutes) — generous enough that normal restocking habits never trip it.
+    static let spoilageBufferSeconds = 900.0
+    /// Fraction of the excess (stock above the buffer) that spoils per
+    /// second — slow enough to feel like "forgotten stock going stale," not
+    /// a punishing drain.
+    static let spoilageFraction = 0.01
+
+    /// Spoils a small share of genuinely excess stock (well beyond what the
+    /// café is actually using lately) and updates the rolling consumption
+    /// estimate used to size that buffer. The buffer also never dips below
+    /// what Marble's auto-restock is targeting, so the manager and spoilage
+    /// can't fight each other into a buy/spoil loop.
+    private static func updateConsumptionAndSpoilage(
+        _ s: inout GameState, stockBeforeServing: [String: Int], dt: TimeInterval
+    ) {
+        guard dt > 0 else { return }
+        let alpha = min(1, dt / consumptionTimeConstant)
+        let managerTarget = Double(10 * (s.staffLevels["marble"] ?? 0))
+        for ing in MenuCatalog.ingredients {
+            let before = stockBeforeServing[ing.id] ?? 0
+            let after = s.stock[ing.id] ?? 0
+            let consumed = max(0, before - after)
+            let rate = Double(consumed) / dt
+            var ema = s.cafe.consumptionEMA[ing.id] ?? 0
+            ema = ema * (1 - alpha) + rate * alpha
+            s.cafe.consumptionEMA[ing.id] = ema
+
+            let buffer = max(spoilageMinBuffer, max(managerTarget, ema * spoilageBufferSeconds))
+            let current = Double(s.stock[ing.id] ?? 0)
+            guard current > buffer else { continue }
+            let excess = current - buffer
+            let spoil = min(excess, excess * spoilageFraction * dt)
+            let spoilUnits = Int(spoil.rounded(.down))
+            if spoilUnits > 0 {
+                s.stock[ing.id] = (s.stock[ing.id] ?? 0) - spoilUnits
+            }
+        }
     }
 
     /// Weight for how much this customer craves an item: city taste × species
@@ -393,7 +447,7 @@ enum SalesEngine {
         for ing in MenuCatalog.ingredients {
             var safety = 40
             while (s.stock[ing.id] ?? 0) < target, safety > 0 {
-                let cost = MenuCatalog.packCost(ing.id, units: 25)
+                let cost = MenuCatalog.livePackCost(ing.id, units: 25, s)
                 guard s.coins >= cost else { return }
                 s.coins -= cost
                 s.stock[ing.id, default: 0] += 25
@@ -404,9 +458,10 @@ enum SalesEngine {
 
     // MARK: player actions
 
-    /// Pack price with any live supplier deal applied.
+    /// Pack price off the live market price, with any live supplier deal
+    /// applied on top.
     static func packPrice(_ ingredient: String, units: Int, _ s: GameState) -> Double {
-        MenuCatalog.packCost(ingredient, units: units)
+        MenuCatalog.livePackCost(ingredient, units: units, s)
             * (Events.isActive("supplier", s) ? 0.5 : 1.0)
     }
 

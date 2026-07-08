@@ -26,6 +26,7 @@ enum Theme {
     static let gold = Color(red: 0.98, green: 0.73, blue: 0.09)
     static let dim = Color(red: 0.72, green: 0.62, blue: 0.56)
     static let danger = Color(red: 0.93, green: 0.47, blue: 0.42)
+    static let dealGreen = Color(red: 0.55, green: 0.85, blue: 0.55)
 }
 
 /// Crisp pixel sprite from the bundle for SwiftUI.

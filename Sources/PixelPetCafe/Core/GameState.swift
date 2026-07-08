@@ -42,6 +42,9 @@ struct GameState: Codable, Equatable {
     var casinoWagered: Double = 0
     var casinoWon: Double = 0
     var casinoBiggestWin: Double = 0
+    // v4: fluctuating ingredient market (global, not per-café)
+    var marketPrices: [String: Double] = [:]     // ingredient id -> live unit price
+    var priceHistory: [String: [Double]] = [:]   // ingredient id -> recent price samples (sparkline)
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -102,6 +105,10 @@ struct GameState: Codable, Equatable {
             s.cafes[i].cleanliness = min(100, max(0, s.cafes[i].cleanliness))
         }
         s.reputation = min(100, max(0, s.reputation))
+        for ing in MenuCatalog.ingredients {
+            if s.marketPrices[ing.id] == nil { s.marketPrices[ing.id] = ing.unitCost }
+            if s.priceHistory[ing.id]?.isEmpty ?? true { s.priceHistory[ing.id] = [ing.unitCost] }
+        }
         return s
     }
 
@@ -116,6 +123,7 @@ struct GameState: Codable, Equatable {
         case menuTaste, salesCount, tasteKnown
         case activeEvent, eventEndsAt, lastCriticVerdict, achievements
         case casinoWagered, casinoWon, casinoBiggestWin
+        case marketPrices, priceHistory
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -145,6 +153,8 @@ struct GameState: Codable, Equatable {
         casinoWagered = try c.decodeIfPresent(Double.self, forKey: .casinoWagered) ?? 0
         casinoWon = try c.decodeIfPresent(Double.self, forKey: .casinoWon) ?? 0
         casinoBiggestWin = try c.decodeIfPresent(Double.self, forKey: .casinoBiggestWin) ?? 0
+        marketPrices = try c.decodeIfPresent([String: Double].self, forKey: .marketPrices) ?? [:]
+        priceHistory = try c.decodeIfPresent([String: [Double]].self, forKey: .priceHistory) ?? [:]
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -190,5 +200,7 @@ struct GameState: Codable, Equatable {
         try c.encode(casinoWagered, forKey: .casinoWagered)
         try c.encode(casinoWon, forKey: .casinoWon)
         try c.encode(casinoBiggestWin, forKey: .casinoBiggestWin)
+        try c.encode(marketPrices, forKey: .marketPrices)
+        try c.encode(priceHistory, forKey: .priceHistory)
     }
 }

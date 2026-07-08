@@ -87,9 +87,26 @@ enum MenuCatalog {
         (ingredientCost(item.ingredients) * customMargin).rounded()
     }
 
-    /// Pack purchase: 25 units at cost, 100 units at 10% off.
+    /// Pack purchase: 25 units at cost, 100 units at 10% off. Uses the flat
+    /// base unitCost — kept for callers that want the static reference price.
     static func packCost(_ id: String, units: Int) -> Double {
         let unit = ingredientDef(id)?.unitCost ?? 0
+        let discount = units >= 100 ? 0.9 : 1.0
+        return (unit * Double(units) * discount).rounded()
+    }
+
+    /// The ingredient's live market price (drifts over time via
+    /// `MarketEngine.drift`), falling back to the flat base cost for any
+    /// ingredient the market hasn't priced yet (e.g. a save that predates
+    /// the market system).
+    static func currentUnitCost(_ id: String, _ s: GameState) -> Double {
+        s.marketPrices[id] ?? ingredientDef(id)?.unitCost ?? 0
+    }
+
+    /// Pack purchase priced off the *live* market price rather than the flat
+    /// base cost: 25 units at cost, 100 units at 10% off.
+    static func livePackCost(_ id: String, units: Int, _ s: GameState) -> Double {
+        let unit = currentUnitCost(id, s)
         let discount = units >= 100 ? 0.9 : 1.0
         return (unit * Double(units) * discount).rounded()
     }

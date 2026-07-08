@@ -61,6 +61,9 @@ struct CafeState: Equatable {
     var customerProgress: Double = 0
     var lastSaleAt: Date?
     var tables: Int = 2
+    /// Ingredient id -> smoothed units-consumed-per-second (rolling EMA), used
+    /// to size the spoilage buffer so normal buffer-stocking never spoils.
+    var consumptionEMA: [String: Double] = [:]
 
     static func fresh(city: String) -> CafeState {
         var c = CafeState()
@@ -75,7 +78,7 @@ struct CafeState: Equatable {
 extension CafeState: Codable {
     enum CodingKeys: String, CodingKey {
         case city, staffLevels, equipmentLevels, stock, menuEnabled
-        case cleanliness, customerProgress, lastSaleAt, tables
+        case cleanliness, customerProgress, lastSaleAt, tables, consumptionEMA
     }
 
     init(from decoder: Decoder) throws {
@@ -89,6 +92,7 @@ extension CafeState: Codable {
         customerProgress = try c.decodeIfPresent(Double.self, forKey: .customerProgress) ?? 0
         lastSaleAt = try c.decodeIfPresent(Date.self, forKey: .lastSaleAt)
         tables = try c.decodeIfPresent(Int.self, forKey: .tables) ?? 2
+        consumptionEMA = try c.decodeIfPresent([String: Double].self, forKey: .consumptionEMA) ?? [:]
     }
 
     func encode(to encoder: Encoder) throws {
@@ -102,5 +106,6 @@ extension CafeState: Codable {
         try c.encode(customerProgress, forKey: .customerProgress)
         try c.encodeIfPresent(lastSaleAt, forKey: .lastSaleAt)
         try c.encode(tables, forKey: .tables)
+        try c.encode(consumptionEMA, forKey: .consumptionEMA)
     }
 }

@@ -283,12 +283,15 @@ struct StockTab: View {
     @ObservedObject var controller: GameController
 
     var body: some View {
-        Text("Ingredients are used up by every sale — keep the pantry full or the café closes!")
+        Text("Ingredients are used up by every sale — keep the pantry full or the café closes! Prices drift, so watch for dips.")
             .font(.system(size: 9.5, design: .rounded))
             .foregroundColor(Theme.dim)
             .frame(maxWidth: .infinity, alignment: .leading)
         ForEach(MenuCatalog.ingredients, id: \.id) { ing in
             let have = controller.state.stock[ing.id] ?? 0
+            let price = MenuCatalog.currentUnitCost(ing.id, controller.state)
+            let goodDeal = price <= ing.unitCost * 0.97
+            let pricey = price >= ing.unitCost * 1.15
             HStack(spacing: 8) {
                 PixelImage(name: "ing_\(ing.id)", scale: 2)
                 VStack(alignment: .leading, spacing: 2) {
@@ -298,6 +301,19 @@ struct StockTab: View {
                     Text("\(have) in stock")
                         .font(.system(size: 10, design: .rounded))
                         .foregroundColor(have == 0 ? Theme.danger : Theme.dim)
+                    HStack(spacing: 5) {
+                        Text("🪙\(String(format: "%.1f", price))/unit")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundColor(goodDeal ? Theme.dealGreen : (pricey ? Theme.danger : Theme.dim))
+                        if goodDeal {
+                            Text("good deal!")
+                                .font(.system(size: 8, weight: .heavy, design: .rounded))
+                                .foregroundColor(Theme.dealGreen)
+                        }
+                        PriceSparkline(history: controller.state.priceHistory[ing.id] ?? [],
+                                       base: ing.unitCost)
+                            .frame(width: 44, height: 14)
+                    }
                 }
                 Spacer()
                 CostButton(cost: SalesEngine.packPrice(ing.id, units: 25, controller.state),
@@ -310,6 +326,34 @@ struct StockTab: View {
             .padding(8)
             .background(Theme.card)
             .cornerRadius(9)
+        }
+    }
+}
+
+/// Tiny inline line chart of an ingredient's recent price history — enough
+/// to eyeball "is this cheap right now?" without a full chart library.
+struct PriceSparkline: View {
+    let history: [Double]
+    let base: Double
+
+    private var samples: [Double] { history.isEmpty ? [base] : history }
+
+    var body: some View {
+        let values = samples
+        let minV = min(values.min() ?? base, base * 0.98)
+        let maxV = max(values.max() ?? base, base * 1.02)
+        let range = max(maxV - minV, 0.0001)
+        let lineColor = (values.last ?? base) <= base ? Theme.dealGreen : Theme.gold
+        Canvas { context, size in
+            guard values.count > 1 else { return }
+            var path = Path()
+            for (i, v) in values.enumerated() {
+                let x = size.width * CGFloat(i) / CGFloat(values.count - 1)
+                let y = size.height * (1 - CGFloat((v - minV) / range))
+                if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                else { path.addLine(to: CGPoint(x: x, y: y)) }
+            }
+            context.stroke(path, with: .color(lineColor), style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
         }
     }
 }
