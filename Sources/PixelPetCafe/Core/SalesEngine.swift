@@ -538,8 +538,16 @@ enum SalesEngine {
         s.cleanliness = min(100, s.cleanliness + 15)
     }
 
+    /// Uncapped, this scaled directly with income estimate, which itself
+    /// compounds per equipment level — at deep late-game equipment (e.g. an
+    /// espresso machine past level 40+) that made a single sweep cost tens of
+    /// millions of coins, wildly disproportionate to what "sweeping the
+    /// floor" should cost. Capped at a modest slice of your current balance
+    /// so it always feels proportionate, at any stage of the game.
+    static let sweepCostMaxShareOfCoins = 0.03
     static func sweepCost(_ s: GameState) -> Double {
-        max(20, (incomeEstimate(s) * 60).rounded())
+        let raw = max(20, (incomeEstimate(s) * 60).rounded())
+        return max(20, min(raw, (s.coins * sweepCostMaxShareOfCoins).rounded()))
     }
 
     /// Chip the cleaner: once hired, auto-cleans in the same discrete +15
