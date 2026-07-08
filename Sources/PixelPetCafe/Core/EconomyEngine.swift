@@ -74,6 +74,36 @@ enum EconomyEngine {
         return true
     }
 
+    // MARK: storage capacity (per café, same cap applies to every ingredient)
+
+    /// Starter pantry: 200 units of headroom per ingredient before a buy or
+    /// an auto-restock is refused.
+    static let baseStorageCap = 200
+    static let storageCapPerLevel = 150
+    static let maxStorageLevel = 12
+    /// base 200 + 12 × 150 = 2,000 units/ingredient at max level — comfortably
+    /// ahead of the spoilage buffer's 15-minute-of-consumption sizing at any
+    /// realistic staffing, so a maxed-out pantry is a genuine "stop worrying
+    /// about stock" milestone rather than a number nobody reaches.
+    static func storageCap(_ s: GameState) -> Int {
+        baseStorageCap + storageCapPerLevel * s.storageLevel
+    }
+
+    static func storageCost(_ s: GameState) -> Double {
+        guard s.storageLevel < maxStorageLevel else { return .infinity }
+        return cost(base: 800, level: s.storageLevel, growth: 1.55)
+    }
+
+    @discardableResult
+    static func buyStorage(_ s: inout GameState) -> Bool {
+        guard s.storageLevel < maxStorageLevel else { return false }
+        let c = storageCost(s)
+        guard s.coins >= c else { return false }
+        s.coins -= c
+        s.storageLevel += 1
+        return true
+    }
+
     // MARK: offline cap
 
     static func offlineCap(_ s: GameState) -> TimeInterval {

@@ -283,12 +283,14 @@ struct StockTab: View {
     @ObservedObject var controller: GameController
 
     var body: some View {
-        Text("Ingredients are used up by every sale — keep the pantry full or the café closes! Prices drift, so watch for dips.")
+        Text("Ingredients are used up by every sale — keep the pantry full or the café closes! Prices drift with the market and the season, so watch for dips.")
             .font(.system(size: 9.5, design: .rounded))
             .foregroundColor(Theme.dim)
             .frame(maxWidth: .infinity, alignment: .leading)
+        StorageCard(controller: controller)
         ForEach(MenuCatalog.ingredients, id: \.id) { ing in
             let have = controller.state.stock[ing.id] ?? 0
+            let cap = EconomyEngine.storageCap(controller.state)
             let price = MenuCatalog.currentUnitCost(ing.id, controller.state)
             let goodDeal = price <= ing.unitCost * 0.97
             let pricey = price >= ing.unitCost * 1.15
@@ -298,7 +300,7 @@ struct StockTab: View {
                     Text(ing.name)
                         .font(.system(size: 12.5, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.cream)
-                    Text("\(have) in stock")
+                    Text("\(have)/\(cap) in stock")
                         .font(.system(size: 10, design: .rounded))
                         .foregroundColor(have == 0 ? Theme.danger : Theme.dim)
                     HStack(spacing: 5) {
@@ -317,16 +319,69 @@ struct StockTab: View {
                 }
                 Spacer()
                 CostButton(cost: SalesEngine.packPrice(ing.id, units: 25, controller.state),
-                           affordable: controller.state.coins >= SalesEngine.packPrice(ing.id, units: 25, controller.state),
+                           affordable: have + 25 <= cap
+                               && controller.state.coins >= SalesEngine.packPrice(ing.id, units: 25, controller.state),
                            label: "25 · ") { controller.buyPack(ing.id, units: 25) }
                 CostButton(cost: SalesEngine.packPrice(ing.id, units: 100, controller.state),
-                           affordable: controller.state.coins >= SalesEngine.packPrice(ing.id, units: 100, controller.state),
+                           affordable: have + 100 <= cap
+                               && controller.state.coins >= SalesEngine.packPrice(ing.id, units: 100, controller.state),
                            label: "100 · ") { controller.buyPack(ing.id, units: 100) }
             }
             .padding(8)
             .background(Theme.card)
             .cornerRadius(9)
         }
+    }
+}
+
+/// Storage capacity + Marble's refill-threshold setting: one card up top of
+/// the Stock tab, in the same "capped, buyable, N/max" shape as Seating in
+/// the Café tab.
+struct StorageCard: View {
+    @ObservedObject var controller: GameController
+
+    var body: some View {
+        let cap = EconomyEngine.storageCap(controller.state)
+        let maxed = controller.state.storageLevel >= EconomyEngine.maxStorageLevel
+        let cost = EconomyEngine.storageCost(controller.state)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("📦 Pantry storage — \(cap)/unit cap")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.cream)
+                    Text("Lv \(controller.state.storageLevel)/\(EconomyEngine.maxStorageLevel) · caps every ingredient's stock and Marble's restocking")
+                        .font(.system(size: 9, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                }
+                Spacer()
+                if maxed {
+                    Text("Maxed out")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                } else {
+                    CostButton(cost: cost, affordable: controller.state.coins >= cost) {
+                        controller.buyStorage()
+                    }
+                }
+            }
+            if (controller.state.staffLevels["marble"] ?? 0) > 0 {
+                HStack {
+                    Text("🔧 Marble refills to \(Int(controller.state.refillThreshold * 100))% of cap")
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .foregroundColor(Theme.cream)
+                    Spacer()
+                    Stepper("", value: Binding(
+                        get: { controller.state.refillThreshold },
+                        set: { controller.setRefillThreshold($0) }),
+                        in: 0...1, step: 0.1)
+                        .labelsHidden()
+                }
+            }
+        }
+        .padding(9)
+        .background(Theme.card)
+        .cornerRadius(9)
     }
 }
 

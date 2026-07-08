@@ -269,6 +269,14 @@ final class GameController: ObservableObject {
         if EconomyEngine.buyTable(&state) { soundRequest.send("buy") }
     }
 
+    func buyStorage() {
+        if EconomyEngine.buyStorage(&state) { soundRequest.send("buy") }
+    }
+
+    func setRefillThreshold(_ value: Double) {
+        state.refillThreshold = min(1, max(0, value))
+    }
+
     func toggleMenuItem(_ id: String) {
         if let i = state.menuEnabled.firstIndex(of: id) {
             if state.menuEnabled.count > 1 { state.menuEnabled.remove(at: i) }  // never empty menu

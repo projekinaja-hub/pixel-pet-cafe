@@ -82,8 +82,26 @@ struct CafeTab: View {
     private static let cityEmoji = ["home": "🏡", "sakura": "🌸", "neon": "🌃", "seaside": "🌊",
                                     "forest": "🌲", "desert": "🏜️", "snowy": "❄️", "sunset": "🌅",
                                     "ember": "🌋", "royal": "👑", "cloud": "☁️", "moon": "🌕"]
+    private static let seasonEmoji: [Season: String] = [
+        .spring: "🌱", .summer: "☀️", .autumn: "🍂", .winter: "❄️",
+    ]
 
     var body: some View {
+        // calendar
+        HStack {
+            let season = controller.state.season
+            Text("\(Self.seasonEmoji[season] ?? "") Day \(GameCalendar.dayOfSeason(controller.state)) of \(season.rawValue.capitalized)")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.cream)
+            Spacer()
+            Text("~1hr/day")
+                .font(.system(size: 9, design: .rounded))
+                .foregroundColor(Theme.dim)
+        }
+        .padding(9)
+        .background(Theme.card)
+        .cornerRadius(9)
+
         // locations
         VStack(alignment: .leading, spacing: 6) {
             HStack {

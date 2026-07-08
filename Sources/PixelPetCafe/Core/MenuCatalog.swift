@@ -95,12 +95,16 @@ enum MenuCatalog {
         return (unit * Double(units) * discount).rounded()
     }
 
-    /// The ingredient's live market price (drifts over time via
-    /// `MarketEngine.drift`), falling back to the flat base cost for any
-    /// ingredient the market hasn't priced yet (e.g. a save that predates
-    /// the market system).
+    /// The ingredient's live market price: `MarketEngine.drift`'s random walk
+    /// (falling back to the flat base cost for any ingredient the market
+    /// hasn't priced yet — e.g. a save that predates the market system)
+    /// multiplied by the current season's price effect (see
+    /// `SeasonalPricing`). The two effects compose independently — the
+    /// random walk's own clamp is checked against the flat base cost and
+    /// never sees the seasonal multiplier at all.
     static func currentUnitCost(_ id: String, _ s: GameState) -> Double {
-        s.marketPrices[id] ?? ingredientDef(id)?.unitCost ?? 0
+        let raw = s.marketPrices[id] ?? ingredientDef(id)?.unitCost ?? 0
+        return raw * SeasonalPricing.multiplier(id, s.season)
     }
 
     /// Pack purchase priced off the *live* market price rather than the flat
