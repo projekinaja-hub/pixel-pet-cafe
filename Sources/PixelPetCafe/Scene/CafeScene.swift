@@ -456,8 +456,14 @@ final class CafeScene: SKScene {
         lastTimePhase = phase
         timeTint.run(.group([.colorize(with: tint, colorBlendFactor: 1, duration: 2.5),
                              .fadeAlpha(to: alpha, duration: 2.5)]))
-        windowTint.run(.group([.colorize(with: windowColor, colorBlendFactor: 1, duration: 2.5),
-                              .fadeAlpha(to: windowColor == .clear ? 0 : 1, duration: 2.5)]))
+        // The window-pane glass tint only makes sense over the indoor room's
+        // baked-in window — outdoor cafés (seaside/forest) have no window at
+        // that position at all, so this node was showing up as a big,
+        // out-of-place floating tinted rectangle over open sky/water.
+        let isOutdoor = lastState.map { Self.outdoorCities.contains($0.cafe.city) } ?? false
+        let effectiveWindowColor = isOutdoor ? NSColor.clear : windowColor
+        windowTint.run(.group([.colorize(with: effectiveWindowColor, colorBlendFactor: 1, duration: 2.5),
+                              .fadeAlpha(to: effectiveWindowColor == .clear ? 0 : 1, duration: 2.5)]))
     }
 
     // MARK: seasonal overlay (spring/summer/autumn/winter)
