@@ -33,6 +33,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demo.owner.species = "fox"
         demo.owner.palette = "cream"
         demo.owner.accessory = "cap"
+        if let city = ProcessInfo.processInfo.environment["PPC_CITY"] {
+            demo.cafe.city = city
+        }
         if ProcessInfo.processInfo.environment["PPC_MODE"] == "casino" {
             scene.setMode(.casino)
             if ProcessInfo.processInfo.environment["PPC_GAME"] == "map" {

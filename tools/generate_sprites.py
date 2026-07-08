@@ -401,6 +401,28 @@ def _triangle(c, cx, base_y, height, half_w, color):
         ww = max(1, round(half_w * (1 - i / height)))
         c.rect(cx - ww, yy, ww * 2, 1, color)
 
+def _umbrella(c, cx, base_y, height, half_w, color, color_d, pole_color, pole_len):
+    """beach-umbrella silhouette: striped triangular canopy, scalloped rim,
+    pole down to the table beneath. base_y is the rim row."""
+    for i in range(height):
+        yy = base_y - i
+        ww = max(1, round(half_w * (1 - i / height)))
+        band = color if (i // 2) % 2 == 0 else color_d
+        c.rect(cx - ww, yy, ww * 2, 1, band)
+    for k in range(-half_w, half_w + 1, 3):
+        c.set(cx + k, base_y, color_d)
+    c.set(cx, base_y - height - 1, WHITE)
+    c.vline(cx, base_y + 1, pole_len, pole_color)
+
+def _leaf_canopy(c, cx, base_y, r, leaf, leaf_d, pole_color, pole_len):
+    """overhanging tree-shade silhouette: three overlapping leaf clusters
+    plus a pole down to the table beneath."""
+    _disk(c, cx - r + 2, base_y - r, r, leaf)
+    _disk(c, cx + r - 2, base_y - r, r, leaf)
+    _disk(c, cx, base_y - r - 2, r + 1, leaf_d)
+    c.set(cx - 1, base_y - r - r, (255, 240, 190, 180))
+    c.vline(cx, base_y + 1, pole_len, pole_color)
+
 def _window_scene(c, theme):
     """distinct outdoor view per café theme, drawn inside the window pane
     (x 32-61, y 14-47), BEFORE the mullion cross-bars are redrawn on top."""
@@ -581,6 +603,158 @@ def background(tier, theme="home"):
             c.set(x, 6, (255, 230, 150, 255))
         c.rect(126, 38, 18, 8, (150, 68, 60, 255))                    # ★ banner
         c.set(134, 41, GOLD); c.set(135, 41, GOLD)
+    return c
+
+def outdoor_background(tier, theme):
+    """Open-air patio layout: sky backdrop instead of walls, a deck/patio
+    floor, an open entry path where the door used to be, and a thatched
+    patio bar counter in the same footprint as the indoor counter (so the
+    counter-front z-order trick in CafeScene.swift keeps working unmodified).
+    Currently used for 'seaside' (beach patio) and 'forest' (treehouse deck)."""
+    W, H = 180, 120
+    th = THEMES[theme]
+    sky = th["sky"]
+    accent = th["accent"]
+    horizon_y = 62
+    floor_y = 72
+    c = Canvas(W, H, sky)
+    # sky gradient, brighter near the top
+    for y in range(0, horizon_y):
+        f = 1.16 - 0.30 * (y / horizon_y)
+        for x in range(W):
+            c.px[y][x] = _shade(sky, f)
+
+    if theme == "seaside":
+        _disk(c, 150, 16, 6, (255, 236, 170, 255))
+        for gx, gy in ((30, 14), (40, 10), (120, 20)):
+            c.set(gx, gy, INK); c.set(gx - 2, gy + 1, INK); c.set(gx + 2, gy + 1, INK)
+        sea = (78, 148, 196, 255)
+        c.rect(0, 40, W, horizon_y - 40, sea)
+        for y in range(42, horizon_y, 4):
+            c.hline(0, y, W, _shade(sea, 1.14))
+        for y in range(44, horizon_y, 6):
+            _dashed_line(c, 0, y, W - 1, y, (222, 240, 245, 200), phase=y)
+        c.vline(100, 34, 8, (90, 60, 50, 255))
+        for i, yy in enumerate(range(30, 36)):
+            c.hline(100 - i, yy, i + 1, (250, 250, 245, 255))
+    elif theme == "forest":
+        _disk(c, 130, 14, 5, (255, 240, 190, 255))
+        for cx in range(6, W, 22):
+            _disk(c, cx, 20, 10, (94, 154, 84, 255))
+            _disk(c, cx + 12, 15, 8, (108, 168, 94, 255))
+        for px, py in ((26, 30), (64, 26), (98, 32), (140, 28), (160, 24)):
+            c.set(px, py, (255, 240, 190, 180))
+
+    # ridge band: transition between sky/horizon and the patio floor
+    if theme == "seaside":
+        sand = (230, 208, 160, 255)
+        c.rect(0, horizon_y, W, floor_y - horizon_y, sand)
+        c.hline(0, horizon_y, W, (250, 236, 202, 255))
+        for x in range(0, W, 5):
+            c.set(x, horizon_y + 2, (200, 180, 130, 255))
+    else:
+        grass = (120, 150, 90, 255)
+        c.rect(0, horizon_y, W, floor_y - horizon_y, grass)
+        c.hline(0, horizon_y, W, (152, 187, 112, 255))
+        for x in range(0, W, 4):
+            c.vline(x, horizon_y, 3, (100, 130, 75, 255))
+
+    # patio deck floor (planks, horizontal boards)
+    floor_a = th["floors"][tier]
+    c.rect(0, floor_y, W, H - floor_y, floor_a)
+    for y in range(floor_y, H, 4):
+        c.hline(0, y, W, _shade(floor_a, 0.84))
+    for i, x in enumerate(range(6, W, 24)):
+        for y in range(floor_y + 2 + (i % 2) * 2, H, 4):
+            c.set(x, y, _shade(floor_a, 0.62))
+    c.rect(0, floor_y, W, 2, _shade(floor_a, 0.7))
+    for y in range(floor_y, H):                        # soft side falloff
+        for x in list(range(0, 6)) + list(range(W - 6, W)):
+            if (x + y) % 2 == 0:
+                c.px[y][x] = _shade(c.px[y][x], 0.85)
+
+    # open entry: two posts + a strung rope/vine where the door used to be,
+    # plus stepping planks leading a customer in (doorPoint sits at x~14).
+    post_color = (150, 110, 70, 255) if theme == "seaside" else WOOD_D
+    c.rect(2, horizon_y - 10, 2, 20, post_color)
+    c.rect(24, horizon_y - 10, 2, 20, post_color)
+    tie_color = (90, 70, 50, 255) if theme == "seaside" else (70, 100, 55, 255)
+    _dashed_line(c, 3, horizon_y - 9, 25, horizon_y - 9, tie_color)
+    for i, x in enumerate(range(4, 24, 5)):
+        c.rect(x, 76 + (i % 2) * 4, 3, 2, _shade(floor_a, 0.58))
+    if theme == "seaside":
+        c.vline(27, horizon_y - 14, 6, (90, 70, 40, 255))
+        for dx, dy in ((-1, -15), (1, -15), (0, -17)):
+            c.set(27 + dx, horizon_y + dy, (90, 150, 70, 255))
+    else:
+        c.rect(12, horizon_y - 9, 2, 3, GOLD)             # small lantern on the rope
+
+    # patio bar counter — same footprint as the indoor counter (cols 96-170,
+    # rows 52-80) so CafeScene.swift's counterFront crop keeps working as-is.
+    roof_color, roof_d = ((196, 160, 90, 255), (166, 130, 66, 255)) if theme == "seaside" \
+        else ((94, 154, 84, 255), (70, 120, 62, 255))
+    for i, y in enumerate(range(6, 24)):
+        w = 4 + i
+        c.rect(133 - w, y, w * 2, 1, roof_color if i % 2 == 0 else roof_d)
+    c.rect(98, 24, 2, 28, post_color)
+    c.rect(166, 24, 2, 28, post_color)
+    c.rect(112, 27, 44, 18, (72, 84, 76, 255))            # hanging chalk menu
+    c.rect(112, 27, 44, 2, WOOD_D); c.rect(112, 43, 44, 2, WOOD_D)
+    c.vline(112, 27, 18, INK); c.vline(155, 27, 18, INK)
+    for i, w in enumerate((22, 16, 20)):
+        c.hline(118, 31 + i * 5, w, (214, 224, 210, 255))
+    counter_top = WOOD_L if theme == "seaside" else (150, 118, 78, 255)
+    body = (196, 164, 110, 255) if theme == "seaside" else (112, 84, 58, 255)
+    c.rect(96, 52, 74, 6, counter_top)
+    c.rect(96, 52, 74, 1, INK)
+    c.rect(98, 58, 70, 22, body)
+    c.rect(98, 78, 70, 2, _shade(body, 0.75))
+    c.vline(98, 58, 22, INK); c.vline(167, 58, 22, INK)
+    for x in range(102, 166, 6):
+        c.vline(x, 58, 22, _shade(body, 0.85))
+    for x in range(96, 170):                              # counter shadow
+        for y in range(80, 86):
+            if 0 <= y < H:
+                c.px[y][x] = _shade(c.px[y][x], 0.8 if (x + y) % 2 else 0.86)
+
+    # patio tables — same base footprint as the indoor tables, shaded by an
+    # umbrella (seaside) or a low tree canopy (forest) instead of a ceiling.
+    for tx in (36, 66):
+        for x in range(tx - 2, tx + 24):
+            for y in range(105, 109):
+                if 0 <= x < W and 0 <= y < H and (x + y) % 2 == 0:
+                    c.px[y][x] = _shade(c.px[y][x], 0.78)
+        if theme == "seaside":
+            _umbrella(c, tx + 11, 70, 15, 15, accent, _shade(accent, 0.72), post_color, 17)
+        else:
+            _leaf_canopy(c, tx + 11, 76, 9, (100, 162, 88, 255), (76, 128, 66, 255), (110, 78, 50, 255), 11)
+        c.rect(tx, 88, 22, 4, WOOD_L)
+        c.hline(tx, 88, 22, INK)
+        c.hline(tx, 91, 22, _shade(WOOD_L, 0.8))
+        c.rect(tx + 9, 92, 4, 12, WOOD_D)
+        c.rect(tx + 6, 104, 10, 2, WOOD_D)
+
+    # tier 1+: patio mat + a leaning prop near the entry
+    if tier >= 1:
+        mat = _shade(accent, 0.9)
+        c.rect(120, 96, 46, 16, _shade(accent, 0.65))
+        c.rect(122, 98, 42, 12, mat)
+        if theme == "seaside":
+            c.rect(29, 46, 3, 22, (230, 120, 90, 255))    # surfboard leaning by the gate
+            c.hline(29, 50, 3, WHITE)
+            c.vline(30, 47, 20, (200, 90, 70, 255))
+        else:
+            c.set(12, horizon_y - 5, (255, 220, 140, 220))  # lantern glow
+
+    # tier 2: string lights along the roofline + small pennant flags
+    if tier >= 2:
+        for x in range(100, 168, 14):
+            c.vline(x, 24, 4, INK)
+            c.rect(x - 1, 28, 3, 3, accent)
+            c.set(x, 29, (255, 230, 150, 255))
+        for i, x in enumerate(range(4, 24, 6)):
+            flag = accent if i % 2 == 0 else WHITE
+            c.rect(x, horizon_y - 8, 3, 3, flag)
     return c
 
 def table_extra():
@@ -1336,9 +1510,11 @@ def main():
         baricon(f).save(f"baricon_{f}.png"); count += 1
     for t in range(3):
         background(t).save(f"bg_tier{t}.png"); count += 1
+    OUTDOOR_THEMES = {"seaside", "forest"}
     for theme in THEMES:
         for t in range(3):
-            background(t, theme).save(f"bg_{theme}_tier{t}.png"); count += 1
+            gen = outdoor_background if theme in OUTDOOR_THEMES else background
+            gen(t, theme).save(f"bg_{theme}_tier{t}.png"); count += 1
     print(f"generated {count} sprites -> {os.path.abspath(OUT)}")
     main_v2()
     main_v4()

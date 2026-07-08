@@ -43,6 +43,10 @@ final class CafeScene: SKScene {
 
     private static let doorPoint = CGPoint(x: 14, y: 32)
     private static let counterPoint = CGPoint(x: 104, y: 42)
+    /// Cities rendered with the open-air patio background (tools/generate_sprites.py
+    /// `outdoor_background`) instead of the indoor room. Anchor points above are
+    /// shared with the indoor layout, so no furniture/staff positions differ.
+    private static let outdoorCities: Set<String> = ["seaside", "forest"]
     private static let seatPoints = [CGPoint(x: 44, y: 34), CGPoint(x: 74, y: 34), CGPoint(x: 96, y: 22)]
     /// Slots for tables bought beyond the two baked into the background art
     /// (a back row, further from the viewer). (tablePos, seatPos) pairs.
@@ -493,7 +497,10 @@ final class CafeScene: SKScene {
         guard mode == .cafe else { return }
         cafeLayer.childNode(withName: "counterFront")?.removeFromParent()
         cafeLayer.childNode(withName: "lightShaft")?.removeFromParent()
-        if state.cafe.city != "neon" {
+        // The sunbeam overlay is positioned to spill from the indoor window;
+        // open-air layouts (seaside, forest) have no window frame for it to
+        // shine through, so skip it there (same as the neon night café).
+        if state.cafe.city != "neon" && !Self.outdoorCities.contains(state.cafe.city) {
             let shaft = SKSpriteNode(texture: SpriteLoader.texture("shaft"))
             shaft.name = "lightShaft"
             shaft.size = shaft.texture!.size()
