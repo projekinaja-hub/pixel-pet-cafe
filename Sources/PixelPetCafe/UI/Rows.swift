@@ -77,6 +77,7 @@ struct LockedRow: View {
 
 struct CafeTab: View {
     @ObservedObject var controller: GameController
+    @State private var calendarExpanded = false
 
     private static let emoji = ["espresso": "☕", "grinder": "⚙️", "oven": "🔥", "decor": "🪴", "sound": "🎵"]
     private static let cityEmoji = ["home": "🏡", "sakura": "🌸", "neon": "🌃", "seaside": "🌊",
@@ -87,16 +88,62 @@ struct CafeTab: View {
     ]
 
     var body: some View {
-        // calendar
-        HStack {
-            let season = controller.state.season
-            Text("\(Self.seasonEmoji[season] ?? "") Day \(GameCalendar.dayOfSeason(controller.state)) of \(season.rawValue.capitalized)")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(Theme.cream)
-            Spacer()
-            Text("~1hr/day")
-                .font(.system(size: 9, design: .rounded))
-                .foregroundColor(Theme.dim)
+        // calendar — tap to open the full breakdown (days left, seasonal ingredient prices)
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) { calendarExpanded.toggle() }
+            } label: {
+                HStack {
+                    let season = controller.state.season
+                    Text("\(Self.seasonEmoji[season] ?? "") Day \(GameCalendar.dayOfSeason(controller.state)) of \(season.rawValue.capitalized)")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.cream)
+                    Spacer()
+                    Text("~1hr/day")
+                        .font(.system(size: 9, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                    Image(systemName: calendarExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(Theme.dim)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if calendarExpanded {
+                let season = controller.state.season
+                let daysLeft = max(0, GameCalendar.daysPerSeason - GameCalendar.dayOfSeason(controller.state))
+                VStack(alignment: .leading, spacing: 5) {
+                    Divider().background(Theme.dim.opacity(0.3))
+                    Text("\(daysLeft) day\(daysLeft == 1 ? "" : "s") left in \(season.rawValue.capitalized)")
+                        .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                    let seasonal = MenuCatalog.ingredients
+                        .map { ($0, SeasonalPricing.multiplier($0.id, season)) }
+                        .filter { $0.1 != 1.0 }
+                    if seasonal.isEmpty {
+                        Text("No ingredients are in or out of season right now")
+                            .font(.system(size: 9, design: .rounded))
+                            .foregroundColor(Theme.dim)
+                    } else {
+                        Text("🛒 Seasonal prices")
+                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.dim)
+                        ForEach(seasonal, id: \.0.id) { ing, mult in
+                            HStack {
+                                Text("\(ing.emoji) \(ing.name)")
+                                    .font(.system(size: 9.5, design: .rounded))
+                                    .foregroundColor(Theme.cream)
+                                Spacer()
+                                Text(mult < 1 ? "▼ cheaper" : "▲ pricier")
+                                    .font(.system(size: 9, weight: .bold, design: .rounded))
+                                    .foregroundColor(mult < 1 ? Theme.dealGreen : Theme.danger)
+                            }
+                        }
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
         .padding(9)
         .background(Theme.card)
