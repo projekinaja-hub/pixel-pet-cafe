@@ -266,7 +266,8 @@ struct StaffTab: View {
             if controller.state.lifetimeCoins >= def.unlockAtLifetime {
                 let level = controller.state.staffLevels[def.id] ?? 0
                 let cost = EconomyEngine.staffCost(def.id, controller.state)
-                let extra = def.id == "earl" ? " · +1h away cap/lv" : ""
+                let extra = def.id == "earl" ? " · +1h away cap/lv"
+                    : def.id == "chip" ? " · auto-cleans, no more manual sweeping" : ""
                 PurchaseRow(
                     leading: PixelImage(name: "staff_\(def.id)_0", scale: 1.4),
                     name: def.name,

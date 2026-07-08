@@ -168,6 +168,7 @@ STAFF = {
     #        fur                fur_dark           belly   apron   species accent
     "mocha":   ((150, 102, 66, 255), (112, 72, 46, 255), CREAM, (206, 106, 76, 255), "cat", None),
     "biscuit": ((222, 158, 90, 255), (176, 116, 60, 255), CREAM, (96, 129, 171, 255), "corgi", INK),
+    "chip":    ((196, 168, 132, 255), (156, 130, 100, 255), WHITE, (140, 190, 200, 255), "deer", INK),
     "poppy":   ((228, 214, 202, 255), (186, 168, 155, 255), WHITE, PINK, "bunny", None),
     "juno":    ((212, 110, 58, 255), (160, 76, 38, 255), WHITE, (74, 110, 88, 255), "fox", INK),
     "bo":      ((122, 88, 62, 255), (88, 60, 42, 255), (168, 132, 100, 255), (150, 68, 60, 255), "bear", INK),
@@ -1114,7 +1115,7 @@ def main_v6():
     print(f"v6: generated {count} seasonal overlay sprites")
 
 
-STAFF_SPECIES = {"mocha": "cat", "biscuit": "corgi", "poppy": "bunny",
+STAFF_SPECIES = {"mocha": "cat", "biscuit": "corgi", "poppy": "bunny", "chip": "deer",
                  "juno": "fox", "bo": "bear", "earl": "owl", "marble": "raccoon"}
 
 def main_v2():

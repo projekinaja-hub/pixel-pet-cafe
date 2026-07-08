@@ -71,6 +71,7 @@ final class CafeScene: SKScene {
         "earl":  CGPoint(x: 118, y: 58),
         "poppy": CGPoint(x: 88, y: 46),
         "biscuit": CGPoint(x: 62, y: 24),
+        "chip": CGPoint(x: 30, y: 16),
     ]
     private static let equipSpots: [String: (CGPoint, CGFloat)] = [
         "espresso": (CGPoint(x: 104, y: 68), 9),
@@ -803,6 +804,13 @@ final class CafeScene: SKScene {
             let patrol = SKAction.repeatForever(.sequence([
                 .moveTo(x: 42, duration: 2.6), .wait(forDuration: 1.2),
                 .moveTo(x: 76, duration: 2.6), .wait(forDuration: 1.2),
+            ]))
+            node.run(patrol)
+        } else if id == "chip" {
+            // sweeps a wider loop across the floor, dirt-spot territory
+            let patrol = SKAction.repeatForever(.sequence([
+                .moveTo(x: 100, duration: 3.4), .wait(forDuration: 0.8),
+                .moveTo(x: 24, duration: 3.4), .wait(forDuration: 0.8),
             ]))
             node.run(patrol)
         } else {

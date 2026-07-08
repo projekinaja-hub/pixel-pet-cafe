@@ -252,6 +252,7 @@ enum SalesEngine {
         _ s: inout GameState, dt: TimeInterval, now: Date, boost: Double, rng: inout R
     ) -> [SaleEvent] {
         managerRestock(&s)
+        janitorClean(&s, dt: dt)
         if isClosed(s, now: now) {
             s.reputation = max(0, s.reputation - 0.01 * dt)
         }
@@ -445,6 +446,7 @@ enum SalesEngine {
     private static func offlineSimOneCafe(_ s: inout GameState, elapsed: TimeInterval) -> Double {
         let window = min(elapsed, EconomyEngine.offlineCap(s))
         managerRestock(&s)
+        janitorClean(&s, dt: window)
         var customers = Int(customerRate(s) * window)
         var haul = 0.0
         var safety = 250_000
@@ -538,6 +540,23 @@ enum SalesEngine {
 
     static func sweepCost(_ s: GameState) -> Double {
         max(20, (incomeEstimate(s) * 60).rounded())
+    }
+
+    /// Chip the cleaner: once hired, automatically restores cleanliness over
+    /// time instead of needing manual sweeping — but it's not free labor,
+    /// it's still paid for continuously (half the price of one full manual
+    /// sweep, spread proportionally over however much cleanliness it
+    /// actually restores this tick). Pauses like ads do if you can't afford it.
+    static let janitorRatePerLevel = 1.2   // cleanliness/sec restored, per level
+    private static func janitorClean(_ s: inout GameState, dt: TimeInterval) {
+        let level = s.staffLevels["chip"] ?? 0
+        guard level > 0, dt > 0 else { return }
+        let wanted = min(100 - s.cleanliness, janitorRatePerLevel * Double(level) * dt)
+        guard wanted > 0 else { return }
+        let cost = (wanted / 100) * 0.5 * sweepCost(s)
+        guard s.coins >= cost else { return }
+        s.coins -= cost
+        s.cleanliness += wanted
     }
 
     @discardableResult

@@ -200,6 +200,29 @@ final class V3Tests: XCTestCase {
         XCTAssertGreaterThan(moonCost, homeCost)
     }
 
+    func testChipAutoCleansOverTimeForACost() {
+        var s = GameState.newGame()
+        s.coins = 100_000
+        s.cleanliness = 10
+        s.staffLevels["chip"] = 5
+        var rng = SeededGenerator(seed: 3)
+        let before = s.cleanliness
+        let coinsBefore = s.coins
+        _ = SalesEngine.tick(&s, dt: 1.0, rng: &rng)
+        XCTAssertGreaterThan(s.cleanliness, before, "hired Chip should auto-restore cleanliness")
+        XCTAssertLessThan(s.coins, coinsBefore, "auto-cleaning still costs coins")
+    }
+
+    func testNoChipMeansNoAutoClean() {
+        var s = GameState.newGame()
+        s.coins = 100_000
+        s.cleanliness = 10
+        var rng = SeededGenerator(seed: 3)
+        let before = s.cleanliness
+        _ = SalesEngine.tick(&s, dt: 1.0, rng: &rng)
+        XCTAssertEqual(s.cleanliness, before, accuracy: 1e-9, "without Chip hired, cleanliness shouldn't self-heal")
+    }
+
     func testManagerAutoRestocks() {
         var s = GameState.newGame()
         s.coins = 10_000
