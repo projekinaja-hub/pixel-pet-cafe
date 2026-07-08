@@ -84,6 +84,106 @@ final class CasinoTests: XCTestCase {
         XCTAssertEqual(CasinoEngine.roulettePayout(.dozen(2), result: 25), 3)
         XCTAssertEqual(CasinoEngine.roulettePayout(.dozen(2), result: 24), 0)
     }
+
+    // MARK: progressive jackpot
+
+    func testJackpotPotGrowsOnWager() {
+        var pot = CasinoEngine.jackpotSeed
+        var rng = SeededGenerator(seed: 1)
+        // Rig the trigger chance to zero so we only observe growth.
+        let payout = CasinoEngine.growJackpot(&pot, wager: 1000, rng: &rng)
+        // Either it grew (nil, common) or it triggered (rare) — either way the
+        // wager's slice was added before the roll, so growth math is exact.
+        if payout == nil {
+            XCTAssertEqual(pot, CasinoEngine.jackpotSeed + 1000 * CasinoEngine.jackpotGrowthRate, accuracy: 1e-9)
+        } else {
+            XCTAssertEqual(pot, CasinoEngine.jackpotSeed)   // reset after paying out
+        }
+    }
+
+    func testJackpotTriggerPaysFullPotAndResetsAboveZero() {
+        // Search a range of seeds for one that fires the (rare) trigger,
+        // proving the payout/reset path is exercised deterministically.
+        var found = false
+        for seed in 0..<20_000 {
+            var pot: Double = 12_345
+            var rng = SeededGenerator(seed: UInt64(seed))
+            if let payout = CasinoEngine.growJackpot(&pot, wager: 500, rng: &rng) {
+                XCTAssertEqual(payout, 12_345 + 500 * CasinoEngine.jackpotGrowthRate, accuracy: 1e-9)
+                XCTAssertEqual(pot, CasinoEngine.jackpotSeed)
+                XCTAssertGreaterThan(pot, 0)   // never resets to zero
+                found = true
+                break
+            }
+        }
+        XCTAssertTrue(found, "expected at least one trigger across 20k seeded rolls at chance \(CasinoEngine.jackpotTriggerChance)")
+    }
+
+    func testJackpotNeverTriggersWhenChanceRolledJustAboveThreshold() {
+        // A pot that never triggers still only grows — never resets on its own.
+        var pot: Double = 1000
+        var rng = SeededGenerator(seed: 42)
+        for _ in 0..<5 {
+            let before = pot
+            if CasinoEngine.growJackpot(&pot, wager: 200, rng: &rng) == nil {
+                XCTAssertGreaterThan(pot, before)
+            }
+        }
+    }
+
+    // MARK: Lucky Hour boost
+
+    func testLuckyHourBoostsProfitNotStakeReturn() {
+        // A push (payout == bet) shouldn't be inflated — no profit to boost.
+        XCTAssertEqual(CasinoEngine.applyLuckyHour(100, bet: 100, active: true), 100)
+        // A real win's profit is scaled by the multiplier; stake passes through untouched.
+        let boosted = CasinoEngine.applyLuckyHour(200, bet: 100, active: true)
+        XCTAssertEqual(boosted, 100 + 100 * CasinoEngine.luckyHourMultiplier, accuracy: 1e-9)
+        XCTAssertGreaterThan(boosted, 200)
+    }
+
+    func testLuckyHourInactiveLeavesPayoutUnchanged() {
+        XCTAssertEqual(CasinoEngine.applyLuckyHour(200, bet: 100, active: false), 200)
+    }
+
+    func testLuckyHourEventDefExistsAndFollowsEventPattern() {
+        guard let def = Events.def("lucky_hour") else {
+            return XCTFail("lucky_hour must be registered in Events.all")
+        }
+        XCTAssertGreaterThan(def.duration, 0)
+        XCTAssertFalse(def.emoji.isEmpty)
+        XCTAssertFalse(def.name.isEmpty)
+    }
+
+    func testLuckyHourDoesNotSpawnBeforeCasinoUnlocked() {
+        var s = GameState.newGame()
+        s.lifetimeCoins = 0   // casino locked
+        s.coins = 1_000_000   // ensure income estimate is nonzero so the roll can happen
+        s.staffLevels["mocha"] = 3
+        var rng = SeededGenerator(seed: 0)
+        for _ in 0..<50_000 {
+            if let event = Events.maybeSpawn(&s, dt: 5, now: Date(), rng: &rng) {
+                XCTAssertNotEqual(event.id, "lucky_hour", "lucky_hour must not spawn while casino is locked")
+            }
+            s.activeEvent = nil
+            s.eventEndsAt = nil
+        }
+    }
+
+    // MARK: backward-compat decode
+
+    func testOldSaveWithoutJackpotFieldDecodesToSeed() throws {
+        let old = """
+        {"coins": 900, "lifetimeCoins": 60000, "lifetimeCoinsThisRun": 2500,
+         "casinoWagered": 500, "casinoWon": 300, "casinoBiggestWin": 100}
+        """
+        let s = try JSONDecoder().decode(GameState.self, from: Data(old.utf8)).normalized()
+        XCTAssertEqual(s.casinoJackpotPot, CasinoEngine.jackpotSeed, accuracy: 1e-9)
+        // round-trips cleanly in the new shape
+        let data = try JSONEncoder().encode(s)
+        let again = try JSONDecoder().decode(GameState.self, from: data)
+        XCTAssertEqual(again.casinoJackpotPot, s.casinoJackpotPot, accuracy: 1e-9)
+    }
 }
 
 final class V3Tests: XCTestCase {

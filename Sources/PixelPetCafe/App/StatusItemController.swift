@@ -121,6 +121,15 @@ final class StatusItemController: NSObject {
                 SoundPlayer.shared.play("win")
             }
             .store(in: &cancellables)
+        controller.casinoJackpotWon
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] amount in
+                self?.scene.playCasinoWin(amount, jackpot: true)
+                self?.happyUntil = Date().addingTimeInterval(5)
+                self?.refreshIcon()
+                SoundPlayer.shared.play("achieve")
+            }
+            .store(in: &cancellables)
         controller.tipCollected
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in

@@ -19,6 +19,8 @@ enum Events {
                  desc: "Ingredient packs half price — stock up now!", duration: 90),
         EventDef(id: "critic", emoji: "🧐", name: "Food Critic",
                  desc: "A critic just reviewed your café…", duration: 0),
+        EventDef(id: "lucky_hour", emoji: "🍀", name: "Lucky Hour",
+                 desc: "Casino payouts are running hot — press your luck!", duration: 120),
     ]
 
     static func def(_ id: String) -> EventDef? { all.first { $0.id == id } }
@@ -37,6 +39,9 @@ enum Events {
               Double.random(in: 0..<1, using: &rng) < spawnChancePerSecond * dt,
               SalesEngine.incomeEstimate(s) > 0 else { return nil }
         let event = all[Int.random(in: 0..<all.count, using: &rng)]
+        // Lucky Hour is casino-only content — don't spawn it (and burn the
+        // roll) for players who haven't unlocked the casino yet.
+        if event.id == "lucky_hour", !s.casinoUnlocked { return nil }
         if event.duration > 0 {
             s.activeEvent = event.id
             s.eventEndsAt = now.addingTimeInterval(event.duration)

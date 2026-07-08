@@ -357,20 +357,22 @@ final class CafeScene: SKScene {
     }
 
     /// Coin shower over the table when the player wins at the casino.
-    func playCasinoWin(_ amount: Double) {
+    /// `jackpot` makes it a bigger, wider, longer-lingering burst.
+    func playCasinoWin(_ amount: Double, jackpot: Bool = false) {
         guard mode == .casino, !isPaused else { return }
-        let n = min(14, 5 + Int(amount / 100))
+        let n = jackpot ? 28 : min(14, 5 + Int(amount / 100))
         for i in 0..<n {
             let coin = SKSpriteNode(texture: SpriteLoader.texture("tip"))
             coin.size = coin.texture!.size()
-            coin.position = CGPoint(x: 110 + CGFloat.random(in: 0...50), y: 120)
+            if jackpot { coin.setScale(1.3) }
+            coin.position = CGPoint(x: 110 + CGFloat.random(in: (jackpot ? -20...80 : 0...50)), y: 120)
             coin.zPosition = 25
             casinoLayer.addChild(coin)
             let fall = SKAction.sequence([
-                .wait(forDuration: Double(i) * 0.08),
-                .group([.moveTo(y: CGFloat.random(in: 24...40), duration: 0.7),
-                        .rotate(byAngle: .pi * 2, duration: 0.7)]),
-                .wait(forDuration: 0.6),
+                .wait(forDuration: Double(i) * (jackpot ? 0.05 : 0.08)),
+                .group([.moveTo(y: CGFloat.random(in: 24...40), duration: jackpot ? 1.0 : 0.7),
+                        .rotate(byAngle: .pi * 2, duration: jackpot ? 1.0 : 0.7)]),
+                .wait(forDuration: jackpot ? 1.0 : 0.6),
                 .fadeOut(withDuration: 0.4),
                 .removeFromParent(),
             ])
@@ -378,6 +380,10 @@ final class CafeScene: SKScene {
             coin.run(fall)
         }
         sparkle(at: CGPoint(x: 133, y: 40), color: NSColor(calibratedRed: 1, green: 0.9, blue: 0.5, alpha: 1))
+        if jackpot {
+            sparkle(at: CGPoint(x: 100, y: 55), color: NSColor(calibratedRed: 1, green: 0.78, blue: 0.25, alpha: 1))
+            sparkle(at: CGPoint(x: 166, y: 55), color: NSColor(calibratedRed: 1, green: 0.78, blue: 0.25, alpha: 1))
+        }
     }
 
     private var lastState: GameState?

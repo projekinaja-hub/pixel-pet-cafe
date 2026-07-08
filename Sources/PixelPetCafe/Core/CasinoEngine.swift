@@ -5,6 +5,43 @@ import Foundation
 enum CasinoEngine {
     static let unlockAtLifetime: Double = 50_000
 
+    // MARK: - Progressive jackpot (chain-wide pot, grows with every wager)
+
+    /// What the pot resets to after paying out — never zero, so there's
+    /// always something to chase again immediately.
+    static let jackpotSeed: Double = 500
+    /// Slice of every wager (any of the 4 games) that feeds the pot.
+    static let jackpotGrowthRate: Double = 0.02
+    /// Flat chance per wager that the jackpot hits, independent of stake size
+    /// — classic progressive-jackpot design, a small bet has the same shot.
+    static let jackpotTriggerChance: Double = 0.004
+
+    // MARK: - Lucky Hour (timed casino-wide payout boost, see Events.swift)
+
+    static let luckyHourMultiplier: Double = 1.35
+
+    /// Applies the Lucky Hour boost to a game's payout, scaling only the
+    /// profit above the returned stake (so a push/break-even isn't inflated).
+    static func applyLuckyHour(_ payout: Double, bet: Double, active: Bool,
+                                multiplier: Double = luckyHourMultiplier) -> Double {
+        guard active, payout > bet else { return payout }
+        return bet + (payout - bet) * multiplier
+    }
+
+    /// Grows the chain-wide jackpot pot by a slice of `wager`, then rolls a
+    /// flat, stake-independent chance to trigger it. On a hit, returns the
+    /// full pot (payout) and resets `pot` to the seed value; otherwise
+    /// returns nil and `pot` is left at its new (grown) size.
+    static func growJackpot<R: RandomNumberGenerator>(
+        _ pot: inout Double, wager: Double, rng: inout R
+    ) -> Double? {
+        pot += wager * jackpotGrowthRate
+        guard Double.random(in: 0..<1, using: &rng) < jackpotTriggerChance else { return nil }
+        let payout = pot
+        pot = jackpotSeed
+        return payout
+    }
+
     // MARK: - Slots
 
     /// Café-themed symbols, weighted. Star is rare, honey uncommon.

@@ -42,6 +42,8 @@ struct GameState: Codable, Equatable {
     var casinoWagered: Double = 0
     var casinoWon: Double = 0
     var casinoBiggestWin: Double = 0
+    // v6: chain-wide progressive jackpot pot — grows with every casino wager.
+    var casinoJackpotPot: Double = CasinoEngine.jackpotSeed
     // v4: fluctuating ingredient market (global, not per-café)
     var marketPrices: [String: Double] = [:]     // ingredient id -> live unit price
     var priceHistory: [String: [Double]] = [:]   // ingredient id -> recent price samples (sparkline)
@@ -126,7 +128,7 @@ struct GameState: Codable, Equatable {
         case cafes, activeCafe, reputation, adsActive, workMode
         case menuTaste, salesCount, tasteKnown
         case activeEvent, eventEndsAt, lastCriticVerdict, achievements
-        case casinoWagered, casinoWon, casinoBiggestWin
+        case casinoWagered, casinoWon, casinoBiggestWin, casinoJackpotPot
         case marketPrices, priceHistory, season
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
@@ -157,6 +159,7 @@ struct GameState: Codable, Equatable {
         casinoWagered = try c.decodeIfPresent(Double.self, forKey: .casinoWagered) ?? 0
         casinoWon = try c.decodeIfPresent(Double.self, forKey: .casinoWon) ?? 0
         casinoBiggestWin = try c.decodeIfPresent(Double.self, forKey: .casinoBiggestWin) ?? 0
+        casinoJackpotPot = try c.decodeIfPresent(Double.self, forKey: .casinoJackpotPot) ?? CasinoEngine.jackpotSeed
         marketPrices = try c.decodeIfPresent([String: Double].self, forKey: .marketPrices) ?? [:]
         priceHistory = try c.decodeIfPresent([String: [Double]].self, forKey: .priceHistory) ?? [:]
         season = try c.decodeIfPresent(Season.self, forKey: .season) ?? .spring
@@ -205,6 +208,7 @@ struct GameState: Codable, Equatable {
         try c.encode(casinoWagered, forKey: .casinoWagered)
         try c.encode(casinoWon, forKey: .casinoWon)
         try c.encode(casinoBiggestWin, forKey: .casinoBiggestWin)
+        try c.encode(casinoJackpotPot, forKey: .casinoJackpotPot)
         try c.encode(marketPrices, forKey: .marketPrices)
         try c.encode(priceHistory, forKey: .priceHistory)
         try c.encode(season, forKey: .season)
