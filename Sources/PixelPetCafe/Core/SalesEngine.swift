@@ -175,6 +175,7 @@ enum SalesEngine {
         guard s.coins >= cost else { return false }
         s.coins -= cost
         s.tasteKnown.append(city)
+        Goals.recordProgress(&s, .researchTaste)
         return true
     }
 
@@ -544,6 +545,8 @@ enum SalesEngine {
         s.lifetimeCoinsThisRun += earned
         s.cleanliness = max(0, s.cleanliness - dirtPerSale)
         s.salesCount[chosen.id, default: 0] += 1
+        if let goalKind = Goals.kindForCategory(chosen.category) { Goals.recordProgress(&s, goalKind) }
+        if whale { Goals.recordProgress(&s, .bigSpender) }
         if mood == .happy {
             // satisfaction: refined recipes and matching cravings build fame
             let sat = 60.0
@@ -681,6 +684,7 @@ enum SalesEngine {
     /// Cleaning one dirt spot restores 15 cleanliness.
     static func cleanSpot(_ s: inout GameState) {
         s.cleanliness = min(100, s.cleanliness + 15)
+        Goals.recordProgress(&s, .cleanCafe)
     }
 
     /// Uncapped, this scaled directly with income estimate, which itself
@@ -721,6 +725,7 @@ enum SalesEngine {
         let amount = min(janitorBurstAmount, 100 - s.cleanliness)
         s.cleanliness += amount
         s.chipCooldown = janitorCooldown(level: level)
+        Goals.recordProgress(&s, .cleanCafe)
     }
 
     @discardableResult
@@ -729,6 +734,7 @@ enum SalesEngine {
         guard s.coins >= cost, s.cleanliness < 100 else { return false }
         s.coins -= cost
         s.cleanliness = 100
+        Goals.recordProgress(&s, .cleanCafe)
         return true
     }
 }

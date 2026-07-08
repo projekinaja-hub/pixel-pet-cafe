@@ -11,6 +11,7 @@ struct MenuTab: View {
     }
 
     var body: some View {
+        GoalsCard(controller: controller)
         TasteResearchRow(controller: controller)
         ForEach(MenuCatalog.items, id: \.id) { def in
             if controller.state.lifetimeCoins >= def.unlockAtLifetime {
@@ -45,6 +46,93 @@ struct MenuTab: View {
                     .cornerRadius(9)
             }
             .buttonStyle(.plain)
+        }
+    }
+}
+
+/// Rotating short-term goals — a fresh 2-3 set roughly once per in-game day
+/// (see Goals.swift). Distinct from the permanent Milestones list on the
+/// Renovate tab: these are a small chase to actively pursue this session,
+/// not a lifetime unlock.
+struct GoalsCard: View {
+    @ObservedObject var controller: GameController
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("🎯 Today's Goals")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                Spacer()
+                Text("resets daily")
+                    .font(.system(size: 9, design: .rounded))
+                    .foregroundColor(Theme.dim)
+            }
+            ForEach(controller.state.activeGoals, id: \.kind) { goal in
+                GoalRow(controller: controller, goal: goal)
+            }
+        }
+        .padding(9)
+        .background(Theme.card)
+        .cornerRadius(9)
+    }
+}
+
+struct GoalRow: View {
+    @ObservedObject var controller: GameController
+    let goal: ActiveGoal
+
+    var body: some View {
+        let def = Goals.def(goal.kind)
+        let complete = Goals.isComplete(goal)
+        let frac = min(1, goal.progress / max(0.0001, def.target))
+        HStack(spacing: 8) {
+            Text(def.emoji).font(.system(size: 16))
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    Text(def.name)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.cream)
+                    Text(def.desc)
+                        .font(.system(size: 8.5, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Theme.bg.opacity(0.6))
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(goal.claimed ? Theme.dealGreen : Theme.gold)
+                            .frame(width: geo.size.width * frac)
+                    }
+                }
+                .frame(height: 6)
+                Text(goal.claimed ? "claimed" : def.progressText(goal.progress))
+                    .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                    .foregroundColor(Theme.dim)
+            }
+            Spacer()
+            if goal.claimed {
+                Text("✓")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundColor(Theme.dealGreen)
+            } else if complete {
+                Button {
+                    controller.claimGoal(goal.kind)
+                } label: {
+                    Text("Claim 🪙\(formatNumber(goal.rewardCoins))")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.bg)
+                        .padding(.horizontal, 8).padding(.vertical, 5)
+                        .background(Theme.gold)
+                        .cornerRadius(7)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text("🪙\(formatNumber(goal.rewardCoins))")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundColor(Theme.dim)
+            }
         }
     }
 }
