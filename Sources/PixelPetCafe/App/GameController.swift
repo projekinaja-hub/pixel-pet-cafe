@@ -266,6 +266,7 @@ final class GameController: ObservableObject {
         if SalesEngine.buyPack(ingredient, units: units, &state) { soundRequest.send("buy") }
     }
     func renovate() { EconomyEngine.renovate(&state); saveNow() }
+    func moveToNewCountry() { EconomyEngine.moveToNewCountry(&state); saveNow() }
     func toggleMuted() { state.muted.toggle() }
     func cleanSpot() { SalesEngine.cleanSpot(&state) }
     func sweepAll() {

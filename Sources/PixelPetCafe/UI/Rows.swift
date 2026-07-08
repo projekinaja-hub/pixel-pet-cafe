@@ -403,6 +403,7 @@ struct StaffTab: View {
 struct RenovateTab: View {
     @ObservedObject var controller: GameController
     @State private var confirming = false
+    @State private var confirmingWorld = false
 
     var body: some View {
         let pending = EconomyEngine.prestigeStars(controller.state)
@@ -442,6 +443,61 @@ struct RenovateTab: View {
             } else {
                 let need = EconomyEngine.prestigeThreshold
                 Text("Earn 🪙 \(formatNumber(need)) this run to renovate\n(\(formatNumber(controller.state.lifetimeCoinsThisRun)) so far)")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(Theme.dim)
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(Theme.card)
+        .cornerRadius(9)
+
+        VStack(spacing: 10) {
+            let s = controller.state
+            let eligible = EconomyEngine.canMoveToNewCountry(s)
+            let jumpstart = EconomyEngine.worldJumpstartCoins(s)
+            Text("🌍 \(s.worldsVisited) countries visited · +\(Int(EconomyEngine.worldPermanentBonusPerVisit * Double(s.worldsVisited) * 100))% prices forever")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.cream)
+            Text("Move to a New Country is a whole-game reset: every café\n(not just this one), stars, reputation and the market all\nstart over. You keep achievements, style and settings —\nand start the new run with 10% of this run's earnings.")
+                .font(.system(size: 10, design: .rounded))
+                .foregroundColor(Theme.dim)
+                .multilineTextAlignment(.center)
+            if eligible {
+                if confirmingWorld {
+                    VStack(spacing: 6) {
+                        Text("Jumpstart: 🪙 \(formatNumber(jumpstart)) · +\(Int(EconomyEngine.worldPermanentBonusPerVisit * 100))% permanent prices")
+                            .font(.system(size: 10, weight: .semibold, design: .rounded))
+                            .foregroundColor(Theme.gold)
+                        HStack(spacing: 8) {
+                            Button("Move to a New Country") {
+                                controller.moveToNewCountry()
+                                confirmingWorld = false
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.bg)
+                            .padding(.horizontal, 12).padding(.vertical, 7)
+                            .background(Theme.gold).cornerRadius(8)
+                            Button("Cancel") { confirmingWorld = false }
+                                .buttonStyle(.plain)
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundColor(Theme.dim)
+                        }
+                    }
+                } else {
+                    Button("🌍 Move to a New Country") { confirmingWorld = true }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.bg)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                        .background(Theme.gold).cornerRadius(9)
+                }
+            } else {
+                let need = EconomyEngine.worldPrestigeCoinThreshold
+                let citiesNeed = EconomyEngine.worldPrestigeCitiesRequired
+                Text("Earn 🪙 \(formatNumber(need)) lifetime and own \(citiesNeed) cities\n(🪙 \(formatNumber(s.lifetimeCoins)) lifetime · \(s.cafes.count)/\(citiesNeed) cities)")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .foregroundColor(Theme.dim)
                     .multilineTextAlignment(.center)

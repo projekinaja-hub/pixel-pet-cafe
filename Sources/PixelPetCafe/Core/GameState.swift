@@ -59,6 +59,11 @@ struct GameState: Codable {
     /// GameState value is first constructed (newGame() included) and never
     /// touched again — old saves missing it default to "now" on load.
     var calendarStartedAt: Date = Date()
+    // v7: "Move to a New Country" — the big, whole-game prestige on top of
+    // renovate(). Counts completed world resets; never itself reset by a
+    // world reset (or by renovate) — see EconomyEngine.moveToNewCountry.
+    // Grants a small permanent global bonus per world via SalesEngine.
+    var worldsVisited: Int = 0
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -154,6 +159,7 @@ struct GameState: Codable {
         case activeEvent, eventEndsAt, lastCriticVerdict, achievements
         case casinoWagered, casinoWon, casinoBiggestWin, casinoJackpotPot
         case marketPrices, priceHistory, season, calendarStartedAt
+        case worldsVisited
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -188,6 +194,7 @@ struct GameState: Codable {
         priceHistory = try c.decodeIfPresent([String: [Double]].self, forKey: .priceHistory) ?? [:]
         season = try c.decodeIfPresent(Season.self, forKey: .season) ?? .spring
         calendarStartedAt = try c.decodeIfPresent(Date.self, forKey: .calendarStartedAt) ?? Date()
+        worldsVisited = try c.decodeIfPresent(Int.self, forKey: .worldsVisited) ?? 0
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -238,6 +245,7 @@ struct GameState: Codable {
         try c.encode(priceHistory, forKey: .priceHistory)
         try c.encode(season, forKey: .season)
         try c.encode(calendarStartedAt, forKey: .calendarStartedAt)
+        try c.encode(worldsVisited, forKey: .worldsVisited)
     }
 }
 
@@ -276,5 +284,6 @@ extension GameState: Equatable {
             && lhs.marketPrices == rhs.marketPrices
             && lhs.priceHistory == rhs.priceHistory
             && lhs.season == rhs.season
+            && lhs.worldsVisited == rhs.worldsVisited
     }
 }

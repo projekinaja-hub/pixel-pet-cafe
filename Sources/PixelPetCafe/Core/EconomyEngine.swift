@@ -139,6 +139,74 @@ enum EconomyEngine {
         s.cafe = fresh
     }
 
+    // MARK: world prestige ("Move to a New Country")
+
+    /// Gate is deliberately far past renovate's (100× the coin bar, plus
+    /// owning half the map) — renovate is a "reset this café for a quick
+    /// boost" action you can do every few minutes; this is a "you've mastered
+    /// this run, start the whole game over for a permanent edge" milestone,
+    /// so it should take real hours of play to reach, not be casually spammed.
+    static let worldPrestigeCoinThreshold: Double = 100_000_000
+    static let worldPrestigeCitiesRequired: Int = 6
+
+    /// Permanent global price bonus per completed world reset — stacks with
+    /// stars in priceMultiplier (see SalesEngine). Small per-reset (5%) since
+    /// it's forever and compounds across many resets over a player's
+    /// lifetime, unlike stars which reset to 0 with every world move.
+    static let worldPermanentBonusPerVisit: Double = 0.05
+
+    static func canMoveToNewCountry(_ s: GameState) -> Bool {
+        s.lifetimeCoins >= worldPrestigeCoinThreshold && s.cafes.count >= worldPrestigeCitiesRequired
+    }
+
+    /// 10% of coins earned THIS RUN (since the last world move or renovate),
+    /// not current wallet balance: current coins can be driven to ~0 just by
+    /// buying upgrades in the run's final minutes (which is the natural,
+    /// expected way to spend down before a reset anyway, since everything
+    /// unspent is about to be wiped) — basing the jumpstart on current coins
+    /// would punish that normal play pattern and perversely reward hoarding
+    /// coins unspent instead of playing the café. lifetimeCoinsThisRun only
+    /// ever goes up, so the jumpstart reflects genuine run performance and
+    /// can't be tanked or gamed by spending timing.
+    static func worldJumpstartCoins(_ s: GameState) -> Double {
+        s.lifetimeCoinsThisRun * 0.10
+    }
+
+    /// The big reset: every café is gone but Home (fresh defaults), market
+    /// resets to base, stars/reputation/taste/events reset — same convention
+    /// as renovate, just chain-wide. In exchange: a 10% coin jumpstart (see
+    /// worldJumpstartCoins) and +1 to `worldsVisited`, which grants a
+    /// permanent +5% price bonus (stacking, forever) via SalesEngine — so
+    /// every world move makes every future run measurably stronger.
+    /// Survives untouched: achievements, owner/barCharacter, muted/workMode,
+    /// all casino meta-progression, lifetimeCoins (the all-time total that
+    /// gates menu unlocks and this very threshold), and worldsVisited itself.
+    static func moveToNewCountry(_ s: inout GameState) {
+        guard canMoveToNewCountry(s) else { return }
+        let jumpstart = worldJumpstartCoins(s)
+        s.worldsVisited += 1
+        s.coins = jumpstart
+        s.lifetimeCoinsThisRun = 0
+        s.stars = 0
+        s.reputation = 50
+        s.adsActive = false
+        s.menuTaste = [:]
+        s.tasteKnown = []
+        s.activeEvent = nil
+        s.eventEndsAt = nil
+        s.customItems = []
+        for ing in MenuCatalog.ingredients {
+            s.marketPrices[ing.id] = ing.unitCost
+            s.priceHistory[ing.id] = [ing.unitCost]
+        }
+        var home = CafeState.fresh(city: "home")
+        home.menuEnabled = MenuCatalog.items
+            .filter { s.lifetimeCoins >= $0.unlockAtLifetime }
+            .map(\.id)
+        s.cafes = [home]
+        s.activeCafe = 0
+    }
+
     // MARK: golden tip
 
     static func goldenTipValue(_ s: GameState) -> Double {

@@ -54,6 +54,9 @@ enum SalesEngine {
     static func priceMultiplier(_ s: GameState) -> Double {
         equipMultiplier(s) * (1 + 0.10 * Double(s.stars)) * s.city.priceBonus
             * min(1.5, 1 + 0.02 * Double(s.staffLevels["juno"] ?? 0))
+            // permanent world-prestige bonus — see EconomyEngine.moveToNewCountry.
+            // Survives every reset (renovate and world moves alike), unlike stars.
+            * (1 + EconomyEngine.worldPermanentBonusPerVisit * Double(s.worldsVisited))
     }
 
     /// Role bonuses: Mocha boosts drinks, Poppy boosts pastries (+4%/level).
