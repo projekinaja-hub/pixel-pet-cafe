@@ -376,18 +376,35 @@ struct DeliveryCard: View {
 struct StaffTab: View {
     @ObservedObject var controller: GameController
 
+    /// Every role's real, distinct effect — replaces a stale generic
+    /// "+15% customer flow per level" line that was shown for ALL staff
+    /// regardless of what they actually do, hiding how differentiated the
+    /// roles already are (each also adds a small flat +8%/level to base
+    /// customer flow on top of this, from just being on staff).
+    private static func detail(_ id: String) -> String {
+        switch id {
+        case "mocha":   return "+4% drink prices/lv (cap ×2) · helps keep drinks fast"
+        case "biscuit": return "Waits tables · adds real serving capacity (throughput)"
+        case "poppy":   return "+4% pastry prices/lv (cap ×2) · helps keep pastries fast"
+        case "juno":    return "+2% all prices/lv (cap ×1.5)"
+        case "bo":      return "2%/lv chance a sale costs no ingredients (cap 50%)"
+        case "earl":    return "+1h away-earnings cap per level"
+        case "marble":  return "Auto-restocks ingredients when stock runs low"
+        case "chip":    return "Auto-cleans on a cooldown, free once hired"
+        default:        return "+8% customer flow per level"
+        }
+    }
+
     var body: some View {
         ForEach(Catalog.staff, id: \.id) { def in
             if controller.state.lifetimeCoins >= def.unlockAtLifetime {
                 let level = controller.state.staffLevels[def.id] ?? 0
                 let cost = EconomyEngine.staffCost(def.id, controller.state)
-                let extra = def.id == "earl" ? " · +1h away cap/lv"
-                    : def.id == "chip" ? " · auto-cleans, no more manual sweeping" : ""
                 PurchaseRow(
                     leading: PixelImage(name: "staff_\(def.id)_0", scale: 1.4),
                     name: def.name,
                     subtitle: level > 0 ? "\(def.role) · Lv \(level)" : "\(def.role) · Hire",
-                    detail: "+15% customer flow per level\(extra)",
+                    detail: Self.detail(def.id),
                     cost: cost,
                     affordable: controller.state.coins >= cost
                 ) { controller.buyStaff(def.id) }
