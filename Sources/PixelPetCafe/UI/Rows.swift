@@ -241,18 +241,86 @@ struct CafeTab: View {
                 .font(.system(size: 9, design: .rounded))
                 .foregroundColor(Theme.dim)
         }
+        ThroughputCard(controller: controller)
+        if controller.state.deliveryUnlocked {
+            DeliveryCard(controller: controller)
+        }
         ForEach(Catalog.equipment, id: \.id) { def in
             let level = controller.state.equipmentLevels[def.id] ?? 0
             let cost = EconomyEngine.equipmentCost(def.id, controller.state)
+            let speedNote = def.speedCategories.isEmpty ? ""
+                : String(format: " · ×%.2f prep speed/level (%@)", def.speedMultPerLevel,
+                         def.speedCategories.contains(.drink) ? "drinks" : "pastries")
             PurchaseRow(
                 leading: Text(Self.emoji[def.id] ?? "🧰").font(.system(size: 20)),
                 name: def.name,
                 subtitle: level > 0 ? "Lv \(level)" : "New",
-                detail: String(format: "×%.2f prices & customers per level", def.multPerLevel),
+                detail: String(format: "×%.2f prices & customers per level", def.multPerLevel) + speedNote,
                 cost: cost,
                 affordable: controller.state.coins >= cost
             ) { controller.buyEquipment(def.id) }
         }
+    }
+}
+
+/// How fast the café can actually prep/serve right now, and whether that's
+/// keeping up with who's walking in — the visible face of the throughput cap.
+struct ThroughputCard: View {
+    @ObservedObject var controller: GameController
+
+    var body: some View {
+        let s = controller.state
+        let cap = SalesEngine.capacityPerSec(s)
+        let rate = SalesEngine.customerRate(s)
+        let strained = cap.isFinite && cap < rate
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("👩‍🍳 Kitchen throughput")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                Spacer()
+                Text(cap.isFinite ? String(format: "~%.1f/sec", cap) : "—")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(strained ? Theme.danger : Theme.gold)
+            }
+            Text(strained
+                 ? "Demand is outpacing prep speed — customers are being turned away. Hire Mocha/Poppy/Biscuit or upgrade the Espresso Machine/Stone Oven."
+                 : "Comfortably keeping up with walk-in demand right now.")
+                .font(.system(size: 9, design: .rounded))
+                .foregroundColor(Theme.dim)
+        }
+        .padding(9)
+        .background(Theme.card)
+        .cornerRadius(9)
+    }
+}
+
+/// Late-game Delivery channel — unlocked once 10 of 12 cities are owned.
+/// Shows lifetime served/missed so under-investment in service capacity is
+/// visible, not just a silent number.
+struct DeliveryCard: View {
+    @ObservedObject var controller: GameController
+
+    var body: some View {
+        let cafe = controller.state.cafe
+        let total = cafe.deliveryOrdersServed + cafe.deliveryOrdersMissed
+        let fillPct = total > 0 ? Int((cafe.deliveryOrdersServed / total * 100).rounded()) : 0
+        VStack(alignment: .leading, spacing: 4) {
+            Text("🚚 Delivery — unlocked")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.cream)
+            Text("A flood of new orders on top of walk-ins — but only your prep capacity decides how many you can actually fill.")
+                .font(.system(size: 9, design: .rounded))
+                .foregroundColor(Theme.dim)
+            if total > 0 {
+                Text("Filled \(fillPct)% of \(formatNumber(total)) delivery orders so far")
+                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                    .foregroundColor(fillPct < 20 ? Theme.danger : Theme.dealGreen)
+            }
+        }
+        .padding(9)
+        .background(Theme.card)
+        .cornerRadius(9)
     }
 }
 

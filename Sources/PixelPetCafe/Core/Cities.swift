@@ -74,6 +74,14 @@ struct CafeState: Equatable {
     /// Seconds until Chip's next auto-clean burst (+15 cleanliness, matching
     /// manual cleanSpot). Counts down each tick; see SalesEngine.janitorClean.
     var chipCooldown: Double = 0
+    /// Carry-over fraction (0...1) of an unused prep-capacity slot from the
+    /// previous tick — smooths the throughput cap across tick boundaries.
+    /// Bounded to [0, 1] by construction, so it can never bank indefinitely.
+    var serviceBuffer: Double = 0
+    /// Cumulative Delivery orders fulfilled/missed (stats/UI only — not
+    /// consumed by any formula, so it can't desync balance).
+    var deliveryOrdersServed: Double = 0
+    var deliveryOrdersMissed: Double = 0
 
     static func fresh(city: String) -> CafeState {
         var c = CafeState()
@@ -90,6 +98,7 @@ extension CafeState: Codable {
         case city, staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt, tables, consumptionEMA
         case storageLevel, refillThreshold, chipCooldown
+        case serviceBuffer, deliveryOrdersServed, deliveryOrdersMissed
     }
 
     init(from decoder: Decoder) throws {
@@ -107,6 +116,9 @@ extension CafeState: Codable {
         storageLevel = try c.decodeIfPresent(Int.self, forKey: .storageLevel) ?? 0
         refillThreshold = try c.decodeIfPresent(Double.self, forKey: .refillThreshold) ?? 1.0
         chipCooldown = try c.decodeIfPresent(Double.self, forKey: .chipCooldown) ?? 0
+        serviceBuffer = try c.decodeIfPresent(Double.self, forKey: .serviceBuffer) ?? 0
+        deliveryOrdersServed = try c.decodeIfPresent(Double.self, forKey: .deliveryOrdersServed) ?? 0
+        deliveryOrdersMissed = try c.decodeIfPresent(Double.self, forKey: .deliveryOrdersMissed) ?? 0
     }
 
     func encode(to encoder: Encoder) throws {
@@ -124,5 +136,8 @@ extension CafeState: Codable {
         try c.encode(storageLevel, forKey: .storageLevel)
         try c.encode(refillThreshold, forKey: .refillThreshold)
         try c.encode(chipCooldown, forKey: .chipCooldown)
+        try c.encode(serviceBuffer, forKey: .serviceBuffer)
+        try c.encode(deliveryOrdersServed, forKey: .deliveryOrdersServed)
+        try c.encode(deliveryOrdersMissed, forKey: .deliveryOrdersMissed)
     }
 }

@@ -106,6 +106,10 @@ struct GameState: Codable {
     }
 
     var casinoUnlocked: Bool { lifetimeCoins >= CasinoEngine.unlockAtLifetime }
+    /// Late-game Delivery channel: unlocks chain-wide once the player owns 10
+    /// of the 12 cities. Derived, not persisted — same pattern as
+    /// `casinoUnlocked`.
+    var deliveryUnlocked: Bool { cafes.count >= 10 }
     func ownsCity(_ id: String) -> Bool { cafes.contains { $0.city == id } }
 
     static func newGame() -> GameState {
