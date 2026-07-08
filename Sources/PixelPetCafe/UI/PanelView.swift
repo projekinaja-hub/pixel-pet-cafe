@@ -103,7 +103,13 @@ struct PanelView: View {
                 .padding(10)
                 .frame(width: 360)
             }
-            .frame(maxHeight: .infinity)
+            // Fixed, not maxHeight/.infinity: a flexible height here previously caused
+            // the SpriteKit scene to render a single static frame and never update again
+            // (likely an NSHostingView redraw stall from the ambiguous flexible layout).
+            // 176 is sized for the WORST case — header showing its 3rd (goal-progress)
+            // row — so the scroll area never overflows the fixed 544pt popover, even
+            // though that leaves a little unused space when the header is only 2 rows.
+            .frame(height: 176)
         }
         .frame(width: 360, height: 544, alignment: .top)
         .clipped()
@@ -234,6 +240,7 @@ struct PanelView: View {
                             .shadow(color: active ? Theme.gold.opacity(0.45) : .clear, radius: 4, y: 1)
                     )
                     .scaleEffect(active ? 1.0 : 0.94)
+                    .contentShape(Rectangle())   // whole padded box is tappable, not just the glyph/text pixels
                 }
                 .buttonStyle(.plain)
             }
