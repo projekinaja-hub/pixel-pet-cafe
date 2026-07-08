@@ -189,6 +189,62 @@ enum SalesEngine {
         return customerRate(s) * avg
     }
 
+    // MARK: throughput / prep-time capacity
+
+    /// One item's prep time right now: base seconds ÷ every relevant
+    /// equipment's speed bonus, floored so nothing ever becomes ~instant.
+    static func prepTime(_ item: ResolvedItem, _ s: GameState) -> Double {
+        var t = PrepTime.base(item)
+        for def in Catalog.equipment where def.speedCategories.contains(item.category) {
+            let level = s.equipmentLevels[def.id] ?? 0
+            if level > 0 { t /= pow(def.speedMultPerLevel, Double(level)) }
+        }
+        return max(1.5, t)
+    }
+
+    /// Hands-on serving staff only — Mocha (barista), Poppy (pâtissier),
+    /// Biscuit (waiter) — the roles thematically tied to actually plating
+    /// orders. The Owner alone (baseline 1.0) always mans the counter.
+    static func serviceWorkers(_ s: GameState) -> Double {
+        1.0
+            + 0.5 * Double(s.staffLevels["mocha"] ?? 0)
+            + 0.5 * Double(s.staffLevels["poppy"] ?? 0)
+            + 0.5 * Double(s.staffLevels["biscuit"] ?? 0)
+    }
+
+    /// Simple (unweighted) average prep time across the currently servable
+    /// menu. `.infinity` when nothing is servable — a total stock-out is
+    /// already handled by the existing "angry" mood, so it must not also
+    /// register as a capacity bottleneck.
+    static func avgPrepTime(_ s: GameState) -> Double {
+        let items = servable(s)
+        guard !items.isEmpty else { return .infinity }
+        return items.reduce(0) { $0 + prepTime($1, s) } / Double(items.count)
+    }
+
+    /// Customers/sec the café can actually prep and serve right now, given
+    /// its staff and the speed of its current menu. `.infinity` when nothing
+    /// is servable (see `avgPrepTime`) — the cap simply doesn't apply then.
+    static func capacityPerSec(_ s: GameState) -> Double {
+        let t = avgPrepTime(s)
+        guard t.isFinite else { return .infinity }
+        return serviceWorkers(s) / t
+    }
+
+    // MARK: Delivery (late-game channel, unlocked at 10/12 cities)
+
+    /// Flat multiplier on `customerRate` — composes with every existing rate
+    /// multiplier (stars, rush, ads, city) rather than a parallel formula.
+    static let deliveryDemandMultiplier = 400.0
+
+    static func deliveryDemand(_ s: GameState) -> Double {
+        guard s.deliveryUnlocked else { return 0 }
+        return customerRate(s) * deliveryDemandMultiplier
+    }
+
+    /// Delivery platform fee — a distinct, slightly-discounted revenue line.
+    static let deliveryFeeRetained = 0.85
+
     static func hasStockOut(_ s: GameState) -> Bool {
         let all = MenuCatalog.resolve(s)
         guard !all.isEmpty else { return false }
@@ -259,11 +315,76 @@ enum SalesEngine {
         s.customerProgress += customerRate(s) * boost * dt
         var events: [SaleEvent] = []
         let stockBeforeServing = s.stock
-        while s.customerProgress >= 1 {
+
+        // Throughput cap: how many customers this café's staff can actually
+        // prep/serve this tick. `max(1.0, ...)` floors it at one guaranteed
+        // serve-slot per tick — the single-arrival-per-tick idiom used
+        // throughout the test suite (fresh copy, customerProgress = 1,
+        // dt ≈ 0.001) always clears this floor untouched, so the cap only
+        // ever binds when MORE than one customer's worth of progress
+        // accumulates within a single tick: large dt (offline-style catch
+        // up), rush/ads stacking pushing customerRate*dt > 1, or a Delivery
+        // burst below — precisely the "kitchen can't keep up" moment.
+        let capacityThisTick = capacityPerSec(s).isFinite
+            ? max(1.0, capacityPerSec(s) * dt + s.cafe.serviceBuffer)
+            : Double.infinity
+        var slotsLeft = capacityThisTick
+        var servedThisTick = 0.0
+        let hardStop = 2000.0   // bulk past this instead of looping per-customer
+        var loops = 0.0
+
+        while s.customerProgress >= 1, loops < hardStop {
             s.customerProgress -= 1
+            loops += 1
+            if slotsLeft < 1 {
+                // Capacity exhausted this tick — the kitchen genuinely can't
+                // keep up, so the customer walks rather than waits. Distinct
+                // from the existing stock-out sadLeave: servable(s) is
+                // non-empty here, it's just too slow.
+                if events.count < 20 {
+                    events.append(SaleEvent(itemIcon: "", itemName: "", price: 0, mood: .sadLeave,
+                                             customerSpecies: Int.random(in: 0...2, using: &rng), dineIn: false))
+                }
+                s.reputation = max(0, s.reputation - 0.15)
+                continue
+            }
+            slotsLeft -= 1
+            servedThisTick += 1
             events.append(serveCustomer(&s, now: now, rng: &rng))
             if events.count >= 20 { s.customerProgress = 0; break }  // sanity cap per tick
         }
+        if s.customerProgress >= 1 {
+            // Extreme burst (e.g. Delivery-scale under-capacity): resolve the
+            // remainder in bulk rather than looping further, with a smaller
+            // aggregate reputation ding so it can't zero reputation in one tick.
+            let remainder = s.customerProgress
+            s.reputation = max(0, s.reputation - min(5.0, 0.02 * remainder))
+            s.customerProgress = 0
+        }
+        s.cafe.serviceBuffer = slotsLeft.isFinite ? max(0.0, min(1.0, slotsLeft)) : 0
+
+        // Delivery: reuses this tick's already-computed capacity/serve
+        // numbers via leftover-capacity subtraction — no separate demand
+        // pool, no second dt-scaling surface.
+        if s.deliveryUnlocked {
+            let leftoverCapacity = capacityThisTick.isFinite ? max(0, capacityThisTick - servedThisTick) : 0
+            let demandThisTick = deliveryDemand(s) * dt
+            let filled = min(demandThisTick, leftoverCapacity)
+            let missed = max(0, demandThisTick - filled)
+            if filled > 0 {
+                let items = servable(s)
+                if !items.isEmpty {
+                    let avgPrice = items.reduce(0) { $0 + price($1, s) } / Double(items.count)
+                    let earned = filled * avgPrice * deliveryFeeRetained
+                    s.coins += earned
+                    s.lifetimeCoins += earned
+                    s.lifetimeCoinsThisRun += earned
+                    s.cafe.deliveryOrdersServed += filled
+                }
+            }
+            s.cafe.deliveryOrdersMissed += missed
+        }
+
         updateConsumptionAndSpoilage(&s, stockBeforeServing: stockBeforeServing, dt: dt)
         return events
     }
@@ -447,7 +568,9 @@ enum SalesEngine {
         let window = min(elapsed, EconomyEngine.offlineCap(s))
         managerRestock(&s)
         janitorClean(&s, dt: window)
-        var customers = Int(customerRate(s) * window)
+        let cap = capacityPerSec(s)
+        let demanded = Int(customerRate(s) * window)
+        var customers = cap.isFinite ? min(demanded, Int(cap * window)) : demanded
         var haul = 0.0
         var safety = 250_000
         while customers > 0, safety > 0 {

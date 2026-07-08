@@ -141,6 +141,9 @@ struct MenuRow: View {
                             .font(.system(size: 9, design: .rounded))
                             .foregroundColor(Theme.dim)
                     }
+                    Text("⏱ ~\(String(format: "%.1f", SalesEngine.prepTime(resolved, controller.state)))s to prep")
+                        .font(.system(size: 9, design: .rounded))
+                        .foregroundColor(Theme.dim)
                     if sold > 0 {
                         Text("· sold \(formatNumber(Double(sold)))")
                             .font(.system(size: 9, design: .rounded))

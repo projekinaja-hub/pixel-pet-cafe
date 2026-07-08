@@ -13,7 +13,13 @@ struct EquipmentDef {
     let id: String
     let name: String
     let baseCost: Double
-    let multPerLevel: Double    // income ×(multPerLevel^level)
+    let multPerLevel: Double    // income ×(multPerLevel^level) — price/rate effect, unchanged
+    /// Prep-time speed effect: divides prep time by (speedMultPerLevel^level)
+    /// for every item in `speedCategories`. Defaults mean "no speed role" —
+    /// existing equipment definitions that don't set these behave exactly as
+    /// before.
+    var speedMultPerLevel: Double = 1.0
+    var speedCategories: Set<ItemCategory> = []
 }
 
 enum Catalog {
@@ -29,9 +35,12 @@ enum Catalog {
     ]
 
     static let equipment: [EquipmentDef] = [
-        EquipmentDef(id: "espresso", name: "Espresso Machine", baseCost: 100,     multPerLevel: 1.10),
-        EquipmentDef(id: "grinder",  name: "Bean Grinder",     baseCost: 1_200,   multPerLevel: 1.09),
-        EquipmentDef(id: "oven",     name: "Stone Oven",       baseCost: 9_000,   multPerLevel: 1.09),
+        EquipmentDef(id: "espresso", name: "Espresso Machine", baseCost: 100,     multPerLevel: 1.10,
+                     speedMultPerLevel: 1.06, speedCategories: [.drink]),
+        EquipmentDef(id: "grinder",  name: "Bean Grinder",     baseCost: 1_200,   multPerLevel: 1.09,
+                     speedMultPerLevel: 1.02, speedCategories: [.drink]),
+        EquipmentDef(id: "oven",     name: "Stone Oven",       baseCost: 9_000,   multPerLevel: 1.09,
+                     speedMultPerLevel: 1.08, speedCategories: [.pastry, .special]),
         EquipmentDef(id: "decor",    name: "Cozy Decor",       baseCost: 60_000,  multPerLevel: 1.08),
         EquipmentDef(id: "sound",    name: "Sound System",     baseCost: 450_000, multPerLevel: 1.08),
     ]
