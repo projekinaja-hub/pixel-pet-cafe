@@ -401,7 +401,7 @@ struct StaffTab: View {
                 let level = controller.state.staffLevels[def.id] ?? 0
                 let cost = EconomyEngine.staffCost(def.id, controller.state)
                 PurchaseRow(
-                    leading: PixelImage(name: "staff_\(def.id)_0", scale: 1.4),
+                    leading: StaffLayeredIcon(id: def.id, pair: StaffPalette.pair(for: def.id, in: controller.state), scale: 1.4),
                     name: def.name,
                     subtitle: level > 0 ? "\(def.role) · Lv \(level)" : "\(def.role) · Hire",
                     detail: Self.detail(def.id),

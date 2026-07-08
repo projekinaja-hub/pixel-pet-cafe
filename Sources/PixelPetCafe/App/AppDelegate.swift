@@ -33,6 +33,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         demo.owner.species = "fox"
         demo.owner.palette = "cream"
         demo.owner.accessory = "cap"
+        if ProcessInfo.processInfo.environment["PPC_STAFF_COLOR"] == "1" {
+            demo.staffColors["mocha"] = StaffColorPair(body: StaffColor(r: 40, g: 200, b: 210),
+                                                         clothes: StaffColor(r: 230, g: 40, b: 190))
+        }
         if let city = ProcessInfo.processInfo.environment["PPC_CITY"] {
             demo.cafe.city = city
         }
@@ -87,6 +91,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     private func runSnapshot(to path: String) {
         let scene = CafeScene()
+        // dev hook: PPC_STAFF=1 hires a demo staff roster so panels that are
+        // otherwise empty on a fresh save (Style's staff-colors section,
+        // Staff tab) have something to screenshot.
+        if ProcessInfo.processInfo.environment["PPC_STAFF"] == "1" {
+            game.debugSeedStaff()
+        }
+        if ProcessInfo.processInfo.environment["PPC_STAFF_COLOR"] == "1" {
+            game.debugTintMocha()
+        }
         scene.configure(with: game.state)
         scene.setActive(true)
         let host = NSHostingController(rootView: PanelView(controller: game, scene: scene))

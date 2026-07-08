@@ -265,6 +265,28 @@ final class GameController: ObservableObject {
     func buyStaff(_ id: String) {
         if EconomyEngine.buyStaff(id, &state) { soundRequest.send("buy") }
     }
+    /// Dev-only: seeds a demo staff roster for PPC_STAFF=1 offscreen
+    /// snapshotting — panels like Style's staff-colors section have nothing
+    /// to screenshot on an otherwise-empty fresh save.
+    func debugSeedStaff() {
+        state.staffLevels = ["mocha": 3, "biscuit": 2, "poppy": 1, "chip": 1]
+        state.lifetimeCoins = max(state.lifetimeCoins, 5000)
+    }
+    /// Dev-only: PPC_STAFF_COLOR=1 verification hook — tints Mocha bright
+    /// teal/magenta so screenshots can confirm custom tinting actually
+    /// applies (vs. silently no-oping and just showing the default palette).
+    func debugTintMocha() {
+        EconomyEngine.setStaffColor("mocha", body: StaffColor(r: 40, g: 200, b: 210),
+                                     clothes: StaffColor(r: 230, g: 40, b: 190), &state)
+    }
+    func setStaffColor(_ id: String, body: StaffColor, clothes: StaffColor) {
+        EconomyEngine.setStaffColor(id, body: body, clothes: clothes, &state)
+        saveNow()
+    }
+    func resetStaffColor(_ id: String) {
+        EconomyEngine.resetStaffColor(id, &state)
+        saveNow()
+    }
     func buyEquipment(_ id: String) {
         if EconomyEngine.buyEquipment(id, &state) {
             soundRequest.send("buy")

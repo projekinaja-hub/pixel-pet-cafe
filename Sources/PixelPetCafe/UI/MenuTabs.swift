@@ -508,6 +508,7 @@ struct PriceSparkline: View {
 
 struct StyleTab: View {
     @ObservedObject var controller: GameController
+    @Binding var editingStaffColorId: String?
 
     var body: some View {
         let owner = controller.state.owner
@@ -579,6 +580,44 @@ struct StyleTab: View {
         .padding(10)
         .background(Theme.card)
         .cornerRadius(9)
+
+        staffColorsSection
+    }
+
+    /// Free, cosmetic, per-staff-role recoloring — tap a hired staff member
+    /// to mix their own body/clothes colors. Only staff already on payroll
+    /// show up here (nothing to preview/tint until they're hired).
+    private var staffColorsSection: some View {
+        let hired = Catalog.staff.filter { (controller.state.staffLevels[$0.id] ?? 0) > 0 }
+        return Group {
+            if !hired.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("🎨 Staff colors")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.cream)
+                    Text("Tap a staff member to mix their own colors — free, just for fun")
+                        .font(.system(size: 9.5, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(50), spacing: 6), count: 6),
+                              alignment: .leading, spacing: 6) {
+                        ForEach(hired, id: \.id) { def in
+                            Button { editingStaffColorId = def.id } label: {
+                                StaffLayeredIcon(id: def.id, pair: StaffPalette.pair(for: def.id, in: controller.state), scale: 1.6)
+                                    .frame(width: 44, height: 50)
+                                    .background(Theme.bg.opacity(0.5))
+                                    .cornerRadius(6)
+                            }
+                            .buttonStyle(.plain)
+                            .help("Recolor \(def.name)")
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(10)
+                .background(Theme.card)
+                .cornerRadius(9)
+            }
+        }
     }
 
     var workModeSection: some View {

@@ -1557,13 +1557,51 @@ def main_v4():
     light_shaft().save("shaft.png"); count += 1
     print(f"v4: generated {count} more sprites")
 
+def split_staff_layers(c, fur, fur_d, apron):
+    """Split a rendered character canvas into recolorable layers for the staff
+    color customization feature. `bodylight`/`bodydark` are opaque-white masks
+    over the fur/fur_d pixels (tinted at runtime via colorBlendFactor=1, with
+    bodydark meant to receive a programmatically-darkened version of whatever
+    tint bodylight gets — so any custom color still gets believable shading);
+    `clothes` is the same kind of mask over apron pixels; `detail` keeps every
+    other pixel (outlines, eyes, ears, stitching...) at its original color,
+    untouched and unrecolorable, so identity-defining features never wash out."""
+    bodylight = Canvas(c.w, c.h)
+    bodydark = Canvas(c.w, c.h)
+    clothes = Canvas(c.w, c.h)
+    detail = Canvas(c.w, c.h)
+    mask = (255, 255, 255, 255)
+    for y in range(c.h):
+        for x in range(c.w):
+            p = c.px[y][x]
+            if p[3] == 0:
+                continue
+            if p == fur:
+                bodylight.set(x, y, mask)
+            elif p == fur_d:
+                bodydark.set(x, y, mask)
+            elif apron and p == apron:
+                clothes.set(x, y, mask)
+            else:
+                detail.set(x, y, p)
+    return bodylight, bodydark, clothes, detail
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     count = 0
     for sid, args in STAFF.items():
+        fur, fur_d, belly, apron, species, accent = args
         f0 = character(*args)
-        f0.save(f"staff_{sid}_0.png"); f0.shifted_down().save(f"staff_{sid}_1.png")
+        f1 = f0.shifted_down()
+        f0.save(f"staff_{sid}_0.png"); f1.save(f"staff_{sid}_1.png")
         count += 2
+        for fi, frame in enumerate((f0, f1)):
+            bodylight, bodydark, clothes, detail = split_staff_layers(frame, fur, fur_d, apron)
+            bodylight.save(f"staff_{sid}_bodylight_{fi}.png")
+            bodydark.save(f"staff_{sid}_bodydark_{fi}.png")
+            clothes.save(f"staff_{sid}_clothes_{fi}.png")
+            detail.save(f"staff_{sid}_detail_{fi}.png")
+            count += 4
     for i, args in enumerate(CUSTOMERS):
         f0 = character(*args)
         f0.save(f"customer_{i}_0.png"); f0.shifted_down().save(f"customer_{i}_1.png")

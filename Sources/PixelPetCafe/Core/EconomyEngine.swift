@@ -65,6 +65,16 @@ enum EconomyEngine {
         return true
     }
 
+    /// Purely cosmetic, free, and global (persists across renovate/prestige,
+    /// same as the custom menu/style) — self-expression, not a power upgrade.
+    static func setStaffColor(_ id: String, body: StaffColor, clothes: StaffColor, _ s: inout GameState) {
+        s.staffColors[id] = StaffColorPair(body: body, clothes: clothes)
+    }
+
+    static func resetStaffColor(_ id: String, _ s: inout GameState) {
+        s.staffColors.removeValue(forKey: id)
+    }
+
     @discardableResult
     static func buyEquipment(_ id: String, _ s: inout GameState) -> Bool {
         let c = equipmentCost(id, s)

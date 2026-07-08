@@ -5,6 +5,10 @@ import SpriteKit
 enum SceneMode { case cafe, casino, map }
 enum CasinoGame { case slots, blackjack, roulette, mahjong }
 
+extension StaffColor {
+    var nsColor: NSColor { NSColor(calibratedRed: r / 255, green: g / 255, blue: b / 255, alpha: 1) }
+}
+
 final class CafeScene: SKScene {
     var onGoldenTip: (() -> Void)?
     var onCleanSpot: (() -> Void)?
@@ -31,6 +35,7 @@ final class CafeScene: SKScene {
 
     private var currentBGTier = -1
     private var configuredStaff: Set<String> = []
+    private var configuredStaffColors: [String: StaffColorPair] = [:]
     private var configuredEquipTiers: [String: Int] = [:]
     private var configuredOwnerKey = ""
     private var configuredDirt = -1
@@ -639,13 +644,30 @@ final class CafeScene: SKScene {
 
     private func configureStaff(_ state: GameState) {
         let hired = Set(state.staffLevels.filter { $0.value > 0 }.keys)
-        guard hired != configuredStaff else { return }
-        for id in hired.subtracting(configuredStaff) { addStaff(id) }
-        for id in configuredStaff.subtracting(hired) {
-            staffNodes[id]?.removeFromParent()
-            staffNodes[id] = nil
+        if hired != configuredStaff {
+            for id in hired.subtracting(configuredStaff) { addStaff(id) }
+            for id in configuredStaff.subtracting(hired) {
+                staffNodes[id]?.removeFromParent()
+                staffNodes[id] = nil
+                configuredStaffColors[id] = nil
+            }
+            configuredStaff = hired
         }
-        configuredStaff = hired
+        // Recoloring is free and instant (Style tab), independent of the
+        // hire/fire gate above, so it needs its own change-detection pass.
+        for id in hired {
+            let pair = StaffPalette.pair(for: id, in: state)
+            guard configuredStaffColors[id] != pair else { continue }
+            configuredStaffColors[id] = pair
+            applyStaffColors(id, pair)
+        }
+    }
+
+    private func applyStaffColors(_ id: String, _ pair: StaffColorPair) {
+        guard let node = staffNodes[id] else { return }
+        (node.childNode(withName: "bodylight") as? SKSpriteNode)?.color = pair.body.nsColor
+        (node.childNode(withName: "bodydark") as? SKSpriteNode)?.color = pair.body.darkened.nsColor
+        (node.childNode(withName: "clothes") as? SKSpriteNode)?.color = pair.clothes.nsColor
     }
 
     private func configureEquipment(_ state: GameState) {
@@ -801,7 +823,7 @@ final class CafeScene: SKScene {
     }
 
     private func addStaff(_ id: String) {
-        let node = animatedSprite(prefix: "staff_\(id)")
+        let node = staffSprite(id)
         node.position = Self.staffSpots[id] ?? CGPoint(x: 90, y: 30)
         node.zPosition = id == "biscuit" ? 10 : 6
         cafeLayer.addChild(node)
@@ -829,6 +851,43 @@ final class CafeScene: SKScene {
             ]))
             node.run(.sequence([.wait(forDuration: Double.random(in: 0...0.8)), work]))
         }
+    }
+
+    /// Staff are rendered as 4 stacked layers (bodylight/bodydark/clothes/
+    /// detail — see split_staff_layers in tools/generate_sprites.py) instead
+    /// of one flat sprite, so the Style tab can retint body/clothes per
+    /// staff id at runtime via colorBlendFactor=1 while outlines, eyes, ears
+    /// etc. (the "detail" layer) always stay at their authored color. Tint
+    /// colors are applied separately by applyStaffColors/configureStaff —
+    /// this only builds the untinted structure.
+    private func staffSprite(_ id: String) -> SKSpriteNode {
+        let refSize = SpriteLoader.texture("staff_\(id)_detail_0").size()
+        let node = SKSpriteNode(color: .clear, size: refSize)
+        node.anchorPoint = CGPoint(x: 0.5, y: 0)
+
+        func layer(_ suffix: String, name: String, z: CGFloat) -> SKSpriteNode {
+            let frames = [SpriteLoader.texture("staff_\(id)_\(suffix)_0"), SpriteLoader.texture("staff_\(id)_\(suffix)_1")]
+            let n = SKSpriteNode(texture: frames[0])
+            n.name = name
+            n.size = frames[0].size()
+            n.anchorPoint = CGPoint(x: 0.5, y: 0)
+            n.zPosition = z
+            if suffix != "detail" {
+                n.colorBlendFactor = 1
+            }
+            n.run(.repeatForever(.animate(with: frames, timePerFrame: 0.45)))
+            return n
+        }
+        node.addChild(layer("bodylight", name: "bodylight", z: 0))
+        node.addChild(layer("bodydark", name: "bodydark", z: 1))
+        node.addChild(layer("clothes", name: "clothes", z: 2))
+        node.addChild(layer("detail", name: "detail", z: 3))
+
+        let shadow = SKSpriteNode(texture: SpriteLoader.texture("shadow"))
+        shadow.size = shadow.texture!.size()
+        shadow.zPosition = -1
+        node.addChild(shadow)
+        return node
     }
 
     private func animatedSprite(prefix: String) -> SKSpriteNode {

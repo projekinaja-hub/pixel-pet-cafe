@@ -50,6 +50,7 @@ struct PanelView: View {
     let scene: CafeScene
     @State private var tab: PanelTab
     @State private var showDashboard: Bool
+    @State private var editingStaffColorId: String?
 
     init(controller: GameController, scene: CafeScene) {
         self.controller = controller
@@ -61,6 +62,9 @@ struct PanelView: View {
         // dev hook: PPC_DASHBOARD=1 opens the café health dashboard on launch,
         // for offscreen PPC_SNAPSHOT verification.
         _showDashboard = State(initialValue: ProcessInfo.processInfo.environment["PPC_DASHBOARD"] == "1")
+        // dev hook: PPC_STAFF_EDITOR=<id> opens the staff color editor sheet
+        // on launch, for offscreen PPC_SNAPSHOT verification.
+        _editingStaffColorId = State(initialValue: ProcessInfo.processInfo.environment["PPC_STAFF_EDITOR"])
     }
 
     var body: some View {
@@ -110,7 +114,7 @@ struct PanelView: View {
                     case .stock: StockTab(controller: controller)
                     case .staff: StaffTab(controller: controller)
                     case .cafe: CafeTab(controller: controller)
-                    case .style: StyleTab(controller: controller)
+                    case .style: StyleTab(controller: controller, editingStaffColorId: $editingStaffColorId)
                     case .casino: CasinoTab(controller: controller)
                     case .renovate: RenovateTab(controller: controller)
                     }
@@ -142,6 +146,8 @@ struct PanelView: View {
         .overlay {
             if showDashboard {
                 DashboardOverlay(controller: controller) { showDashboard = false }
+            } else if let id = editingStaffColorId, let def = Catalog.staff.first(where: { $0.id == id }) {
+                StaffColorEditorSheet(id: id, name: def.name, controller: controller) { editingStaffColorId = nil }
             }
         }
     }

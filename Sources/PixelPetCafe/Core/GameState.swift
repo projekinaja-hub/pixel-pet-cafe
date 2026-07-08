@@ -75,6 +75,10 @@ struct GameState: Codable {
     // compressed in-game calendar) — see GameController.updateDailyStreak.
     var dailyStreak: Int = 0
     var lastPlayedRealDate: Date?
+    // v10: cosmetic, free, global (not per-café) staff recoloring — id ->
+    // chosen body/clothes tint. Missing entries render with StaffPalette's
+    // original defaults, so this is purely additive over existing art.
+    var staffColors: [String: StaffColorPair] = [:]
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -173,6 +177,7 @@ struct GameState: Codable {
         case marketPrices, priceHistory, season, calendarStartedAt
         case worldsVisited
         case activeGoals, goalsDay, dailyStreak, lastPlayedRealDate
+        case staffColors
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -212,6 +217,7 @@ struct GameState: Codable {
         goalsDay = try c.decodeIfPresent(Int.self, forKey: .goalsDay) ?? -1
         dailyStreak = try c.decodeIfPresent(Int.self, forKey: .dailyStreak) ?? 0
         lastPlayedRealDate = try c.decodeIfPresent(Date.self, forKey: .lastPlayedRealDate)
+        staffColors = try c.decodeIfPresent([String: StaffColorPair].self, forKey: .staffColors) ?? [:]
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -267,6 +273,7 @@ struct GameState: Codable {
         try c.encode(goalsDay, forKey: .goalsDay)
         try c.encode(dailyStreak, forKey: .dailyStreak)
         try c.encodeIfPresent(lastPlayedRealDate, forKey: .lastPlayedRealDate)
+        try c.encode(staffColors, forKey: .staffColors)
     }
 }
 
@@ -309,5 +316,6 @@ extension GameState: Equatable {
             && lhs.activeGoals == rhs.activeGoals
             && lhs.goalsDay == rhs.goalsDay
             && lhs.dailyStreak == rhs.dailyStreak
+            && lhs.staffColors == rhs.staffColors
     }
 }
