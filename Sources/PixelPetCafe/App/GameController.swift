@@ -84,6 +84,10 @@ final class GameController: ObservableObject {
             showBanner(def.emoji, "Achievement: \(def.name)!")
             soundRequest.send("achieve")
         }
+        if state.cleanliness >= 80 { Goals.recordProgress(&state, .cleanlinessStreak, amount: dt) }
+        if Goals.refreshIfNeeded(&state, now: now, rng: &rng) > 0 {
+            showBanner("🎯", "New goals for the day! Unclaimed rewards were paid out.")
+        }
         if let clear = banner, bannerClearAt < now, clear.text.isEmpty == false, now > bannerClearAt {
             banner = nil
         }
@@ -236,6 +240,7 @@ final class GameController: ObservableObject {
         state.coins += amount
         state.casinoWon += amount
         state.casinoBiggestWin = max(state.casinoBiggestWin, amount)
+        Goals.recordProgress(&state, .casinoWin)
         casinoWin.send(amount)
     }
 
@@ -260,7 +265,10 @@ final class GameController: ObservableObject {
         if EconomyEngine.buyStaff(id, &state) { soundRequest.send("buy") }
     }
     func buyEquipment(_ id: String) {
-        if EconomyEngine.buyEquipment(id, &state) { soundRequest.send("buy") }
+        if EconomyEngine.buyEquipment(id, &state) {
+            soundRequest.send("buy")
+            Goals.recordProgress(&state, .upgradeEquipment)
+        }
     }
     func buyPack(_ ingredient: String, units: Int) {
         if SalesEngine.buyPack(ingredient, units: units, &state) { soundRequest.send("buy") }
@@ -315,6 +323,23 @@ final class GameController: ObservableObject {
 
     func setOwner(_ owner: OwnerConfig) { state.owner = owner }
     func setBarCharacter(_ id: String) { state.barCharacter = id }
+
+    // MARK: rotating short-term goals (Goals.swift)
+
+    /// Claims a completed goal's reward. Safe to call repeatedly — `Goals.claim`
+    /// only pays out once per goal (guards on `claimed`).
+    /// Test-only seam: lets tests pin a known goal set without threading RNG
+    /// through `Goals.refreshIfNeeded` just to exercise a single call site.
+    func setGoalsForTesting(_ goals: [ActiveGoal]) {
+        state.activeGoals = goals
+    }
+
+    func claimGoal(_ kind: GoalKind) {
+        let reward = Goals.claim(&state, kind)
+        guard reward > 0 else { return }
+        showBanner(Goals.def(kind).emoji, "Goal complete: \(Goals.def(kind).name)! +🪙 \(formatNumber(reward))")
+        soundRequest.send("achieve")
+    }
 
     func collectGoldenTip() {
         let v = EconomyEngine.goldenTipValue(state)

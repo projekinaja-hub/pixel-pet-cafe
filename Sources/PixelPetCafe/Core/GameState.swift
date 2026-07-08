@@ -59,6 +59,13 @@ struct GameState: Codable {
     /// GameState value is first constructed (newGame() included) and never
     /// touched again — old saves missing it default to "now" on load.
     var calendarStartedAt: Date = Date()
+    // v7: rotating short-term goals (Goals.swift) — distinct from the
+    // permanent `achievements` above. `goalsDay` is the in-game calendar day
+    // (GameCalendar.currentDay) the current set was rolled for; refreshed
+    // roughly once per in-game day. Empty on a fresh/old save — normalized()
+    // populates the first set.
+    var activeGoals: [ActiveGoal] = []
+    var goalsDay: Int = -1
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -139,6 +146,7 @@ struct GameState: Codable {
             if s.marketPrices[ing.id] == nil { s.marketPrices[ing.id] = ing.unitCost }
             if s.priceHistory[ing.id]?.isEmpty ?? true { s.priceHistory[ing.id] = [ing.unitCost] }
         }
+        Goals.seedInitialSet(&s)
         return s
     }
 
@@ -154,6 +162,7 @@ struct GameState: Codable {
         case activeEvent, eventEndsAt, lastCriticVerdict, achievements
         case casinoWagered, casinoWon, casinoBiggestWin, casinoJackpotPot
         case marketPrices, priceHistory, season, calendarStartedAt
+        case activeGoals, goalsDay
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -188,6 +197,8 @@ struct GameState: Codable {
         priceHistory = try c.decodeIfPresent([String: [Double]].self, forKey: .priceHistory) ?? [:]
         season = try c.decodeIfPresent(Season.self, forKey: .season) ?? .spring
         calendarStartedAt = try c.decodeIfPresent(Date.self, forKey: .calendarStartedAt) ?? Date()
+        activeGoals = try c.decodeIfPresent([ActiveGoal].self, forKey: .activeGoals) ?? []
+        goalsDay = try c.decodeIfPresent(Int.self, forKey: .goalsDay) ?? -1
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -238,6 +249,8 @@ struct GameState: Codable {
         try c.encode(priceHistory, forKey: .priceHistory)
         try c.encode(season, forKey: .season)
         try c.encode(calendarStartedAt, forKey: .calendarStartedAt)
+        try c.encode(activeGoals, forKey: .activeGoals)
+        try c.encode(goalsDay, forKey: .goalsDay)
     }
 }
 
@@ -276,5 +289,7 @@ extension GameState: Equatable {
             && lhs.marketPrices == rhs.marketPrices
             && lhs.priceHistory == rhs.priceHistory
             && lhs.season == rhs.season
+            && lhs.activeGoals == rhs.activeGoals
+            && lhs.goalsDay == rhs.goalsDay
     }
 }
