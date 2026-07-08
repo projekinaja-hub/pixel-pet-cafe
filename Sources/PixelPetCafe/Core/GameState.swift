@@ -101,6 +101,9 @@ struct GameState: Codable {
     var refillThreshold: Double {
         get { cafe.refillThreshold } set { cafe.refillThreshold = newValue }
     }
+    var chipCooldown: Double {
+        get { cafe.chipCooldown } set { cafe.chipCooldown = newValue }
+    }
 
     var casinoUnlocked: Bool { lifetimeCoins >= CasinoEngine.unlockAtLifetime }
     func ownsCity(_ id: String) -> Bool { cafes.contains { $0.city == id } }

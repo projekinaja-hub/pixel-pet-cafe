@@ -223,6 +223,27 @@ final class V3Tests: XCTestCase {
         XCTAssertEqual(s.cleanliness, before, accuracy: 1e-9, "without Chip hired, cleanliness shouldn't self-heal")
     }
 
+    func testChipCooldownShortensPerLevelDownToAFloor() {
+        XCTAssertEqual(SalesEngine.janitorCooldown(level: 1), SalesEngine.janitorBaseCooldown, accuracy: 1e-9)
+        XCTAssertLessThan(SalesEngine.janitorCooldown(level: 5), SalesEngine.janitorCooldown(level: 1))
+        XCTAssertEqual(SalesEngine.janitorCooldown(level: 100), SalesEngine.janitorMinCooldown, accuracy: 1e-9)
+    }
+
+    func testChipCleansInFifteenPointBurstsOnCooldownNotContinuously() {
+        var s = GameState.newGame()
+        s.coins = 1_000_000
+        s.cleanliness = 0
+        s.staffLevels["chip"] = 1
+        var rng = SeededGenerator(seed: 1)
+        _ = SalesEngine.tick(&s, dt: 1.0, rng: &rng)   // cooldown starts at 0: first burst fires right away
+        XCTAssertEqual(s.cleanliness, SalesEngine.janitorBurstAmount, accuracy: 1e-9)
+        let afterFirstBurst = s.cleanliness
+        _ = SalesEngine.tick(&s, dt: 1.0, rng: &rng)   // still on cooldown — no second burst yet
+        XCTAssertEqual(s.cleanliness, afterFirstBurst, accuracy: 1e-9)
+        _ = SalesEngine.tick(&s, dt: SalesEngine.janitorBaseCooldown, rng: &rng)  // cooldown clears
+        XCTAssertGreaterThan(s.cleanliness, afterFirstBurst)
+    }
+
     func testManagerAutoRestocks() {
         var s = GameState.newGame()
         s.coins = 10_000

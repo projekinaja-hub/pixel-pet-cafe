@@ -542,21 +542,34 @@ enum SalesEngine {
         max(20, (incomeEstimate(s) * 60).rounded())
     }
 
-    /// Chip the cleaner: once hired, automatically restores cleanliness over
-    /// time instead of needing manual sweeping — but it's not free labor,
-    /// it's still paid for continuously (half the price of one full manual
-    /// sweep, spread proportionally over however much cleanliness it
-    /// actually restores this tick). Pauses like ads do if you can't afford it.
-    static let janitorRatePerLevel = 1.2   // cleanliness/sec restored, per level
+    /// Chip the cleaner: once hired, auto-cleans in the same discrete +15
+    /// bursts a manual cleanSpot tap gives you, on a cooldown — not a smooth
+    /// continuous drip. The cooldown gets shorter every level you upgrade him,
+    /// so a maxed-out Chip cleans noticeably more often than a fresh hire.
+    /// Each burst still costs coins (half the price of one manual Sweep All,
+    /// scaled to the fraction of 100 actually restored) — leveling him up
+    /// doesn't make cleaning free, just more frequent.
+    static let janitorBurstAmount = 15.0
+    static let janitorBaseCooldown: TimeInterval = 20
+    static let janitorCooldownPerLevel: TimeInterval = 1.5
+    static let janitorMinCooldown: TimeInterval = 3
+
+    static func janitorCooldown(level: Int) -> TimeInterval {
+        max(janitorMinCooldown, janitorBaseCooldown - janitorCooldownPerLevel * Double(level - 1))
+    }
+
     private static func janitorClean(_ s: inout GameState, dt: TimeInterval) {
         let level = s.staffLevels["chip"] ?? 0
-        guard level > 0, dt > 0 else { return }
-        let wanted = min(100 - s.cleanliness, janitorRatePerLevel * Double(level) * dt)
-        guard wanted > 0 else { return }
-        let cost = (wanted / 100) * 0.5 * sweepCost(s)
-        guard s.coins >= cost else { return }
-        s.coins -= cost
-        s.cleanliness += wanted
+        guard level > 0, dt > 0, s.cleanliness < 100 else { return }
+        s.chipCooldown -= dt
+        guard s.chipCooldown <= 0 else { return }
+        let amount = min(janitorBurstAmount, 100 - s.cleanliness)
+        let cost = (amount / 100) * 0.5 * sweepCost(s)
+        if s.coins >= cost {
+            s.coins -= cost
+            s.cleanliness += amount
+        }
+        s.chipCooldown = janitorCooldown(level: level)
     }
 
     @discardableResult

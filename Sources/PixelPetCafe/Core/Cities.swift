@@ -71,6 +71,9 @@ struct CafeState: Equatable {
     /// keep every ingredient topped up to. Defaults to 1.0 (top off
     /// completely) to match the pre-cap behavior every existing save saw.
     var refillThreshold: Double = 1.0
+    /// Seconds until Chip's next auto-clean burst (+15 cleanliness, matching
+    /// manual cleanSpot). Counts down each tick; see SalesEngine.janitorClean.
+    var chipCooldown: Double = 0
 
     static func fresh(city: String) -> CafeState {
         var c = CafeState()
@@ -86,7 +89,7 @@ extension CafeState: Codable {
     enum CodingKeys: String, CodingKey {
         case city, staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt, tables, consumptionEMA
-        case storageLevel, refillThreshold
+        case storageLevel, refillThreshold, chipCooldown
     }
 
     init(from decoder: Decoder) throws {
@@ -103,6 +106,7 @@ extension CafeState: Codable {
         consumptionEMA = try c.decodeIfPresent([String: Double].self, forKey: .consumptionEMA) ?? [:]
         storageLevel = try c.decodeIfPresent(Int.self, forKey: .storageLevel) ?? 0
         refillThreshold = try c.decodeIfPresent(Double.self, forKey: .refillThreshold) ?? 1.0
+        chipCooldown = try c.decodeIfPresent(Double.self, forKey: .chipCooldown) ?? 0
     }
 
     func encode(to encoder: Encoder) throws {
@@ -119,5 +123,6 @@ extension CafeState: Codable {
         try c.encode(consumptionEMA, forKey: .consumptionEMA)
         try c.encode(storageLevel, forKey: .storageLevel)
         try c.encode(refillThreshold, forKey: .refillThreshold)
+        try c.encode(chipCooldown, forKey: .chipCooldown)
     }
 }
