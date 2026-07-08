@@ -88,6 +88,18 @@ final class CasinoTests: XCTestCase {
 
 final class V3Tests: XCTestCase {
 
+    func testEquipmentCostScalesByCityPriceBonus() {
+        var s = GameState.newGame()
+        s.equipmentLevels["espresso"] = 5
+        let homeCost = EconomyEngine.equipmentCost("espresso", s)
+        s.cafes.append(CafeState.fresh(city: "moon"))
+        s.activeCafe = 1
+        s.equipmentLevels["espresso"] = 5      // same level, different city
+        let moonCost = EconomyEngine.equipmentCost("espresso", s)
+        XCTAssertEqual(moonCost, homeCost * Cities.def("moon").priceBonus, accuracy: 1e-6)
+        XCTAssertGreaterThan(moonCost, homeCost)
+    }
+
     func testManagerAutoRestocks() {
         var s = GameState.newGame()
         s.coins = 10_000

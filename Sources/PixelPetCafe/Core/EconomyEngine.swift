@@ -20,9 +20,14 @@ enum EconomyEngine {
         return cost(base: def.baseCost, level: s.staffLevels[id] ?? 0, growth: staffCostGrowth)
     }
 
+    /// Fancier cities cost more to build out, not just more to buy into: this
+    /// scales by the same priceBonus a city already applies to sales, so a
+    /// Moon café's espresso machine costs noticeably more per level than a
+    /// Home café's at the same level (home's priceBonus is 1.0 — unaffected).
     static func equipmentCost(_ id: String, _ s: GameState) -> Double {
         guard let def = Catalog.equipmentDef(id) else { return .infinity }
-        return cost(base: def.baseCost, level: s.equipmentLevels[id] ?? 0, growth: equipmentCostGrowth)
+        let base = cost(base: def.baseCost, level: s.equipmentLevels[id] ?? 0, growth: equipmentCostGrowth)
+        return base * s.city.priceBonus
     }
 
     /// The café floor has room for 2 baked-in tables + 2 back-row tables (4).
