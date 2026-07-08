@@ -398,6 +398,7 @@ final class CafeScene: SKScene {
         configureDirt(state)
         configureClosed(SalesEngine.isClosed(state))
         applyTimeOfDay()
+        applySeason(state)
         updateWeather(state)
     }
 
@@ -450,6 +451,103 @@ final class CafeScene: SKScene {
                              .fadeAlpha(to: alpha, duration: 2.5)]))
         windowTint.run(.group([.colorize(with: windowColor, colorBlendFactor: 1, duration: 2.5),
                               .fadeAlpha(to: windowColor == .clear ? 0 : 1, duration: 2.5)]))
+    }
+
+    // MARK: seasonal overlay (spring/summer/autumn/winter)
+    //
+    // A tint layer analogous to timeTint but keyed off state.season instead of
+    // real-world hour, plus a few drifting decoration sprites (snow/leaves/
+    // petals). Composes with timeTint rather than replacing it: seasonTint
+    // sits just below timeTint in z-order, so a winter night still shows both
+    // the cool seasonal wash and the night darkening layered together.
+
+    private lazy var seasonTint: SKSpriteNode = {
+        let n = SKSpriteNode(color: .clear, size: CGSize(width: 180, height: 120))
+        n.anchorPoint = .zero
+        n.position = .zero
+        n.zPosition = 24
+        n.blendMode = .alpha
+        cafeLayer.addChild(n)
+        return n
+    }()
+
+    private var lastSeason: Season?
+    private var seasonParticleNodes: [SKSpriteNode] = []
+
+    private func applySeason(_ state: GameState) {
+        let season = state.season
+        cafeLayer.childNode(withName: "seasonProp")?.removeFromParent()
+        if season == .winter && !Self.outdoorCities.contains(state.cafe.city) {
+            let prop = SKSpriteNode(texture: SpriteLoader.texture("prop_wreath"))
+            prop.name = "seasonProp"
+            prop.size = prop.texture!.size()
+            prop.position = CGPoint(x: 14, y: 96)
+            prop.zPosition = 7
+            cafeLayer.addChild(prop)
+        }
+        guard season != lastSeason else { return }
+        lastSeason = season
+        // Kept deliberately subtle — an earlier, stronger version of this kind
+        // of overlay crushed the scene to near-black. Low alpha, verified by
+        // rendering PPC_SCENESHOT and pixel-sampling the result.
+        let tint: NSColor
+        let alpha: CGFloat
+        switch season {
+        case .spring:
+            tint = NSColor(calibratedRed: 0.55, green: 0.85, blue: 0.5, alpha: 1); alpha = 0.06
+        case .summer:
+            tint = NSColor(calibratedRed: 1, green: 0.92, blue: 0.65, alpha: 1); alpha = 0.05
+        case .autumn:
+            tint = NSColor(calibratedRed: 0.85, green: 0.5, blue: 0.18, alpha: 1); alpha = 0.11
+        case .winter:
+            tint = NSColor(calibratedRed: 0.55, green: 0.72, blue: 0.95, alpha: 1); alpha = 0.14
+        }
+        seasonTint.run(.group([.colorize(with: tint, colorBlendFactor: 1, duration: 2.5),
+                               .fadeAlpha(to: alpha, duration: 2.5)]))
+        updateSeasonalParticles(season)
+    }
+
+    /// Falling snow (winter, priority) / leaves (autumn) / petals (spring) —
+    /// same drift+sway+spin structure, driven off a small reusable texture,
+    /// modest particle count (matches the ~18-drop scale of the rain system).
+    private func updateSeasonalParticles(_ season: Season) {
+        seasonParticleNodes.forEach { $0.removeFromParent() }
+        seasonParticleNodes.removeAll()
+        let textureName: String
+        let count: Int
+        switch season {
+        case .winter: textureName = "particle_snow"; count = 14
+        case .autumn: textureName = "particle_leaf"; count = 8
+        case .spring: textureName = "particle_petal"; count = 8
+        case .summer: return
+        }
+        for _ in 0..<count {
+            let node = SKSpriteNode(texture: SpriteLoader.texture(textureName))
+            node.size = node.texture!.size()
+            node.alpha = CGFloat.random(in: 0.55...0.9)
+            node.position = CGPoint(x: CGFloat.random(in: 0...180), y: CGFloat.random(in: 0...140))
+            node.zPosition = 27
+            let dropHeight = CGFloat.random(in: 90...140)
+            let fallDuration = season == .winter ? Double.random(in: 4.5...7) : Double.random(in: 3...5)
+            let sway = CGFloat.random(in: 5...14)
+            let swayDuration = fallDuration / 4
+            let fall = SKAction.group([
+                .repeatForever(.sequence([
+                    .moveBy(x: 0, y: -dropHeight, duration: fallDuration),
+                    .moveBy(x: 0, y: dropHeight, duration: 0),
+                ])),
+                .repeatForever(.sequence([
+                    .moveBy(x: sway, y: 0, duration: swayDuration),
+                    .moveBy(x: -sway, y: 0, duration: swayDuration),
+                    .moveBy(x: -sway, y: 0, duration: swayDuration),
+                    .moveBy(x: sway, y: 0, duration: swayDuration),
+                ])),
+                .repeatForever(.rotate(byAngle: .pi * 2, duration: fallDuration)),
+            ])
+            node.run(fall)
+            cafeLayer.addChild(node)
+            seasonParticleNodes.append(node)
+        }
     }
 
     // MARK: weather (rain event)

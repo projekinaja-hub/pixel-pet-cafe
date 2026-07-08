@@ -36,6 +36,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let city = ProcessInfo.processInfo.environment["PPC_CITY"] {
             demo.cafe.city = city
         }
+        // dev hook: PPC_SEASON=winter forces a season for seasonal-overlay screenshots
+        if let seasonRaw = ProcessInfo.processInfo.environment["PPC_SEASON"],
+           let season = Season(rawValue: seasonRaw) {
+            demo.season = season
+        }
         if ProcessInfo.processInfo.environment["PPC_MODE"] == "casino" {
             scene.setMode(.casino)
             if ProcessInfo.processInfo.environment["PPC_GAME"] == "map" {

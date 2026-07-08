@@ -1047,6 +1047,73 @@ def closed_sign():
                 c.set(4 + x, 7 + y, CREAM)
     return c
 
+# ---------------------------------------------------------------- seasonal overlay sprites
+# Small, reusable-across-all-cities decoration sprites for CafeScene's seasonal
+# overlay: a drifting particle per season (snow/leaves/petals) plus one small
+# door-topper prop for winter. Deliberately tiny — these are layered on top of
+# existing per-city background art, not a redraw of it.
+
+def snowflake():
+    c = Canvas(3, 3, CLEAR)
+    c.set(1, 0, (255, 255, 255, 220))
+    c.set(0, 1, (255, 255, 255, 190)); c.set(1, 1, (255, 255, 255, 255)); c.set(2, 1, (255, 255, 255, 190))
+    c.set(1, 2, (255, 255, 255, 220))
+    return c
+
+def leaf_particle():
+    """small autumn leaf, warm amber."""
+    c = Canvas(4, 4, CLEAR)
+    col = (214, 122, 48, 255)
+    col_d = (172, 88, 36, 255)
+    c.set(1, 0, col); c.set(2, 0, col)
+    c.set(0, 1, col); c.set(1, 1, col); c.set(2, 1, col_d); c.set(3, 1, col)
+    c.set(1, 2, col_d); c.set(2, 2, col)
+    c.set(2, 3, col_d)
+    return c
+
+def petal_particle():
+    """small spring blossom petal, soft pink — same silhouette as leaf_particle
+    so the two read as a matched pair of drifting-particle sprites."""
+    c = Canvas(4, 4, CLEAR)
+    col = (244, 168, 186, 255)
+    col_d = (222, 138, 158, 255)
+    c.set(1, 0, col); c.set(2, 0, col)
+    c.set(0, 1, col); c.set(1, 1, col); c.set(2, 1, col_d); c.set(3, 1, col)
+    c.set(1, 2, col_d); c.set(2, 2, col)
+    c.set(2, 3, col_d)
+    return c
+
+def wreath():
+    """small winter door-topper: a green ring with red berries + a bow,
+    hung above the door on indoor cities only."""
+    c = Canvas(12, 12, CLEAR)
+    green = (76, 128, 66, 255)
+    green_d = (56, 100, 50, 255)
+    ring = [(3, 0), (4, 0), (5, 0), (6, 0), (7, 0), (8, 0),
+            (1, 1), (2, 1), (9, 1), (10, 1),
+            (0, 2), (1, 2), (10, 2), (11, 2),
+            (0, 3), (11, 3), (0, 4), (11, 4),
+            (0, 5), (11, 5), (0, 6), (11, 6),
+            (0, 7), (11, 7),
+            (0, 8), (1, 8), (10, 8), (11, 8),
+            (1, 9), (2, 9), (9, 9), (10, 9),
+            (3, 10), (4, 10), (5, 10), (6, 10), (7, 10), (8, 10)]
+    for i, (x, y) in enumerate(ring):
+        c.set(x, y, green if i % 2 == 0 else green_d)
+    for bx, by in ((5, 1), (2, 5), (9, 5), (5, 9)):
+        c.set(bx, by, (196, 60, 58, 255))
+    c.set(5, 11, (196, 60, 58, 255)); c.set(6, 11, (150, 40, 40, 255))
+    return c
+
+def main_v6():
+    count = 0
+    snowflake().save("particle_snow.png"); count += 1
+    leaf_particle().save("particle_leaf.png"); count += 1
+    petal_particle().save("particle_petal.png"); count += 1
+    wreath().save("prop_wreath.png"); count += 1
+    print(f"v6: generated {count} seasonal overlay sprites")
+
+
 STAFF_SPECIES = {"mocha": "cat", "biscuit": "corgi", "poppy": "bunny",
                  "juno": "fox", "bo": "bear", "earl": "owl", "marble": "raccoon"}
 
@@ -1519,6 +1586,7 @@ def main():
     main_v2()
     main_v4()
     main_v5()
+    main_v6()
 
 if __name__ == "__main__":
     main()
