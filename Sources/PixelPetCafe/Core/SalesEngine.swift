@@ -379,22 +379,18 @@ enum SalesEngine {
             events.append(serveCustomer(&s, now: now, rng: &rng))
             if events.count >= 20 { s.customerProgress = 0; break }  // sanity cap per tick
         }
-        if capacityBlocked > 0 {
-            // Capped small: this fires on EVERY tick a café is chronically
-            // under-capacity (not just once), so even the earlier -5/tick cap
-            // still pinned reputation at 0 forever for any café whose demand
-            // regularly outpaces its service capacity — happy-sale recovery
-            // (a few hundredths per sale) never had a chance against -5/sec
-            // sustained. A chronic bottleneck still costs reputation, but
-            // slowly enough that recovery is actually possible.
-            s.reputation = max(0, s.reputation - min(0.3, 0.02 * capacityBlocked))
-        }
+        // No reputation ding for capacity-blocking (tried -5/tick, then
+        // -0.3/tick — both still pinned reputation at 0 forever for a café
+        // whose demand chronically outpaces capacity by a large factor,
+        // since this fires every single tick and even a small per-tick cap
+        // beats out happy-sale recovery at extreme mismatches). Being
+        // capacity-blocked already has a real, sufficient economic cost:
+        // zero revenue on every blocked customer. Reputation now responds
+        // only to service quality (happy/settled/sadLeave/angry/noTable),
+        // not to how fast the kitchen physically is.
         if s.customerProgress >= 1 {
             // Extreme burst (e.g. Delivery-scale under-capacity): resolve the
-            // remainder in bulk rather than looping further, with a smaller
-            // aggregate reputation ding so it can't zero reputation in one tick.
-            let remainder = s.customerProgress
-            s.reputation = max(0, s.reputation - min(5.0, 0.02 * remainder))
+            // remainder in bulk rather than looping further.
             s.customerProgress = 0
         }
         s.cafe.serviceBuffer = slotsLeft.isFinite ? max(0.0, min(1.0, slotsLeft)) : 0

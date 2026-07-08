@@ -96,19 +96,20 @@ final class ThroughputTests: XCTestCase {
         s.stock = ["beans": 100_000]   // plenty of stock — never a stock-out
         s.customerProgress = 20        // way more than one tick's serve slots
         var rng = SeededGenerator(seed: 4)
-        let repBefore = s.reputation
         let events = SalesEngine.tick(&s, dt: 0.001, rng: &rng)
         XCTAssertEqual(events.count, 20)
         let capacityBlocked = events.filter { $0.mood == .sadLeave && $0.itemName.isEmpty }
         XCTAssertEqual(capacityBlocked.count, 19, "only one serve-slot should clear at this dt; the rest are capacity-blocked")
-        XCTAssertLessThan(s.reputation, repBefore)
     }
 
-    func testCapacityBlockedReputationDingIsCappedPerTickNotPerCustomer() {
+    func testCapacityBlockingNeverDingsReputationEvenAtExtremeMismatch() {
         // A chronically under-capacity café (huge equipment, tiny service staff)
         // can accumulate thousands of blocked "customers" worth of progress in
-        // a single tick. The per-tick reputation ding must be capped — otherwise
-        // it can pin reputation at 0 forever in one tick and never recover.
+        // a single tick, every tick. Any nonzero per-tick reputation ding here —
+        // no matter how small — eventually loses to this happening every tick
+        // forever, permanently pinning reputation at 0 with no way to recover.
+        // Capacity-blocking already costs real revenue (zero payout); it must
+        // NOT also cost reputation.
         var s = GameState.newGame()
         s.stock = ["beans": 10_000_000]
         s.equipmentLevels = ["espresso": 60]   // massive customerRate boost, minimal capacity boost
@@ -117,8 +118,8 @@ final class ThroughputTests: XCTestCase {
         var rng = SeededGenerator(seed: 7)
         let before = s.reputation
         _ = SalesEngine.tick(&s, dt: 0.001, rng: &rng)
-        XCTAssertGreaterThan(s.reputation, 0, "reputation must never be zeroed out by capacity-blocking in a single tick")
-        XCTAssertGreaterThanOrEqual(s.reputation, before - 10, "the capacity-block ding must be capped, not applied per blocked customer")
+        XCTAssertEqual(s.reputation, before, accuracy: 1e-9,
+                       "capacity-blocking must never touch reputation, at any scale")
     }
 
     // MARK: offline sim capacity clamp
