@@ -343,6 +343,7 @@ enum SalesEngine {
         var servedThisTick = 0.0
         let hardStop = 2000.0   // bulk past this instead of looping per-customer
         var loops = 0.0
+        var capacityBlocked = 0.0
 
         while s.customerProgress >= 1, loops < hardStop {
             s.customerProgress -= 1
@@ -351,18 +352,25 @@ enum SalesEngine {
                 // Capacity exhausted this tick — the kitchen genuinely can't
                 // keep up, so the customer walks rather than waits. Distinct
                 // from the existing stock-out sadLeave: servable(s) is
-                // non-empty here, it's just too slow.
+                // non-empty here, it's just too slow. The reputation ding for
+                // this is applied ONCE, capped, after the loop (see below) —
+                // not per-iteration, which could otherwise ding reputation
+                // hundreds of times in one tick for a chronically
+                // under-capacity café and pin it at 0 permanently.
                 if events.count < 20 {
                     events.append(SaleEvent(itemIcon: "", itemName: "", price: 0, mood: .sadLeave,
                                              customerSpecies: Int.random(in: 0...2, using: &rng), dineIn: false))
                 }
-                s.reputation = max(0, s.reputation - 0.15)
+                capacityBlocked += 1
                 continue
             }
             slotsLeft -= 1
             servedThisTick += 1
             events.append(serveCustomer(&s, now: now, rng: &rng))
             if events.count >= 20 { s.customerProgress = 0; break }  // sanity cap per tick
+        }
+        if capacityBlocked > 0 {
+            s.reputation = max(0, s.reputation - min(5.0, 0.15 * capacityBlocked))
         }
         if s.customerProgress >= 1 {
             // Extreme burst (e.g. Delivery-scale under-capacity): resolve the

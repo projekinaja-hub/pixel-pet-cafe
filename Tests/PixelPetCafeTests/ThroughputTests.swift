@@ -104,6 +104,23 @@ final class ThroughputTests: XCTestCase {
         XCTAssertLessThan(s.reputation, repBefore)
     }
 
+    func testCapacityBlockedReputationDingIsCappedPerTickNotPerCustomer() {
+        // A chronically under-capacity café (huge equipment, tiny service staff)
+        // can accumulate thousands of blocked "customers" worth of progress in
+        // a single tick. The per-tick reputation ding must be capped — otherwise
+        // it can pin reputation at 0 forever in one tick and never recover.
+        var s = GameState.newGame()
+        s.stock = ["beans": 10_000_000]
+        s.equipmentLevels = ["espresso": 60]   // massive customerRate boost, minimal capacity boost
+        s.reputation = 100
+        s.customerProgress = 5000              // far more than any single tick could ever serve
+        var rng = SeededGenerator(seed: 7)
+        let before = s.reputation
+        _ = SalesEngine.tick(&s, dt: 0.001, rng: &rng)
+        XCTAssertGreaterThan(s.reputation, 0, "reputation must never be zeroed out by capacity-blocking in a single tick")
+        XCTAssertGreaterThanOrEqual(s.reputation, before - 10, "the capacity-block ding must be capped, not applied per blocked customer")
+    }
+
     // MARK: offline sim capacity clamp
 
     func testOfflineSimClampsThroughputWhenDemandOutpacesCapacity() {
