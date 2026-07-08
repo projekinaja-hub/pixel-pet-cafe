@@ -50,6 +50,7 @@ final class GameController: ObservableObject {
             let haul = SalesEngine.offlineSim(&loaded, elapsed: elapsed)
             if haul > 0, elapsed > 60 { awayReport = haul }
         }
+        EconomyEngine.updateDailyStreak(&loaded)
         self.state = loaded
     }
 

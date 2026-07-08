@@ -71,6 +71,10 @@ struct GameState: Codable {
     // populates the first set.
     var activeGoals: [ActiveGoal] = []
     var goalsDay: Int = -1
+    // v9: real-world daily login streak (actual calendar days, NOT the
+    // compressed in-game calendar) — see GameController.updateDailyStreak.
+    var dailyStreak: Int = 0
+    var lastPlayedRealDate: Date?
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -168,7 +172,7 @@ struct GameState: Codable {
         case casinoWagered, casinoWon, casinoBiggestWin, casinoJackpotPot
         case marketPrices, priceHistory, season, calendarStartedAt
         case worldsVisited
-        case activeGoals, goalsDay
+        case activeGoals, goalsDay, dailyStreak, lastPlayedRealDate
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -206,6 +210,8 @@ struct GameState: Codable {
         worldsVisited = try c.decodeIfPresent(Int.self, forKey: .worldsVisited) ?? 0
         activeGoals = try c.decodeIfPresent([ActiveGoal].self, forKey: .activeGoals) ?? []
         goalsDay = try c.decodeIfPresent(Int.self, forKey: .goalsDay) ?? -1
+        dailyStreak = try c.decodeIfPresent(Int.self, forKey: .dailyStreak) ?? 0
+        lastPlayedRealDate = try c.decodeIfPresent(Date.self, forKey: .lastPlayedRealDate)
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -259,6 +265,8 @@ struct GameState: Codable {
         try c.encode(worldsVisited, forKey: .worldsVisited)
         try c.encode(activeGoals, forKey: .activeGoals)
         try c.encode(goalsDay, forKey: .goalsDay)
+        try c.encode(dailyStreak, forKey: .dailyStreak)
+        try c.encodeIfPresent(lastPlayedRealDate, forKey: .lastPlayedRealDate)
     }
 }
 
@@ -300,5 +308,6 @@ extension GameState: Equatable {
             && lhs.worldsVisited == rhs.worldsVisited
             && lhs.activeGoals == rhs.activeGoals
             && lhs.goalsDay == rhs.goalsDay
+            && lhs.dailyStreak == rhs.dailyStreak
     }
 }

@@ -57,6 +57,7 @@ enum SalesEngine {
             // permanent world-prestige bonus — see EconomyEngine.moveToNewCountry.
             // Survives every reset (renovate and world moves alike), unlike stars.
             * (1 + EconomyEngine.worldPermanentBonusPerVisit * Double(s.worldsVisited))
+            * EconomyEngine.dailyStreakMultiplier(s)
     }
 
     /// Role bonuses: Mocha boosts drinks, Poppy boosts pastries (+4%/level).

@@ -58,6 +58,7 @@ struct DashboardOverlay: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 6) {
                         overallBanner
+                        streakRow
                         reputationRow
                         cleanlinessRow
                         seasonRow
@@ -170,6 +171,15 @@ struct DashboardOverlay: View {
         return DashboardRow(
             icon: seasonEmoji, title: "Season — \(s.season.rawValue.capitalized)",
             value: "", color: Theme.dim, detail: detail
+        )
+    }
+
+    private var streakRow: some View {
+        let bonus = Int((EconomyEngine.dailyStreakMultiplier(s) - 1) * 100)
+        return DashboardRow(
+            icon: "🔥", title: "Daily streak",
+            value: "\(s.dailyStreak) day\(s.dailyStreak == 1 ? "" : "s")", color: Theme.gold,
+            detail: bonus > 0 ? "+\(bonus)% prices from coming back daily — come back tomorrow to keep it" : "Come back tomorrow to start a streak"
         )
     }
 

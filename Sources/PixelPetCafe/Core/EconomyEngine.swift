@@ -212,4 +212,36 @@ enum EconomyEngine {
     static func goldenTipValue(_ s: GameState) -> Double {
         max(600 * SalesEngine.incomeEstimate(s), 25)
     }
+
+    // MARK: daily login streak (real calendar days, not the in-game calendar)
+
+    /// +1%/day, capped at +25% — small enough not to dominate the economy,
+    /// big enough to feel like a real reason to come back tomorrow.
+    static let dailyStreakBonusPerDay = 0.01
+    static let dailyStreakBonusCap = 0.25
+    static func dailyStreakMultiplier(_ s: GameState) -> Double {
+        1 + min(dailyStreakBonusCap, dailyStreakBonusPerDay * Double(s.dailyStreak))
+    }
+
+    /// Called once per app launch. Same real-world day as last time: no
+    /// change. Exactly the next calendar day: streak continues. Any gap (or
+    /// first-ever launch): streak resets to 1 — missing a day costs the
+    /// streak, which is the whole point of a streak.
+    static func updateDailyStreak(_ s: inout GameState, now: Date = Date()) {
+        let cal = Calendar.current
+        guard let last = s.lastPlayedRealDate else {
+            s.dailyStreak = 1
+            s.lastPlayedRealDate = now
+            return
+        }
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: last), to: cal.startOfDay(for: now)).day ?? 0
+        if days == 0 {
+            // already counted today
+        } else if days == 1 {
+            s.dailyStreak += 1
+        } else {
+            s.dailyStreak = 1
+        }
+        s.lastPlayedRealDate = now
+    }
 }
