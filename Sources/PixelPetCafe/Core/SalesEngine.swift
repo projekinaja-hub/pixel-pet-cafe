@@ -202,14 +202,21 @@ enum SalesEngine {
         return max(1.5, t)
     }
 
-    /// Hands-on serving staff only — Mocha (barista), Poppy (pâtissier),
-    /// Biscuit (waiter) — the roles thematically tied to actually plating
-    /// orders. The Owner alone (baseline 1.0) always mans the counter.
+    /// Hands-on serving staff — Mocha (barista), Poppy (pâtissier), Biscuit
+    /// (waiter) — plus the Owner (baseline 2.0) always manning the counter.
+    /// Also credits overall equipment investment (log-dampened, so it never
+    /// runs away): a café that's poured everything into gear rather than
+    /// those three specific hires shouldn't have throughput collapse to
+    /// almost nothing — better tools let the same hands move faster too, not
+    /// only cut prep time per item. Fresh café: 2.0 + 0.5(mocha) + 0.3·log2(2)
+    /// ≈ 2.8, comfortably above baseline demand (unchanged from before this
+    /// broadening — verified by testFreshCafeCapacityComfortablyExceedsBaselineDemand).
     static func serviceWorkers(_ s: GameState) -> Double {
-        1.0
+        2.0
             + 0.5 * Double(s.staffLevels["mocha"] ?? 0)
             + 0.5 * Double(s.staffLevels["poppy"] ?? 0)
             + 0.5 * Double(s.staffLevels["biscuit"] ?? 0)
+            + 0.3 * log2(1 + equipMultiplier(s))
     }
 
     /// Simple (unweighted) average prep time across the currently servable
@@ -325,8 +332,12 @@ enum SalesEngine {
         // accumulates within a single tick: large dt (offline-style catch
         // up), rush/ads stacking pushing customerRate*dt > 1, or a Delivery
         // burst below — precisely the "kitchen can't keep up" moment.
+        // `boost` (Work Mode's typing-speed multiplier) speeds up service
+        // throughput the same way it speeds up customer arrivals — you
+        // typing faster reads as you actively working the counter faster,
+        // not just more people walking in the door.
         let capacityThisTick = capacityPerSec(s).isFinite
-            ? max(1.0, capacityPerSec(s) * dt + s.cafe.serviceBuffer)
+            ? max(1.0, capacityPerSec(s) * boost * dt + s.cafe.serviceBuffer)
             : Double.infinity
         var slotsLeft = capacityThisTick
         var servedThisTick = 0.0

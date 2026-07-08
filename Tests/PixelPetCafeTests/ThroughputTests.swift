@@ -122,6 +122,34 @@ final class ThroughputTests: XCTestCase {
         XCTAssertLessThanOrEqual(consumed, cap * window + 1)
     }
 
+    // MARK: capacity fairness for heavy-equipment / typing-boost play styles
+
+    func testHeavyEquipmentInvestmentAlsoLiftsCapacityNotJustPrepTime() {
+        // A café that poured everything into gear rather than mocha/poppy/biscuit
+        // shouldn't have throughput collapse to almost nothing — better tools
+        // should meaningfully help the same hands move faster, too.
+        var underStaffed = GameState.newGame()
+        let before = SalesEngine.capacityPerSec(underStaffed)
+        underStaffed.equipmentLevels = ["espresso": 46, "grinder": 16, "oven": 11, "decor": 13, "sound": 5]
+        XCTAssertGreaterThan(SalesEngine.capacityPerSec(underStaffed), before,
+                              "heavy equipment investment should raise capacity even with staff left at their starting levels")
+    }
+
+    func testWorkModeBoostSpeedsUpServiceThroughputNotJustArrivals() {
+        var s = GameState.newGame()
+        s.stock = ["beans": 100_000]
+        s.customerProgress = 20
+        var rng = SeededGenerator(seed: 4)
+        var boosted = s
+        let unboosted = SalesEngine.tick(&s, dt: 0.001, boost: 1, rng: &rng)
+        var rng2 = SeededGenerator(seed: 4)
+        let withBoost = SalesEngine.tick(&boosted, dt: 0.001, boost: 3, rng: &rng2)
+        let unboostedServed = unboosted.filter { $0.mood != .sadLeave }.count
+        let boostedServed = withBoost.filter { $0.mood != .sadLeave }.count
+        XCTAssertGreaterThanOrEqual(boostedServed, unboostedServed,
+                                     "typing-speed boost should let capacity keep up better, not just bring in more arrivals")
+    }
+
     // MARK: Delivery
 
     func testDeliveryUnlockedAtTenOfTwelveCities() {
