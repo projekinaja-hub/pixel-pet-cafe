@@ -12,6 +12,7 @@ final class GameController: ObservableObject {
     let saleEvents = PassthroughSubject<SaleEvent, Never>()
     let tipCollected = PassthroughSubject<Void, Never>()
     let casinoWin = PassthroughSubject<Double, Never>()
+    let casinoJackpotWon = PassthroughSubject<Double, Never>()
     let casinoGameChanged = PassthroughSubject<CasinoGame, Never>()
     let blackjackDisplay = PassthroughSubject<(player: [(String, Bool)], dealer: [(String, Bool)], hole: Bool), Never>()
     let rouletteResult = PassthroughSubject<Int, Never>()
@@ -221,6 +222,12 @@ final class GameController: ObservableObject {
         guard amount > 0, state.coins >= amount else { return false }
         state.coins -= amount
         state.casinoWagered += amount
+        if let pot = CasinoEngine.growJackpot(&state.casinoJackpotPot, wager: amount, rng: &rng) {
+            casinoAward(pot)
+            casinoJackpotWon.send(pot)
+            showBanner("🎰", "PROGRESSIVE JACKPOT! +🪙 \(formatNumber(pot))")
+            soundRequest.send("achieve")
+        }
         return true
     }
 

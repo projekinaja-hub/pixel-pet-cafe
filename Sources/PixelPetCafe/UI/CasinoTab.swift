@@ -99,6 +99,7 @@ struct CasinoTab: View {
             .onAppear { publishGame(game) }
             .onChange(of: game) { publishGame($0) }
 
+            jackpotStrip
             statsStrip
 
             HStack(spacing: 5) {
@@ -144,6 +145,32 @@ struct CasinoTab: View {
                 .font(.system(size: 8.5, design: .rounded))
                 .foregroundColor(Theme.dim.opacity(0.8))
         }
+    }
+
+    /// Always-visible pot readout, plus a Lucky Hour callout when it's live —
+    /// the reason to check the casino even when not actively playing a hand.
+    private var jackpotStrip: some View {
+        let luckyHour = Events.isActive("lucky_hour", controller.state)
+        return HStack(spacing: 8) {
+            Image(systemName: "star.circle.fill")
+                .foregroundColor(Color(red: 1, green: 0.78, blue: 0.25))
+            Text("Progressive Jackpot")
+                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                .foregroundColor(Theme.cream)
+            Text("🪙 \(formatNumber(controller.state.casinoJackpotPot))")
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundColor(Color(red: 1, green: 0.78, blue: 0.25))
+            Spacer()
+            if luckyHour {
+                Text("🍀 Lucky Hour — payouts boosted!")
+                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.gold)
+            }
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(Color(red: 1, green: 0.78, blue: 0.25).opacity(luckyHour ? 0.22 : 0.12))
+        .cornerRadius(8)
+        .animation(.easeInOut(duration: 0.3), value: luckyHour)
     }
 
     private var statsStrip: some View {
@@ -260,7 +287,9 @@ struct SlotsView: View {
             let mult = CasinoEngine.slotPayout(final)
             let jackpot = final.allSatisfy { $0 == "star" }
             if mult > 0 {
-                let win = bet * mult
+                let raw = bet * mult
+                let win = CasinoEngine.applyLuckyHour(raw, bet: bet,
+                                                       active: Events.isActive("lucky_hour", controller.state))
                 controller.casinoAward(win)
                 message = "\(Int(mult))× — won 🪙 \(formatNumber(win))!"
                 winPulse = true
@@ -408,11 +437,13 @@ struct BlackjackView: View {
     private func settleIfFinished() {
         guard let g = hand, g.finished, !settled else { return }
         settled = true
-        controller.casinoAward(g.payout)
+        let payout = CasinoEngine.applyLuckyHour(g.payout, bet: g.bet,
+                                                  active: Events.isActive("lucky_hour", controller.state))
+        controller.casinoAward(payout)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
             controller.casinoFocus.send(false)
         }
-        let net = g.payout - g.bet
+        let net = payout - g.bet
         switch g.outcome {
         case .playerBlackjack:
             message = "BLACKJACK! Won 🪙 \(formatNumber(net))"
@@ -635,7 +666,9 @@ struct RouletteView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.7) {
             controller.rouletteResult.send(result)
             history.append(result)
-            let ret = CasinoEngine.roulettePayout(placed, result: result) * bet
+            let raw = CasinoEngine.roulettePayout(placed, result: result) * bet
+            let ret = CasinoEngine.applyLuckyHour(raw, bet: bet,
+                                                   active: Events.isActive("lucky_hour", controller.state))
             controller.casinoAward(ret)
             let color = result == 0 ? "green" : (CasinoEngine.redNumbers.contains(result) ? "red" : "black")
             if ret > 0 {
@@ -867,7 +900,9 @@ struct MahjongView: View {
         game = g
         if case .finished(let outcome) = g.phase, !settled {
             settled = true
-            let ret = Mahjong.payout(outcome, bet: bet)
+            let raw = Mahjong.payout(outcome, bet: bet)
+            let ret = CasinoEngine.applyLuckyHour(raw, bet: bet,
+                                                   active: Events.isActive("lucky_hour", controller.state))
             controller.casinoAward(ret)
             switch outcome {
             case .playerWinSelfDraw:
