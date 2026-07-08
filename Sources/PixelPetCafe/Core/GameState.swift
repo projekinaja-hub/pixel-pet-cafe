@@ -45,6 +45,10 @@ struct GameState: Codable, Equatable {
     // v4: fluctuating ingredient market (global, not per-café)
     var marketPrices: [String: Double] = [:]     // ingredient id -> live unit price
     var priceHistory: [String: [Double]] = [:]   // ingredient id -> recent price samples (sparkline)
+    // v5: shared contract for the calendar/seasons system — see Season.swift.
+    // Stub default (.spring); the real calendar-driven computation replaces
+    // this, but the type/field name is the stable handle everything else reads.
+    var season: Season = .spring
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -123,7 +127,7 @@ struct GameState: Codable, Equatable {
         case menuTaste, salesCount, tasteKnown
         case activeEvent, eventEndsAt, lastCriticVerdict, achievements
         case casinoWagered, casinoWon, casinoBiggestWin
-        case marketPrices, priceHistory
+        case marketPrices, priceHistory, season
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -155,6 +159,7 @@ struct GameState: Codable, Equatable {
         casinoBiggestWin = try c.decodeIfPresent(Double.self, forKey: .casinoBiggestWin) ?? 0
         marketPrices = try c.decodeIfPresent([String: Double].self, forKey: .marketPrices) ?? [:]
         priceHistory = try c.decodeIfPresent([String: [Double]].self, forKey: .priceHistory) ?? [:]
+        season = try c.decodeIfPresent(Season.self, forKey: .season) ?? .spring
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -202,5 +207,6 @@ struct GameState: Codable, Equatable {
         try c.encode(casinoBiggestWin, forKey: .casinoBiggestWin)
         try c.encode(marketPrices, forKey: .marketPrices)
         try c.encode(priceHistory, forKey: .priceHistory)
+        try c.encode(season, forKey: .season)
     }
 }
