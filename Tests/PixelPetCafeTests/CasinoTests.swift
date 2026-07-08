@@ -200,7 +200,7 @@ final class V3Tests: XCTestCase {
         XCTAssertGreaterThan(moonCost, homeCost)
     }
 
-    func testChipAutoCleansOverTimeForACost() {
+    func testChipAutoCleansForFreeOnceHired() {
         var s = GameState.newGame()
         s.coins = 100_000
         s.cleanliness = 10
@@ -210,7 +210,7 @@ final class V3Tests: XCTestCase {
         let coinsBefore = s.coins
         _ = SalesEngine.tick(&s, dt: 1.0, rng: &rng)
         XCTAssertGreaterThan(s.cleanliness, before, "hired Chip should auto-restore cleanliness")
-        XCTAssertLessThan(s.coins, coinsBefore, "auto-cleaning still costs coins")
+        XCTAssertEqual(s.coins, coinsBefore, accuracy: 1e-9, "auto-cleaning is free once Chip is hired — you already paid for him")
     }
 
     func testNoChipMeansNoAutoClean() {

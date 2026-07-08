@@ -688,9 +688,11 @@ enum SalesEngine {
     /// bursts a manual cleanSpot tap gives you, on a cooldown — not a smooth
     /// continuous drip. The cooldown gets shorter every level you upgrade him,
     /// so a maxed-out Chip cleans noticeably more often than a fresh hire.
-    /// Each burst still costs coins (half the price of one manual Sweep All,
-    /// scaled to the fraction of 100 actually restored) — leveling him up
-    /// doesn't make cleaning free, just more frequent.
+    /// Free once hired — you already paid to hire and level him up, and an
+    /// ongoing per-burst coin cost (even capped as a small % of your balance)
+    /// kept reading as "cleaning is eating my money" at late-game scale where
+    /// that % is still an eye-watering absolute number. Manual Sweep All
+    /// still costs coins (sweepCost) for players who haven't hired him.
     static let janitorBurstAmount = 15.0
     static let janitorBaseCooldown: TimeInterval = 20
     static let janitorCooldownPerLevel: TimeInterval = 1.5
@@ -706,11 +708,7 @@ enum SalesEngine {
         s.chipCooldown -= dt
         guard s.chipCooldown <= 0 else { return }
         let amount = min(janitorBurstAmount, 100 - s.cleanliness)
-        let cost = (amount / 100) * 0.5 * sweepCost(s)
-        if s.coins >= cost {
-            s.coins -= cost
-            s.cleanliness += amount
-        }
+        s.cleanliness += amount
         s.chipCooldown = janitorCooldown(level: level)
     }
 
