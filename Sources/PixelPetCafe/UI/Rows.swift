@@ -304,19 +304,24 @@ struct CafeTab: View {
         if controller.state.deliveryUnlocked {
             DeliveryCard(controller: controller)
         }
+        let equipCap = EconomyEngine.equipmentLevelCap(controller.state)
         ForEach(Catalog.equipment, id: \.id) { def in
             let level = controller.state.equipmentLevels[def.id] ?? 0
             let cost = EconomyEngine.equipmentCost(def.id, controller.state)
+            let atCap = level >= equipCap
             let speedNote = def.speedCategories.isEmpty ? ""
                 : String(format: " · ×%.2f prep speed/level (%@)", def.speedMultPerLevel,
                          def.speedCategories.contains(.drink) ? "drinks" : "pastries")
             PurchaseRow(
                 leading: Text(Self.emoji[def.id] ?? "🧰").font(.system(size: 20)),
                 name: def.name,
-                subtitle: level > 0 ? "Lv \(level)" : "New",
-                detail: String(format: "×%.2f prices & customers per level", def.multPerLevel) + speedNote,
+                subtitle: level > 0 ? "Lv \(level)/\(equipCap)" : "New · cap \(equipCap)",
+                detail: atCap ? "Maxed for this café — a fancier café raises the cap"
+                    : String(format: "×%.2f prices & customers per level", def.multPerLevel) + speedNote,
                 cost: cost,
-                affordable: controller.state.coins >= cost
+                affordable: controller.state.coins >= cost,
+                maxed: atCap,
+                maxedLabel: "MAX Lv \(equipCap)"
             ) { controller.buyEquipment(def.id) }
         }
     }

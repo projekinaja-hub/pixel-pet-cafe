@@ -56,19 +56,37 @@ enum EconomyEngine {
         return true
     }
 
+    /// A café's position in the unlock order (Cities.all) — the shared basis
+    /// for every per-café level cap below, so a fancier café consistently
+    /// means a higher ceiling everywhere, not just for one system.
+    static func cityUnlockIndex(_ s: GameState) -> Int {
+        Cities.all.firstIndex { $0.id == s.city.id } ?? 0
+    }
+
     /// Every staff role has a per-café level cap, so leveling can't run away
     /// forever chasing formulas that have long since maxed out or floored
     /// (e.g. Chip's cooldown bottoms out around level 13) — and, like
     /// equipmentCost, fancier cities raise the ceiling: each café further
-    /// along the unlock order (Cities.all) gets a noticeably higher cap than
-    /// the last, so expanding to a new city is real, visible headroom to
-    /// keep growing staff in, not just another place to re-buy the same
-    /// levels.
+    /// along the unlock order gets a noticeably higher cap than the last, so
+    /// expanding to a new city is real, visible headroom to keep growing
+    /// staff in, not just another place to re-buy the same levels.
     static let staffLevelCapBase = 25
     static let staffLevelCapStepPerCity = 10
     static func staffLevelCap(_ s: GameState) -> Int {
-        let cityIndex = Cities.all.firstIndex { $0.id == s.city.id } ?? 0
-        return staffLevelCapBase + staffLevelCapStepPerCity * cityIndex
+        staffLevelCapBase + staffLevelCapStepPerCity * cityUnlockIndex(s)
+    }
+
+    /// Equipment's own multiplier compounds *exponentially* per level
+    /// (equipMultiplier multiplies pow(multPerLevel, level) across every
+    /// piece of gear), unlike staff's roughly-linear bonuses — so without a
+    /// cap it runs away far harder and faster than staff levels ever could,
+    /// same underlying problem as uncapped staff (see EconomyEngine.
+    /// staffLevelCap), just worse. Same base/step as staff for one
+    /// consistent "how far can this café go" story per city.
+    static let equipmentLevelCapBase = 25
+    static let equipmentLevelCapStepPerCity = 10
+    static func equipmentLevelCap(_ s: GameState) -> Int {
+        equipmentLevelCapBase + equipmentLevelCapStepPerCity * cityUnlockIndex(s)
     }
 
     @discardableResult
@@ -93,6 +111,7 @@ enum EconomyEngine {
 
     @discardableResult
     static func buyEquipment(_ id: String, _ s: inout GameState) -> Bool {
+        guard (s.equipmentLevels[id] ?? 0) < equipmentLevelCap(s) else { return false }
         let c = equipmentCost(id, s)
         guard s.coins >= c else { return false }
         s.coins -= c
