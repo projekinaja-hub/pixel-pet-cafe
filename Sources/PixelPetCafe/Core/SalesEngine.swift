@@ -51,28 +51,47 @@ enum SalesEngine {
         return mult
     }
 
+    /// Fast growth for the first `softCap` levels, then much slower (but
+    /// never zero) growth beyond it — same principle as Chip's burst-past-
+    /// cooldown-floor fix: a role should never go fully dead partway through
+    /// the level range a fancier café's higher per-café cap (EconomyEngine.
+    /// staffLevelCap) now lets you reach. Levels used to hard min()-cap at
+    /// exactly 25 with nothing beyond, so leveling Juno/Mocha/Poppy/Bo past
+    /// 25 (routine once caps started going up to 135) did literally nothing.
+    static let tieredBonusSoftCap = 25
+    static let tieredBonusPerLevelAfterCap = 0.004
+    static func tieredBonus(level: Int, perLevel: Double) -> Double {
+        let capped = min(level, tieredBonusSoftCap)
+        let extra = max(0, level - tieredBonusSoftCap)
+        return perLevel * Double(capped) + tieredBonusPerLevelAfterCap * Double(extra)
+    }
+
     static func priceMultiplier(_ s: GameState) -> Double {
         equipMultiplier(s) * (1 + 0.10 * Double(s.stars)) * s.city.priceBonus
-            * min(1.5, 1 + 0.02 * Double(s.staffLevels["juno"] ?? 0))
+            * (1 + tieredBonus(level: s.staffLevels["juno"] ?? 0, perLevel: 0.02))
             // permanent world-prestige bonus — see EconomyEngine.moveToNewCountry.
             // Survives every reset (renovate and world moves alike), unlike stars.
             * (1 + EconomyEngine.worldPermanentBonusPerVisit * Double(s.worldsVisited))
             * EconomyEngine.dailyStreakMultiplier(s)
     }
 
-    /// Role bonuses: Mocha boosts drinks, Poppy boosts pastries (+4%/level).
+    /// Role bonuses: Mocha boosts drinks, Poppy boosts pastries (+4%/level,
+    /// slower but ongoing growth past level 25 — see tieredBonus).
     static func categoryBonus(_ category: ItemCategory, _ s: GameState) -> Double {
         let rainBoost = category == .drink && Events.isActive("rain", s) ? 1.3 : 1.0
         switch category {
-        case .drink:  return rainBoost * min(2, 1 + 0.04 * Double(s.staffLevels["mocha"] ?? 0))
-        case .pastry: return min(2, 1 + 0.04 * Double(s.staffLevels["poppy"] ?? 0))
+        case .drink:  return rainBoost * (1 + tieredBonus(level: s.staffLevels["mocha"] ?? 0, perLevel: 0.04))
+        case .pastry: return 1 + tieredBonus(level: s.staffLevels["poppy"] ?? 0, perLevel: 0.04)
         case .special: return 1
         }
     }
 
-    /// Bo the roaster: chance a sale consumes no ingredients (2%/level, cap 50%).
+    /// Bo the roaster: chance a sale consumes no ingredients (2%/level,
+    /// slower but ongoing growth past level 25 — see tieredBonus — hard
+    /// capped at 85% so ingredients never become fully pointless).
+    static let freeSaleChanceCap = 0.85
     static func freeSaleChance(_ s: GameState) -> Double {
-        min(0.5, 0.02 * Double(s.staffLevels["bo"] ?? 0))
+        min(freeSaleChanceCap, tieredBonus(level: s.staffLevels["bo"] ?? 0, perLevel: 0.02))
     }
 
     /// A more upgraded café burns through ingredients faster per sale, not just
@@ -387,8 +406,9 @@ enum SalesEngine {
         // beats out happy-sale recovery at extreme mismatches). Being
         // capacity-blocked already has a real, sufficient economic cost:
         // zero revenue on every blocked customer. Reputation now responds
-        // only to service quality (happy/settled/sadLeave/angry/noTable),
-        // not to how fast the kitchen physically is.
+        // only to service quality (happy/settled/sadLeave/angry), not to
+        // how fast the kitchen physically is — table seating (noTable) is
+        // the same kind of hard-capped resource, so it's excluded too.
         if s.customerProgress >= 1 {
             // Extreme burst (e.g. Delivery-scale under-capacity): resolve the
             // remainder in bulk rather than looping further.
@@ -514,7 +534,15 @@ enum SalesEngine {
         let species = Int.random(in: 0...2, using: &rng)
         let wantsDineIn = Double.random(in: 0..<1, using: &rng) < dineInShare
         if wantsDineIn, Double.random(in: 0..<1, using: &rng) >= tableAvailability(s) {
-            s.reputation = max(0, s.reputation - 0.4)   // fixable by buying tables, so a lighter hit
+            // No reputation ding here — same reasoning as the kitchen
+            // throughput cap below: table count is a hard-capped resource
+            // (maxTables tops out at 6) while customerRate scales with
+            // staff levels, so at high levels dine-in demand permanently
+            // and unavoidably outstrips seating. A per-event ding here
+            // reproduces the exact "reputation pinned at 0 forever" bug
+            // already fixed for kitchen capacity, just via table seating
+            // instead — a customer who can't get a table already generates
+            // zero revenue, which is already the real cost.
             return SaleEvent(itemIcon: "", itemName: "", price: 0, mood: .noTable,
                              customerSpecies: species, dineIn: true)
         }

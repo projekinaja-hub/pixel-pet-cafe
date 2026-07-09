@@ -107,12 +107,26 @@ enum MenuCatalog {
         return raw * SeasonalPricing.multiplier(id, s.season)
     }
 
+    /// Marble's experience shaves a bit off every pack purchase (manual or
+    /// her own auto-restock), on top of just being hired — level 1 only
+    /// gates whether she acts at all (see SalesEngine.managerTarget), so
+    /// without this every level past 1 did literally nothing. Floors at 50%
+    /// off (level 50) rather than trending toward free.
+    static let marbleDiscountPerLevel = 0.01
+    static let marbleDiscountFloor = 0.5
+    static func marbleDiscount(_ s: GameState) -> Double {
+        let level = s.staffLevels["marble"] ?? 0
+        guard level > 1 else { return 1 }
+        return max(marbleDiscountFloor, 1 - marbleDiscountPerLevel * Double(level - 1))
+    }
+
     /// Pack purchase priced off the *live* market price rather than the flat
-    /// base cost: 25 units at cost, 100 units at 10% off.
+    /// base cost: 25 units at cost, 100 units at 10% off, further discounted
+    /// by Marble's level if she's hired.
     static func livePackCost(_ id: String, units: Int, _ s: GameState) -> Double {
         let unit = currentUnitCost(id, s)
-        let discount = units >= 100 ? 0.9 : 1.0
-        return (unit * Double(units) * discount).rounded()
+        let bulkDiscount = units >= 100 ? 0.9 : 1.0
+        return (unit * Double(units) * bulkDiscount * marbleDiscount(s)).rounded()
     }
 
     static func resolve(_ s: GameState) -> [ResolvedItem] {

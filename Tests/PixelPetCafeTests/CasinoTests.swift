@@ -402,8 +402,12 @@ final class V3Tests: XCTestCase {
         s.staffLevels["mocha"] = 11                    // +10 levels → ×(1.44/1.04)
         XCTAssertEqual(SalesEngine.price(espresso, s), base / 1.04 * 1.44, accuracy: 1e-6)
         XCTAssertEqual(SalesEngine.freeSaleChance(s), 0, accuracy: 1e-9)
+        s.staffLevels["bo"] = 25
+        XCTAssertEqual(SalesEngine.freeSaleChance(s), 0.5, accuracy: 1e-9)   // soft-cap level: 2%/lv × 25
         s.staffLevels["bo"] = 30
-        XCTAssertEqual(SalesEngine.freeSaleChance(s), 0.5)   // capped
+        XCTAssertEqual(SalesEngine.freeSaleChance(s), 0.52, accuracy: 1e-9)  // slower growth past 25, not dead
+        s.staffLevels["bo"] = 1000
+        XCTAssertEqual(SalesEngine.freeSaleChance(s), SalesEngine.freeSaleChanceCap, accuracy: 1e-9)  // hard cap
     }
 
     func testV2SaveMigratesIntoHomeCafe() throws {

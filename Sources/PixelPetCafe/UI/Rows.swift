@@ -395,14 +395,14 @@ struct StaffTab: View {
     /// customer flow on top of this, from just being on staff).
     private static func detail(_ id: String) -> String {
         switch id {
-        case "mocha":   return "+4% drink prices/lv (cap ×2) · helps keep drinks fast"
+        case "mocha":   return "+4% drink prices/lv (slower past 25) · helps keep drinks fast"
         case "biscuit": return "Waits tables · adds real serving capacity (throughput)"
-        case "poppy":   return "+4% pastry prices/lv (cap ×2) · helps keep pastries fast"
-        case "juno":    return "+2% all prices/lv (cap ×1.5)"
-        case "bo":      return "2%/lv chance a sale costs no ingredients (cap 50%)"
+        case "poppy":   return "+4% pastry prices/lv (slower past 25) · helps keep pastries fast"
+        case "juno":    return "+2% all prices/lv (slower past 25)"
+        case "bo":      return "2%/lv chance a sale costs no ingredients (cap 85%)"
         case "earl":    return "+1h away-earnings cap per level"
-        case "marble":  return "Auto-restocks ingredients when stock runs low"
-        case "chip":    return "Auto-cleans on a cooldown, free once hired"
+        case "marble":  return "Auto-restocks ingredients, and cheaper restocks per level"
+        case "chip":    return "Auto-cleans on a cooldown, bigger bursts per level, free once hired"
         default:        return "+8% customer flow per level"
         }
     }
