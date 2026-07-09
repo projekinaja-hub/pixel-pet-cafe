@@ -73,6 +73,7 @@ enum SalesEngine {
             // Survives every reset (renovate and world moves alike), unlike stars.
             * (1 + EconomyEngine.worldPermanentBonusPerVisit * Double(s.worldsVisited))
             * EconomyEngine.dailyStreakMultiplier(s)
+            * (Holidays.today(s)?.priceBoost ?? 1.0)
     }
 
     /// Role bonuses: Mocha boosts drinks, Poppy boosts pastries (+4%/level,
@@ -144,6 +145,7 @@ enum SalesEngine {
             * (s.adsActive ? 1.8 : 1.0)
             * (Events.isActive("rush", s) ? 2.0 : 1.0)
             * (Events.isActive("rain", s) ? 0.7 : 1.0)
+            * (Holidays.today(s)?.customerBoost ?? 1.0)
     }
 
     static func price(_ item: ResolvedItem, _ s: GameState) -> Double {

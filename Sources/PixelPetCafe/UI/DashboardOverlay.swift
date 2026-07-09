@@ -168,6 +168,9 @@ struct DashboardOverlay: View {
             let pct = Int((abs(alert.multiplier - 1.0) * 100).rounded())
             detail += " · \(ing.emoji) \(ing.name) is \(pct)% \(alert.cheaper ? "cheaper" : "pricier") right now"
         }
+        if let holiday = Holidays.today(s) {
+            detail += " · \(holiday.emoji) \(holiday.name) today!"
+        }
         return DashboardRow(
             icon: seasonEmoji, title: "Season — \(s.season.rawValue.capitalized)",
             value: "", color: Theme.dim, detail: detail
@@ -175,7 +178,7 @@ struct DashboardOverlay: View {
     }
 
     private var streakRow: some View {
-        let bonus = Int((EconomyEngine.dailyStreakMultiplier(s) - 1) * 100)
+        let bonus = Int(((EconomyEngine.dailyStreakMultiplier(s) - 1) * 100).rounded())
         return DashboardRow(
             icon: "🔥", title: "Daily streak",
             value: "\(s.dailyStreak) day\(s.dailyStreak == 1 ? "" : "s")", color: Theme.gold,

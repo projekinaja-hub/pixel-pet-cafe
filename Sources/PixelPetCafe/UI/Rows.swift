@@ -89,6 +89,7 @@ struct LockedRow: View {
 
 struct CafeTab: View {
     @ObservedObject var controller: GameController
+    @Binding var showFullCalendar: Bool
     @State private var calendarExpanded = false
 
     private static let emoji = ["espresso": "☕", "grinder": "⚙️", "oven": "🔥", "decor": "🪴", "sound": "🎵"]
@@ -110,6 +111,11 @@ struct CafeTab: View {
                     Text("\(Self.seasonEmoji[season] ?? "") Day \(GameCalendar.dayOfSeason(controller.state)) of \(season.rawValue.capitalized)")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.cream)
+                    if let holiday = Holidays.today(controller.state) {
+                        Text("\(holiday.emoji) \(holiday.name)!")
+                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.gold)
+                    }
                     Spacer()
                     Text("~1hr/day")
                         .font(.system(size: 9, design: .rounded))
@@ -153,6 +159,12 @@ struct CafeTab: View {
                             }
                         }
                     }
+                    Button { showFullCalendar = true } label: {
+                        Text("📅 View full calendar →")
+                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.gold)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
