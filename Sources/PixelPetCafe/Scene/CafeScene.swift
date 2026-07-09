@@ -77,7 +77,13 @@ final class CafeScene: SKScene {
         "poppy": CGPoint(x: 88, y: 46),
         "biscuit": CGPoint(x: 62, y: 24),
         "chip": CGPoint(x: 30, y: 16),
-        "marble": CGPoint(x: 104, y: 58),
+        // x:104 was the real problem, not just y — that's `counterPoint`,
+        // the fixed spot every serving customer walks to and stands at
+        // (zPosition 11, above every staff member), so Marble was getting
+        // hidden behind a customer sprite on every single sale, not just
+        // clipping the espresso machine. x:168 sits well clear of both the
+        // customer/equipment cluster and the main y:58 counter row.
+        "marble": CGPoint(x: 168, y: 46),
     ]
     private static let equipSpots: [String: (CGPoint, CGFloat)] = [
         "espresso": (CGPoint(x: 104, y: 68), 9),
@@ -847,8 +853,8 @@ final class CafeScene: SKScene {
             // restocking bins rather than just standing at a station like
             // the sales-facing counter staff.
             let patrol = SKAction.repeatForever(.sequence([
-                .moveTo(x: 96, duration: 0.9), .wait(forDuration: 0.6),
-                .moveTo(x: 112, duration: 0.9), .wait(forDuration: 0.6),
+                .moveTo(x: 160, duration: 0.9), .wait(forDuration: 0.6),
+                .moveTo(x: 176, duration: 0.9), .wait(forDuration: 0.6),
             ]))
             node.run(patrol)
         } else {
