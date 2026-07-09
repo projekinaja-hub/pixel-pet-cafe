@@ -26,7 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func runSceneShot(to path: String) {
         let scene = CafeScene()
         var demo = game.state
-        demo.staffLevels = ["mocha": 3, "biscuit": 2, "poppy": 1, "juno": 1]
+        demo.staffLevels = ["mocha": 3, "biscuit": 2, "poppy": 1, "juno": 1, "marble": 1]
         demo.equipmentLevels = ["espresso": 6, "grinder": 1, "oven": 1, "decor": 1, "sound": 1]
         demo.stars = 12
         demo.cleanliness = 55
