@@ -709,19 +709,28 @@ enum SalesEngine {
         return max(20, min(raw, (s.coins * sweepCostMaxShareOfCoins).rounded()))
     }
 
-    /// Chip the cleaner: once hired, auto-cleans in the same discrete +15
-    /// bursts a manual cleanSpot tap gives you, on a cooldown — not a smooth
-    /// continuous drip. The cooldown gets shorter every level you upgrade him,
-    /// so a maxed-out Chip cleans noticeably more often than a fresh hire.
-    /// Free once hired — you already paid to hire and level him up, and an
-    /// ongoing per-burst coin cost (even capped as a small % of your balance)
-    /// kept reading as "cleaning is eating my money" at late-game scale where
-    /// that % is still an eye-watering absolute number. Manual Sweep All
-    /// still costs coins (sweepCost) for players who haven't hired him.
-    static let janitorBurstAmount = 15.0
+    /// Chip the cleaner: once hired, auto-cleans in discrete bursts on a
+    /// cooldown — not a smooth continuous drip. The cooldown gets shorter
+    /// every level, down to a hard floor (a cleaner literally cannot clean
+    /// faster than once every 3s and still read as "a cleaner" rather than
+    /// a cheat). Burst size keeps growing every level, floor or not, so
+    /// leveling him past the cooldown floor still visibly does something
+    /// instead of going dead — it used to just silently stop mattering once
+    /// the cooldown bottomed out around level 13, which read as a bug
+    /// ("upgrading Chip has no effect"). Free once hired — you already paid
+    /// to hire and level him up, and an ongoing per-burst coin cost (even
+    /// capped as a small % of your balance) kept reading as "cleaning is
+    /// eating my money" at late-game scale. Manual Sweep All still costs
+    /// coins (sweepCost) for players who haven't hired him.
+    static let janitorBaseBurstAmount = 15.0
+    static let janitorBurstAmountPerLevel = 0.4
     static let janitorBaseCooldown: TimeInterval = 20
     static let janitorCooldownPerLevel: TimeInterval = 1.5
     static let janitorMinCooldown: TimeInterval = 3
+
+    static func janitorBurstAmount(level: Int) -> Double {
+        janitorBaseBurstAmount + janitorBurstAmountPerLevel * Double(level - 1)
+    }
 
     static func janitorCooldown(level: Int) -> TimeInterval {
         max(janitorMinCooldown, janitorBaseCooldown - janitorCooldownPerLevel * Double(level - 1))
@@ -732,7 +741,7 @@ enum SalesEngine {
         guard level > 0, dt > 0, s.cleanliness < 100 else { return }
         s.chipCooldown -= dt
         guard s.chipCooldown <= 0 else { return }
-        let amount = min(janitorBurstAmount, 100 - s.cleanliness)
+        let amount = min(janitorBurstAmount(level: level), 100 - s.cleanliness)
         s.cleanliness += amount
         s.chipCooldown = janitorCooldown(level: level)
         Goals.recordProgress(&s, .cleanCafe)

@@ -56,8 +56,24 @@ enum EconomyEngine {
         return true
     }
 
+    /// Every staff role has a per-café level cap, so leveling can't run away
+    /// forever chasing formulas that have long since maxed out or floored
+    /// (e.g. Chip's cooldown bottoms out around level 13) — and, like
+    /// equipmentCost, fancier cities raise the ceiling: each café further
+    /// along the unlock order (Cities.all) gets a noticeably higher cap than
+    /// the last, so expanding to a new city is real, visible headroom to
+    /// keep growing staff in, not just another place to re-buy the same
+    /// levels.
+    static let staffLevelCapBase = 25
+    static let staffLevelCapStepPerCity = 10
+    static func staffLevelCap(_ s: GameState) -> Int {
+        let cityIndex = Cities.all.firstIndex { $0.id == s.city.id } ?? 0
+        return staffLevelCapBase + staffLevelCapStepPerCity * cityIndex
+    }
+
     @discardableResult
     static func buyStaff(_ id: String, _ s: inout GameState) -> Bool {
+        guard (s.staffLevels[id] ?? 0) < staffLevelCap(s) else { return false }
         let c = staffCost(id, s)
         guard s.coins >= c else { return false }
         s.coins -= c

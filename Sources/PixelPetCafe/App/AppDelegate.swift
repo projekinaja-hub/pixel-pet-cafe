@@ -100,6 +100,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if ProcessInfo.processInfo.environment["PPC_STAFF_COLOR"] == "1" {
             game.debugTintMocha()
         }
+        if ProcessInfo.processInfo.environment["PPC_STAFF_MAXED"] == "1" {
+            game.debugMaxChip()
+        }
         scene.configure(with: game.state)
         scene.setActive(true)
         let host = NSHostingController(rootView: PanelView(controller: game, scene: scene))

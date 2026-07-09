@@ -272,6 +272,11 @@ final class GameController: ObservableObject {
         state.staffLevels = ["mocha": 3, "biscuit": 2, "poppy": 1, "chip": 1]
         state.lifetimeCoins = max(state.lifetimeCoins, 5000)
     }
+    /// Dev-only: PPC_STAFF_MAXED=1 verification hook — puts Chip at this
+    /// café's level cap so the Staff tab's "MAX" state can be screenshotted.
+    func debugMaxChip() {
+        state.staffLevels["chip"] = EconomyEngine.staffLevelCap(state)
+    }
     /// Dev-only: PPC_STAFF_COLOR=1 verification hook — tints Mocha bright
     /// teal/magenta so screenshots can confirm custom tinting actually
     /// applies (vs. silently no-oping and just showing the default palette).

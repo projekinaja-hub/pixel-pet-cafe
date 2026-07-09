@@ -229,6 +229,16 @@ final class V3Tests: XCTestCase {
         XCTAssertEqual(SalesEngine.janitorCooldown(level: 100), SalesEngine.janitorMinCooldown, accuracy: 1e-9)
     }
 
+    /// Regression test for "upgrading Chip has no effect": the cooldown
+    /// floors out around level 13, but the burst size must keep growing
+    /// past that point so every level still does something.
+    func testChipBurstAmountKeepsGrowingPastTheCooldownFloor() {
+        XCTAssertEqual(SalesEngine.janitorCooldown(level: 13), SalesEngine.janitorMinCooldown, accuracy: 1e-9)
+        XCTAssertEqual(SalesEngine.janitorCooldown(level: 40), SalesEngine.janitorMinCooldown, accuracy: 1e-9)
+        XCTAssertGreaterThan(SalesEngine.janitorBurstAmount(level: 40), SalesEngine.janitorBurstAmount(level: 13),
+                              "even once the cooldown is maxed out, higher levels should still clean more per burst")
+    }
+
     func testChipCleansInFifteenPointBurstsOnCooldownNotContinuously() {
         var s = GameState.newGame()
         s.coins = 1_000_000
@@ -236,7 +246,7 @@ final class V3Tests: XCTestCase {
         s.staffLevels["chip"] = 1
         var rng = SeededGenerator(seed: 1)
         _ = SalesEngine.tick(&s, dt: 1.0, rng: &rng)   // cooldown starts at 0: first burst fires right away
-        XCTAssertEqual(s.cleanliness, SalesEngine.janitorBurstAmount, accuracy: 1e-9)
+        XCTAssertEqual(s.cleanliness, SalesEngine.janitorBurstAmount(level: 1), accuracy: 1e-9)
         let afterFirstBurst = s.cleanliness
         _ = SalesEngine.tick(&s, dt: 1.0, rng: &rng)   // still on cooldown — no second burst yet
         XCTAssertEqual(s.cleanliness, afterFirstBurst, accuracy: 1e-9)

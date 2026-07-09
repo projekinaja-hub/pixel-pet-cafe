@@ -8,6 +8,8 @@ struct PurchaseRow<Leading: View>: View {
     let detail: String
     let cost: Double
     let affordable: Bool
+    var maxed: Bool = false
+    var maxedLabel: String = "MAX"
     let action: () -> Void
 
     var body: some View {
@@ -27,7 +29,17 @@ struct PurchaseRow<Leading: View>: View {
                     .foregroundColor(Theme.dim)
             }
             Spacer()
-            CostButton(cost: cost, affordable: affordable, action: action)
+            if maxed {
+                Text(maxedLabel)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.dim)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Theme.card.opacity(0.6))
+                    .cornerRadius(7)
+            } else {
+                CostButton(cost: cost, affordable: affordable, action: action)
+            }
         }
         .padding(9)
         .background(Theme.card)
@@ -396,17 +408,21 @@ struct StaffTab: View {
     }
 
     var body: some View {
+        let cap = EconomyEngine.staffLevelCap(controller.state)
         ForEach(Catalog.staff, id: \.id) { def in
             if controller.state.lifetimeCoins >= def.unlockAtLifetime {
                 let level = controller.state.staffLevels[def.id] ?? 0
                 let cost = EconomyEngine.staffCost(def.id, controller.state)
+                let atCap = level >= cap
                 PurchaseRow(
                     leading: StaffLayeredIcon(id: def.id, pair: StaffPalette.pair(for: def.id, in: controller.state), scale: 1.4),
                     name: def.name,
-                    subtitle: level > 0 ? "\(def.role) · Lv \(level)" : "\(def.role) · Hire",
-                    detail: Self.detail(def.id),
+                    subtitle: level > 0 ? "\(def.role) · Lv \(level)/\(cap)" : "\(def.role) · Hire",
+                    detail: atCap ? "Maxed for this café — a fancier café raises the cap" : Self.detail(def.id),
                     cost: cost,
-                    affordable: controller.state.coins >= cost
+                    affordable: controller.state.coins >= cost,
+                    maxed: atCap,
+                    maxedLabel: "MAX Lv \(cap)"
                 ) { controller.buyStaff(def.id) }
             } else {
                 LockedRow(hint: "??? · unlocks at 🪙 \(formatNumber(def.unlockAtLifetime)) lifetime")
