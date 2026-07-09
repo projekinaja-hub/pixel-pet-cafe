@@ -109,6 +109,23 @@ enum EconomyEngine {
         s.staffColors.removeValue(forKey: id)
     }
 
+    /// Freehand portrait — free, cosmetic, replaces the generated sprite
+    /// (and any color-mixing) entirely once painted. A blank canvas is
+    /// treated the same as no custom paint at all, so clearing every pixel
+    /// naturally falls back to the recolor/default look without a separate
+    /// "reset" action needed.
+    static func setStaffPaint(_ id: String, _ art: PixelArt, _ s: inout GameState) {
+        if art.isBlank {
+            s.staffPaint.removeValue(forKey: id)
+        } else {
+            s.staffPaint[id] = art
+        }
+    }
+
+    static func resetStaffPaint(_ id: String, _ s: inout GameState) {
+        s.staffPaint.removeValue(forKey: id)
+    }
+
     @discardableResult
     static func buyEquipment(_ id: String, _ s: inout GameState) -> Bool {
         guard (s.equipmentLevels[id] ?? 0) < equipmentLevelCap(s) else { return false }

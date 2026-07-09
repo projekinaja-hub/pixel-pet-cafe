@@ -79,6 +79,11 @@ struct GameState: Codable {
     // chosen body/clothes tint. Missing entries render with StaffPalette's
     // original defaults, so this is purely additive over existing art.
     var staffColors: [String: StaffColorPair] = [:]
+    // v11: cosmetic, free, global freehand staff portraits — id -> a full
+    // custom 16x20 canvas that replaces the generated sprite (and staffColors
+    // tint) entirely for that staff member. Missing entries fall back to
+    // staffColors/StaffPalette exactly as before this existed.
+    var staffPaint: [String: PixelArt] = [:]
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -177,7 +182,7 @@ struct GameState: Codable {
         case marketPrices, priceHistory, season, calendarStartedAt
         case worldsVisited
         case activeGoals, goalsDay, dailyStreak, lastPlayedRealDate
-        case staffColors
+        case staffColors, staffPaint
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -218,6 +223,8 @@ struct GameState: Codable {
         dailyStreak = try c.decodeIfPresent(Int.self, forKey: .dailyStreak) ?? 0
         lastPlayedRealDate = try c.decodeIfPresent(Date.self, forKey: .lastPlayedRealDate)
         staffColors = try c.decodeIfPresent([String: StaffColorPair].self, forKey: .staffColors) ?? [:]
+        let decodedPaint = try c.decodeIfPresent([String: PixelArt].self, forKey: .staffPaint) ?? [:]
+        staffPaint = decodedPaint.mapValues { $0.normalized }
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -274,6 +281,7 @@ struct GameState: Codable {
         try c.encode(dailyStreak, forKey: .dailyStreak)
         try c.encodeIfPresent(lastPlayedRealDate, forKey: .lastPlayedRealDate)
         try c.encode(staffColors, forKey: .staffColors)
+        try c.encode(staffPaint, forKey: .staffPaint)
     }
 }
 
@@ -317,5 +325,6 @@ extension GameState: Equatable {
             && lhs.goalsDay == rhs.goalsDay
             && lhs.dailyStreak == rhs.dailyStreak
             && lhs.staffColors == rhs.staffColors
+            && lhs.staffPaint == rhs.staffPaint
     }
 }

@@ -17,14 +17,25 @@ extension StaffColor {
 struct StaffLayeredIcon: View {
     let id: String
     let pair: StaffColorPair
+    /// A freehand-painted portrait, if this staff member has one — takes
+    /// over entirely (see PixelArtRenderer), same "paint replaces tint"
+    /// rule CafeScene follows.
+    var paint: PixelArt? = nil
     var scale: CGFloat = 1.4
 
     var body: some View {
-        ZStack {
-            PixelImage(name: "staff_\(id)_bodylight_0", scale: scale).colorMultiply(pair.body.color)
-            PixelImage(name: "staff_\(id)_bodydark_0", scale: scale).colorMultiply(pair.body.darkened.color)
-            PixelImage(name: "staff_\(id)_clothes_0", scale: scale).colorMultiply(pair.clothes.color)
-            PixelImage(name: "staff_\(id)_detail_0", scale: scale)
+        if let paint {
+            Image(nsImage: PixelArtRenderer.nsImage(paint))
+                .interpolation(.none)
+                .resizable()
+                .frame(width: CGFloat(PixelArt.width) * scale, height: CGFloat(PixelArt.height) * scale)
+        } else {
+            ZStack {
+                PixelImage(name: "staff_\(id)_bodylight_0", scale: scale).colorMultiply(pair.body.color)
+                PixelImage(name: "staff_\(id)_bodydark_0", scale: scale).colorMultiply(pair.body.darkened.color)
+                PixelImage(name: "staff_\(id)_clothes_0", scale: scale).colorMultiply(pair.clothes.color)
+                PixelImage(name: "staff_\(id)_detail_0", scale: scale)
+            }
         }
     }
 }

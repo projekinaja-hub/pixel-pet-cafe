@@ -36,6 +36,10 @@ final class CafeScene: SKScene {
     private var currentBGTier = -1
     private var configuredStaff: Set<String> = []
     private var configuredStaffColors: [String: StaffColorPair] = [:]
+    /// Missing entry = "not yet configured"; PixelArt.blank() = "confirmed
+    /// no custom paint" — avoids a nested-Optional dictionary value just to
+    /// distinguish those two states.
+    private var configuredStaffPaint: [String: PixelArt] = [:]
     private var configuredEquipTiers: [String: Int] = [:]
     private var configuredOwnerKey = ""
     private var configuredDirt = -1
@@ -657,12 +661,26 @@ final class CafeScene: SKScene {
                 staffNodes[id]?.removeFromParent()
                 staffNodes[id] = nil
                 configuredStaffColors[id] = nil
+                configuredStaffPaint[id] = nil
             }
             configuredStaff = hired
         }
+        // Free-form paint replaces the whole node structure (single texture
+        // vs. the 4-layer tinted composite), so unlike a color change it
+        // needs a full rebuild rather than an in-place texture swap — same
+        // gate shape as the hire/fire diff above, just keyed on paint.
+        for id in hired {
+            let paint = state.staffPaint[id] ?? .blank()
+            guard configuredStaffPaint[id] != paint else { continue }
+            configuredStaffPaint[id] = paint
+            staffNodes[id]?.removeFromParent()
+            addStaff(id)
+        }
         // Recoloring is free and instant (Style tab), independent of the
         // hire/fire gate above, so it needs its own change-detection pass.
-        for id in hired {
+        // Skipped for painted staff — colorBlendFactor tinting doesn't apply
+        // to a literal custom portrait.
+        for id in hired where state.staffPaint[id] == nil {
             let pair = StaffPalette.pair(for: id, in: state)
             guard configuredStaffColors[id] != pair else { continue }
             configuredStaffColors[id] = pair
@@ -830,7 +848,12 @@ final class CafeScene: SKScene {
     }
 
     private func addStaff(_ id: String) {
-        let node = staffSprite(id)
+        let node: SKSpriteNode
+        if let paint = lastState?.staffPaint[id] {
+            node = paintedStaffSprite(paint)
+        } else {
+            node = staffSprite(id)
+        }
         node.position = Self.staffSpots[id] ?? CGPoint(x: 90, y: 30)
         node.zPosition = id == "biscuit" ? 10 : 6
         cafeLayer.addChild(node)
@@ -867,6 +890,27 @@ final class CafeScene: SKScene {
             ]))
             node.run(.sequence([.wait(forDuration: Double.random(in: 0...0.8)), work]))
         }
+    }
+
+    /// A fully custom-drawn staff portrait (Style tab's paint editor) —
+    /// replaces the generated sprite's 4-layer composite wholesale with a
+    /// single runtime-built texture (see PixelArtRenderer), animated the
+    /// same walk-cycle way (base frame + a frame nudged down one row) so it
+    /// still reads as "standing there working" like every other staff.
+    private func paintedStaffSprite(_ art: PixelArt) -> SKSpriteNode {
+        let frame0 = SKTexture(image: PixelArtRenderer.nsImage(art))
+        let frame1 = SKTexture(image: PixelArtRenderer.nsImage(art.shiftedDown()))
+        frame0.filteringMode = .nearest
+        frame1.filteringMode = .nearest
+        let node = SKSpriteNode(texture: frame0)
+        node.size = CGSize(width: PixelArt.width, height: PixelArt.height)
+        node.anchorPoint = CGPoint(x: 0.5, y: 0)
+        node.run(.repeatForever(.animate(with: [frame0, frame1], timePerFrame: 0.45)))
+        let shadow = SKSpriteNode(texture: SpriteLoader.texture("shadow"))
+        shadow.size = shadow.texture!.size()
+        shadow.zPosition = -1
+        node.addChild(shadow)
+        return node
     }
 
     /// Staff are rendered as 4 stacked layers (bodylight/bodydark/clothes/

@@ -284,12 +284,32 @@ final class GameController: ObservableObject {
         EconomyEngine.setStaffColor("mocha", body: StaffColor(r: 40, g: 200, b: 210),
                                      clothes: StaffColor(r: 230, g: 40, b: 190), &state)
     }
+    /// Dev-only: PPC_STAFF_PAINT_DEMO=1 verification hook — paints a
+    /// simple smiley on Poppy so screenshots can confirm custom pixel art
+    /// actually replaces the generated sprite in both the scene and UI.
+    func debugPaintPoppy() {
+        var art = PixelArt.blank()
+        for y in 2..<18 {
+            for x in 2..<14 { art.set(x: x, y: y, color: .packRGBA(r: 233, g: 158, b: 160)) }
+        }
+        for (x, y) in [(5, 8), (10, 8)] { art.set(x: x, y: y, color: .packRGBA(r: 52, g: 34, b: 41)) }
+        for x in 5...10 { art.set(x: x, y: 13, color: .packRGBA(r: 52, g: 34, b: 41)) }
+        EconomyEngine.setStaffPaint("poppy", art, &state)
+    }
     func setStaffColor(_ id: String, body: StaffColor, clothes: StaffColor) {
         EconomyEngine.setStaffColor(id, body: body, clothes: clothes, &state)
         saveNow()
     }
     func resetStaffColor(_ id: String) {
         EconomyEngine.resetStaffColor(id, &state)
+        saveNow()
+    }
+    func setStaffPaint(_ id: String, _ art: PixelArt) {
+        EconomyEngine.setStaffPaint(id, art, &state)
+        saveNow()
+    }
+    func resetStaffPaint(_ id: String) {
+        EconomyEngine.resetStaffPaint(id, &state)
         saveNow()
     }
     func buyEquipment(_ id: String) {

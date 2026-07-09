@@ -432,7 +432,8 @@ struct StaffTab: View {
                 let cost = EconomyEngine.staffCost(def.id, controller.state)
                 let atCap = level >= cap
                 PurchaseRow(
-                    leading: StaffLayeredIcon(id: def.id, pair: StaffPalette.pair(for: def.id, in: controller.state), scale: 1.4),
+                    leading: StaffLayeredIcon(id: def.id, pair: StaffPalette.pair(for: def.id, in: controller.state),
+                                               paint: controller.state.staffPaint[def.id], scale: 1.4),
                     name: def.name,
                     subtitle: level > 0 ? "\(def.role) · Lv \(level)/\(cap)" : "\(def.role) · Hire",
                     detail: atCap ? "Maxed for this café — a fancier café raises the cap" : Self.detail(def.id),

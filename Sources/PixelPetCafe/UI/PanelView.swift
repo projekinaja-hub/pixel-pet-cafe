@@ -51,6 +51,7 @@ struct PanelView: View {
     @State private var tab: PanelTab
     @State private var showDashboard: Bool
     @State private var editingStaffColorId: String?
+    @State private var editingStaffPaintId: String?
     @State private var showFullCalendar: Bool = false
 
     init(controller: GameController, scene: CafeScene) {
@@ -66,6 +67,9 @@ struct PanelView: View {
         // dev hook: PPC_STAFF_EDITOR=<id> opens the staff color editor sheet
         // on launch, for offscreen PPC_SNAPSHOT verification.
         _editingStaffColorId = State(initialValue: ProcessInfo.processInfo.environment["PPC_STAFF_EDITOR"])
+        // dev hook: PPC_STAFF_PAINT=<id> opens the pixel-paint editor on
+        // launch, for offscreen PPC_SNAPSHOT verification.
+        _editingStaffPaintId = State(initialValue: ProcessInfo.processInfo.environment["PPC_STAFF_PAINT"])
         // dev hook: PPC_CALENDAR=1 opens the full calendar grid on launch,
         // for offscreen PPC_SNAPSHOT verification.
         _showFullCalendar = State(initialValue: ProcessInfo.processInfo.environment["PPC_CALENDAR"] == "1")
@@ -118,7 +122,8 @@ struct PanelView: View {
                     case .stock: StockTab(controller: controller)
                     case .staff: StaffTab(controller: controller)
                     case .cafe: CafeTab(controller: controller, showFullCalendar: $showFullCalendar)
-                    case .style: StyleTab(controller: controller, editingStaffColorId: $editingStaffColorId)
+                    case .style: StyleTab(controller: controller, editingStaffColorId: $editingStaffColorId,
+                                           editingStaffPaintId: $editingStaffPaintId)
                     case .casino: CasinoTab(controller: controller)
                     case .renovate: RenovateTab(controller: controller)
                     }
@@ -152,6 +157,8 @@ struct PanelView: View {
                 DashboardOverlay(controller: controller) { showDashboard = false }
             } else if let id = editingStaffColorId, let def = Catalog.staff.first(where: { $0.id == id }) {
                 StaffColorEditorSheet(id: id, name: def.name, controller: controller) { editingStaffColorId = nil }
+            } else if let id = editingStaffPaintId, let def = Catalog.staff.first(where: { $0.id == id }) {
+                StaffPaintEditorSheet(id: id, name: def.name, controller: controller) { editingStaffPaintId = nil }
             } else if showFullCalendar {
                 CalendarOverlay(controller: controller) { showFullCalendar = false }
             }

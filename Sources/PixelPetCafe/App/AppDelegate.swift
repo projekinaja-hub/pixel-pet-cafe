@@ -37,6 +37,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             demo.staffColors["mocha"] = StaffColorPair(body: StaffColor(r: 40, g: 200, b: 210),
                                                          clothes: StaffColor(r: 230, g: 40, b: 190))
         }
+        if ProcessInfo.processInfo.environment["PPC_STAFF_PAINT_DEMO"] == "1" {
+            var art = PixelArt.blank()
+            for y in 2..<18 {
+                for x in 2..<14 { art.set(x: x, y: y, color: .packRGBA(r: 233, g: 158, b: 160)) }
+            }
+            for (x, y) in [(5, 8), (10, 8)] { art.set(x: x, y: y, color: .packRGBA(r: 52, g: 34, b: 41)) }
+            for x in 5...10 { art.set(x: x, y: 13, color: .packRGBA(r: 52, g: 34, b: 41)) }
+            demo.staffPaint["poppy"] = art
+        }
         if let city = ProcessInfo.processInfo.environment["PPC_CITY"] {
             demo.cafe.city = city
         }
@@ -102,6 +111,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if ProcessInfo.processInfo.environment["PPC_STAFF_MAXED"] == "1" {
             game.debugMaxChip()
+        }
+        if ProcessInfo.processInfo.environment["PPC_STAFF_PAINT_DEMO"] == "1" {
+            game.debugPaintPoppy()
         }
         scene.configure(with: game.state)
         scene.setActive(true)
