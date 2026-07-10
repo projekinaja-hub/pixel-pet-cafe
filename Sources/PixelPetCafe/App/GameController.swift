@@ -42,6 +42,11 @@ final class GameController: ObservableObject {
     var isClosed: Bool { SalesEngine.isClosed(state) }
     var hasStockOut: Bool { SalesEngine.hasStockOut(state) }
 
+    // come-back-and-check notification trackers (in-memory only, never persisted)
+    private var notifiedHolidayName: String?
+    private var notifiedGoalsDay: Int = .min
+    private var lastStreakReminderDay: Date?
+
     init(persistence: Persistence) {
         self.persistence = persistence
         var loaded = persistence.load().normalized()
@@ -52,6 +57,9 @@ final class GameController: ObservableObject {
         }
         EconomyEngine.updateDailyStreak(&loaded)
         self.state = loaded
+        // Don't announce the goal set that's already up when the app launches —
+        // only a rollover observed while running is news.
+        notifiedGoalsDay = loaded.goalsDay
     }
 
     func start() {
@@ -94,10 +102,64 @@ final class GameController: ObservableObject {
         }
         let events = SalesEngine.tick(&state, dt: dt, now: now, boost: workBoost, rng: &rng)
         for e in events { saleEvents.send(e) }
+        checkNotifications(now: now)
         if now.timeIntervalSince(lastAutosave) >= 30 {
             saveNow()
             lastAutosave = now
         }
+    }
+
+    // MARK: come-back-and-check notifications
+
+    /// Fires system notifications for moments worth returning for: a holiday
+    /// starting, the daily goal set rolling over, and an evening reminder
+    /// before a daily streak lapses. NotificationManager itself no-ops while
+    /// the popover is open (the user is already looking) and when running
+    /// unbundled (bare debug binary).
+    private func checkNotifications(now: Date) {
+        if let holiday = Holidays.today(state) {
+            if holiday.name != notifiedHolidayName {
+                notifiedHolidayName = holiday.name
+                NotificationManager.shared.requestPermissionIfNeeded()
+                NotificationManager.shared.notify(
+                    id: "holiday",
+                    title: "\(holiday.emoji) \(holiday.name) today!",
+                    body: NotificationTriggers.holidayBody(holiday))
+            }
+        } else {
+            notifiedHolidayName = nil
+        }
+
+        if state.goalsDay != notifiedGoalsDay, !state.activeGoals.isEmpty {
+            notifiedGoalsDay = state.goalsDay
+            NotificationManager.shared.requestPermissionIfNeeded()
+            NotificationManager.shared.notify(
+                id: "goals",
+                title: "📋 Fresh goals are up",
+                body: "\(state.activeGoals.count) new goals are waiting at the café.")
+        }
+
+        let today = Calendar.current.startOfDay(for: now)
+        if lastStreakReminderDay != today,
+           NotificationTriggers.shouldSendStreakReminder(
+               now: now, lastPlayed: state.lastPlayedRealDate, streak: state.dailyStreak) {
+            lastStreakReminderDay = today
+            let pct = NotificationTriggers.streakBonusPercent(streak: state.dailyStreak)
+            NotificationManager.shared.requestPermissionIfNeeded()
+            NotificationManager.shared.notify(
+                id: "streak",
+                title: "🔥 Your \(state.dailyStreak)-day streak ends at midnight",
+                body: "Open the café to keep your +\(pct)% price bonus")
+        }
+    }
+
+    /// Opening the popover counts as playing today. `updateDailyStreak` runs
+    /// at launch, so an app left running across midnight would otherwise have
+    /// a stale `lastPlayedRealDate` even while the user actively checks in —
+    /// re-running it here keeps the streak honest (same-day calls are a safe
+    /// no-op) and stops the 19:00 reminder from firing at engaged players.
+    func refreshStreakOnInteraction() {
+        EconomyEngine.updateDailyStreak(&state)
     }
 
     @objc private func willSleep() { saveNow() }

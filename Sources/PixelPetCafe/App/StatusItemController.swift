@@ -301,6 +301,8 @@ final class StatusItemController: NSObject {
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         popover.contentViewController?.view.window?.makeKey()
         SoundPlayer.shared.enabled = true
+        NotificationManager.shared.suppressed = true      // user is looking at the game
+        controller.refreshStreakOnInteraction()           // opening the panel counts as playing today
     }
 
     @objc private func statusClicked() {
@@ -320,6 +322,7 @@ final class StatusItemController: NSObject {
         popover.performClose(nil)
         scene.setActive(false)
         SoundPlayer.shared.enabled = false
+        NotificationManager.shared.suppressed = false
     }
 
     private func showMenu() {
