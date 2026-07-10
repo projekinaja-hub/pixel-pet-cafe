@@ -70,7 +70,7 @@ final class CafeScene: SKScene {
     /// Cities rendered with the open-air patio background (tools/generate_sprites.py
     /// `outdoor_background`) instead of the indoor room. Anchor points above are
     /// shared with the indoor layout, so no furniture/staff positions differ.
-    private static let outdoorCities: Set<String> = ["seaside", "forest"]
+    private static let outdoorCities: Set<String> = ["seaside", "forest", "desert", "sunset"]
     private static let seatPoints = [CGPoint(x: 44, y: 34), CGPoint(x: 74, y: 34), CGPoint(x: 96, y: 22)]
     /// Slots for tables bought beyond the two baked into the background art
     /// (a back row, further from the viewer). (tablePos, seatPos) pairs.

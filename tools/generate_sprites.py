@@ -508,11 +508,21 @@ def background(tier, theme="home"):
                 c.px[y][x] = _shade(wall, f - 0.03)
             else:
                 c.px[y][x] = _shade(wall, f)
-    # wainscot
-    c.rect(0, 58, W, 14, WOOD_D)
-    c.rect(0, 58, W, 2, INK)
-    for x in range(0, W, 12):
-        c.vline(x, 60, 12, (100, 62, 36, 255))
+    # wainscot (moon station swaps the wood for brushed-metal paneling)
+    if theme == "moon":
+        metal, metal_seam = (96, 102, 122, 255), (68, 74, 96, 255)
+        c.rect(0, 58, W, 14, metal)
+        c.rect(0, 58, W, 2, INK)
+        c.hline(0, 60, W, (128, 136, 158, 255))            # brushed highlight
+        for x in range(0, W, 12):
+            c.vline(x, 60, 12, metal_seam)
+            c.set(x + 1, 62, (140, 148, 168, 255))         # rivet
+            c.set(x + 1, 68, (140, 148, 168, 255))
+    else:
+        c.rect(0, 58, W, 14, WOOD_D)
+        c.rect(0, 58, W, 2, INK)
+        for x in range(0, W, 12):
+            c.vline(x, 60, 12, (100, 62, 36, 255))
     # floor
     floor_a = th["floors"][tier]
     floor_shadow = _shade(floor_a, 0.72)
@@ -530,15 +540,87 @@ def background(tier, theme="home"):
             if (x + y) % 2 == 0:
                 c.px[y][x] = _shade(c.px[y][x], 0.85)
     # window (left-center)
-    c.rect(30, 12, 34, 38, INK)
-    c.rect(32, 14, 30, 34, th["sky"])
-    _window_scene(c, theme)
-    c.vline(46, 14, 34, INK); c.hline(32, 30, 30, INK)                # mullion, crisp on top
-    c.rect(28, 50, 38, 3, WOOD)                                       # sill
+    if theme == "cloud":
+        # panoramic glass wall: window + shelf wall replaced by one huge pane
+        # looking out over a sea of clouds. Left pane edge/mullions align with
+        # the classic window rect (x30-63) so the runtime glass tint still
+        # reads as one pane of the wall.
+        c.rect(26, 10, 72, 42, INK)                                   # frame
+        pane_sky = th["sky"]
+        for y in range(12, 50):                                       # pane sky gradient
+            f = 1.12 - 0.26 * ((y - 12) / 38)
+            row = _shade(pane_sky, f)
+            for x in range(28, 96):
+                c.px[y][x] = row
+        _disk(c, 88, 17, 3, (255, 250, 220, 255))                     # high sun
+        puff_hi, puff_lo = WHITE, (222, 228, 244, 255)
+        for px, py, pw in ((33, 20, 8), (52, 27, 10), (44, 16, 6),    # drifting puffs
+                           (70, 22, 9), (86, 30, 7), (36, 33, 7)):
+            c.rect(px, py, pw, 2, puff_hi)
+            c.rect(px + 1, py - 1, pw - 3, 1, puff_hi)
+            c.rect(px + 1, py + 2, pw - 2, 1, puff_lo)
+        # distant floating island drifting between the puffs
+        isl_rock, isl_grass = (128, 116, 146, 255), (150, 196, 140, 255)
+        c.rect(69, 37, 12, 2, isl_rock)
+        c.rect(71, 39, 8, 2, _shade(isl_rock, 0.8))
+        c.rect(73, 41, 4, 1, _shade(isl_rock, 0.62))                  # tapering underside
+        c.hline(69, 36, 12, isl_grass)
+        c.set(72, 35, isl_grass); c.set(76, 35, (110, 160, 110, 255)) # tiny tree tufts
+        c.vline(74, 42, 2, (236, 244, 252, 255))                      # waterfall dribble
+        c.set(66, 40, _shade(isl_rock, 0.85)); c.set(84, 38, _shade(isl_rock, 0.85))  # drift rocks
+        # sea of clouds along the bottom of the pane
+        for bx in range(28, 96, 7):
+            _disk(c, bx + 3, 49, 4, WHITE)
+        c.rect(28, 47, 68, 3, WHITE)
+        for x in range(29, 95, 4):
+            c.set(x, 47, (232, 238, 250, 255))                        # soft scallop shading
+        for gx, gy in ((40, 24), (60, 20)):                           # distant birds
+            c.set(gx, gy, INK); c.set(gx - 1, gy + 1, INK); c.set(gx + 1, gy + 1, INK)
+        c.vline(63, 12, 38, INK); c.vline(80, 12, 38, INK)            # mullions
+        c.rect(24, 52, 76, 3, WOOD)                                   # long sill
+    elif theme == "moon":
+        # dome porthole: black starfield, earthrise, regolith at the rim
+        metal, metal_hi = (118, 124, 144, 255), (160, 168, 188, 255)
+        _disk(c, 47, 30, 21, INK)
+        _disk(c, 47, 30, 19, metal)
+        for a_dx, a_dy in ((0, -20), (14, -14), (20, 0), (14, 14),    # rivets on the ring
+                           (0, 20), (-14, 14), (-20, 0), (-14, -14)):
+            c.set(47 + a_dx, 30 + a_dy, metal_hi)
+        _disk(c, 47, 30, 17, (10, 10, 24, 255))                       # deep space
+        for sx, sy in ((38, 18), (54, 15), (59, 27), (35, 30), (44, 24),
+                       (52, 35), (33, 24), (57, 20), (41, 39), (49, 19)):
+            c.set(sx, sy, WHITE)
+        c.set(36, 36, (170, 180, 210, 255)); c.set(56, 39, (170, 180, 210, 255))  # faint stars
+        _disk(c, 54, 22, 5, (86, 138, 200, 255))                      # the Earth
+        _disk(c, 56, 24, 3, (66, 112, 176, 255))                      # night limb shading
+        c.rect(52, 20, 3, 2, (110, 168, 130, 255))                    # continents
+        c.set(55, 25, (110, 168, 130, 255)); c.set(52, 24, (110, 168, 130, 255))
+        c.hline(51, 22, 3, WHITE); c.set(55, 20, WHITE)               # cloud swirls
+        c.set(53, 26, (226, 238, 248, 255))
+        rego, rego_d = (146, 144, 154, 255), (112, 110, 122, 255)     # regolith at the rim
+        for x in range(31, 64):
+            bump = (x // 5) % 2
+            top = 42 - bump
+            if (x - 47) ** 2 + (top - 30) ** 2 <= 17 * 17:
+                c.rect(x, top, 1, 48 - top, rego)
+                c.set(x, top, (176, 174, 184, 255))                   # sunlit rim
+        for cx2, cy2 in ((39, 45), (50, 44), (58, 46)):               # small craters
+            c.hline(cx2, cy2, 3, rego_d); c.set(cx2 + 1, cy2 - 1, rego_d)
+        c.rect(36, 51, 23, 2, metal)                                  # metal ledge
+        c.hline(36, 51, 23, metal_hi)
+    else:
+        c.rect(30, 12, 34, 38, INK)
+        c.rect(32, 14, 30, 34, th["sky"])
+        _window_scene(c, theme)
+        c.vline(46, 14, 34, INK); c.hline(32, 30, 30, INK)            # mullion, crisp on top
+        c.rect(28, 50, 38, 3, WOOD)                                   # sill
     # door (far left)
     c.rect(4, 22, 20, 50, WOOD)
     c.rect(4, 22, 20, 2, INK); c.vline(4, 22, 50, INK); c.vline(23, 22, 50, INK)
-    c.rect(7, 26, 14, 18, SKY); c.rect(7, 26, 14, 1, INK); c.vline(7, 26, 18, INK); c.vline(20, 26, 18, INK); c.hline(7, 43, 14, INK)
+    door_pane = (10, 10, 24, 255) if theme == "moon" else SKY
+    c.rect(7, 26, 14, 18, door_pane); c.rect(7, 26, 14, 1, INK); c.vline(7, 26, 18, INK); c.vline(20, 26, 18, INK); c.hline(7, 43, 14, INK)
+    if theme == "moon":
+        c.set(11, 30, WHITE); c.set(16, 36, WHITE); c.set(9, 39, (170, 180, 210, 255))
     c.set(20, 50, GOLD)                                               # knob
     # counter (right)
     c.rect(96, 82, 74, 3, None)
@@ -559,12 +641,14 @@ def background(tier, theme="home"):
     c.vline(112, 10, 24, INK); c.vline(155, 10, 24, INK)
     for i, w in enumerate((22, 16, 20)):
         c.hline(118, 16 + i * 5, w, (214, 224, 210, 255))
-    # shelf with jars (between window and menu)
-    c.rect(70, 20, 34, 3, WOOD)
-    jars = [CREAM, (222, 168, 92, 255), GREEN, PINK]
-    for i, jc in enumerate(jars):
-        c.rect(72 + i * 8, 14, 5, 6, jc)
-        c.hline(72 + i * 8, 13, 5, INK)
+    # shelf with jars (between window and menu) — the cloud glass wall
+    # occupies this stretch, so skip it there
+    if theme != "cloud":
+        c.rect(70, 20, 34, 3, WOOD)
+        jars = [CREAM, (222, 168, 92, 255), GREEN, PINK]
+        for i, jc in enumerate(jars):
+            c.rect(72 + i * 8, 14, 5, 6, jc)
+            c.hline(72 + i * 8, 13, 5, INK)
     # tables (floor) with shadows
     for tx in (36, 66):
         for x in range(tx - 2, tx + 24):
@@ -586,7 +670,8 @@ def background(tier, theme="home"):
     if tier >= 1:
         c.rect(120, 96, 46, 16, (172, 96, 84, 255))
         c.rect(122, 98, 42, 12, (198, 120, 100, 255))
-        c.rect(74, 30, 14, 12, WOOD_D); c.rect(76, 32, 10, 8, (140, 180, 190, 255))  # picture
+        if theme != "cloud":                                          # glass wall there
+            c.rect(74, 30, 14, 12, WOOD_D); c.rect(76, 32, 10, 8, (140, 180, 190, 255))  # picture
     # theme extras
     if theme == "sakura":  # falling petals
         for px, py in ((20, 80), (60, 95), (110, 86), (150, 100), (86, 108), (36, 104)):
@@ -611,7 +696,8 @@ def outdoor_background(tier, theme):
     floor, an open entry path where the door used to be, and a thatched
     patio bar counter in the same footprint as the indoor counter (so the
     counter-front z-order trick in CafeScene.swift keeps working unmodified).
-    Currently used for 'seaside' (beach patio) and 'forest' (treehouse deck)."""
+    Used for 'seaside' (beach patio), 'forest' (treehouse deck),
+    'desert' (oasis terrace) and 'sunset' (harbor boardwalk)."""
     W, H = 180, 120
     th = THEMES[theme]
     sky = th["sky"]
@@ -645,6 +731,83 @@ def outdoor_background(tier, theme):
             _disk(c, cx + 12, 15, 8, (108, 168, 94, 255))
         for px, py in ((26, 30), (64, 26), (98, 32), (140, 28), (160, 24)):
             c.set(px, py, (255, 240, 190, 180))
+    elif theme == "desert":
+        # blazing sun high in the open sky, left of the pergola
+        _disk(c, 28, 13, 6, (255, 232, 150, 255))
+        _disk(c, 28, 13, 4, (255, 244, 190, 255))
+        for gx, gy in ((52, 16), (70, 10)):                # distant hawks
+            c.set(gx, gy, INK); c.set(gx - 2, gy + 1, INK); c.set(gx + 2, gy + 1, INK)
+        # rolling dunes on the horizon: rounded far humps, then a near ridge
+        dune_far, dune_near = (232, 196, 134, 255), (218, 176, 114, 255)
+        for cx2, peak in ((26, 42), (88, 39), (152, 43)):
+            r = 62 - peak + 14
+            _disk(c, cx2, 62 + (r - (62 - peak)), r, dune_far)
+        c.rect(0, 56, W, horizon_y - 56, dune_far)
+        for cx2, peak in ((0, 52), (58, 50), (120, 53), (176, 51)):
+            r = 62 - peak + 10
+            _disk(c, cx2, 62 + (r - (62 - peak)), r, dune_near)
+        c.rect(0, 59, W, horizon_y - 59, dune_near)
+        for x in range(0, W, 3):                            # windblown sand ripples
+            if (x // 3) % 2 == 0:
+                c.set(x, 57, (200, 158, 100, 255))
+        # oasis pond glinting on the near dune, framed by two palms
+        pond = (110, 178, 196, 255)
+        c.rect(53, 50, 16, 4, pond)
+        c.set(53, 50, dune_near); c.set(68, 50, dune_near)   # rounded ends
+        c.set(53, 53, dune_near); c.set(68, 53, dune_near)
+        c.hline(57, 51, 6, (196, 232, 238, 255))             # sun glint
+        for px, lean in ((49, 1), (73, -1)):                 # palms leaning over it
+            for i in range(9):
+                c.set(px + (i // 3) * lean, 49 - i, (124, 90, 56, 255))
+            topx, topy = px + 2 * lean, 40
+            for dx, dy in ((-4, 0), (-3, -1), (-2, -1), (2, -1), (3, -1), (4, 0),
+                           (-1, -2), (0, -2), (1, -2), (-2, 1), (2, 1)):
+                c.set(topx + dx, topy + dy, (96, 150, 74, 255))
+            c.set(topx, topy - 1, (70, 118, 58, 255))
+        # saguaro cacti silhouetted on the dune crests
+        for cx2, cy2, hh in ((12, 52, 9), (92, 52, 7)):
+            cactus = (92, 128, 72, 255)
+            c.rect(cx2, cy2 - hh, 2, hh, cactus)
+            c.vline(cx2 - 2, cy2 - hh + 3, 3, cactus); c.hline(cx2 - 2, cy2 - hh + 3, 2, cactus)
+            c.vline(cx2 + 3, cy2 - hh + 1, 3, cactus); c.hline(cx2 + 2, cy2 - hh + 3, 2, cactus)
+            c.set(cx2, cy2 - hh, (70, 104, 58, 255))
+    elif theme == "sunset":
+        # deeper amber bands low in the sky
+        for y in range(24, 40):
+            band = _shade(sky, 0.98 - 0.012 * (y - 24))
+            for x in range(W):
+                if (x + y) % 2 == 0 or y > 32:
+                    c.px[y][x] = band
+        # harbor water
+        water = (150, 96, 104, 255)
+        c.rect(0, 40, W, horizon_y - 40, water)
+        c.hline(0, 40, W, (196, 120, 104, 255))
+        for y in range(43, horizon_y, 4):
+            c.hline(0, y, W, _shade(water, 1.12))
+        # low sun kissing the waterline + shimmering light path (kept clear of
+        # the pergola and the equipment sprites that sit near the counter)
+        _disk(c, 60, 38, 7, (255, 214, 120, 255))
+        _disk(c, 60, 37, 4, (255, 238, 170, 255))
+        c.rect(53, 40, 15, 1, (255, 226, 150, 255))          # melt into the horizon
+        for y in range(41, horizon_y):
+            wob = 1 if (y % 4) < 2 else -1
+            ww = max(2, 7 - (y - 41) // 4)
+            _dashed_line(c, 60 - ww + wob, y, 60 + ww + wob, y, (255, 210, 130, 230), phase=y)
+        for y in range(44, horizon_y, 6):                    # faint cross-waves
+            _dashed_line(c, 0, y, W - 1, y, (232, 160, 120, 190), phase=y + 1)
+        # moored boat silhouettes, masts against the sky (one near, one far)
+        for bx, my, hw in ((32, 22, 8), (12, 30, 5)):
+            hull = (66, 44, 52, 255)
+            c.rect(bx - hw, 41, hw * 2, 3 if hw > 5 else 2, hull)   # hull
+            c.set(bx - hw - 1, 41, hull); c.set(bx + hw, 41, hull)
+            c.vline(bx, my, 41 - my, hull)                   # mast
+            c.hline(bx - hw // 2, my + 4, hw + 1, hull)      # spar
+            _line(c, bx, my, bx + 5, 40, (86, 58, 64, 255))  # rigging
+            c.hline(bx - hw, 44, hw * 2, (46, 32, 40, 255))  # waterline shadow
+        c.rect(174, 42, 2, 3, (200, 90, 70, 255))            # harbor buoy far right
+        c.set(174, 41, (255, 200, 110, 255))
+        for gx, gy in ((76, 14), (106, 10)):                 # gulls heading home
+            c.set(gx, gy, INK); c.set(gx - 2, gy + 1, INK); c.set(gx + 2, gy + 1, INK)
 
     # ridge band: transition between sky/horizon and the patio floor
     if theme == "seaside":
@@ -653,6 +816,21 @@ def outdoor_background(tier, theme):
         c.hline(0, horizon_y, W, (250, 236, 202, 255))
         for x in range(0, W, 5):
             c.set(x, horizon_y + 2, (200, 180, 130, 255))
+    elif theme == "desert":
+        sand = (226, 188, 128, 255)
+        c.rect(0, horizon_y, W, floor_y - horizon_y, sand)
+        c.hline(0, horizon_y, W, (244, 210, 150, 255))
+        for x in range(0, W, 5):
+            c.set(x, horizon_y + 2, (198, 156, 102, 255))
+        for x in range(2, W, 9):                             # scattered pebbles
+            c.set(x, horizon_y + (x // 9) % 3, (206, 166, 110, 255))
+    elif theme == "sunset":
+        dock = (128, 84, 66, 255)                            # weathered dock edge
+        c.rect(0, horizon_y, W, floor_y - horizon_y, dock)
+        c.hline(0, horizon_y, W, (168, 116, 92, 255))
+        for x in range(0, W, 8):                             # plank seams
+            c.vline(x, horizon_y, floor_y - horizon_y, _shade(dock, 0.72))
+        c.hline(0, floor_y - 1, W, _shade(dock, 0.8))
     else:
         grass = (120, 150, 90, 255)
         c.rect(0, horizon_y, W, floor_y - horizon_y, grass)
@@ -676,10 +854,14 @@ def outdoor_background(tier, theme):
 
     # open entry: two posts + a strung rope/vine where the door used to be,
     # plus stepping planks leading a customer in (doorPoint sits at x~14).
-    post_color = (150, 110, 70, 255) if theme == "seaside" else WOOD_D
+    post_colors = {"seaside": (150, 110, 70, 255), "desert": (196, 150, 100, 255),
+                   "sunset": (104, 68, 54, 255)}
+    post_color = post_colors.get(theme, WOOD_D)
     c.rect(2, horizon_y - 10, 2, 20, post_color)
     c.rect(24, horizon_y - 10, 2, 20, post_color)
-    tie_color = (90, 70, 50, 255) if theme == "seaside" else (70, 100, 55, 255)
+    tie_colors = {"seaside": (90, 70, 50, 255), "desert": (150, 110, 70, 255),
+                  "sunset": (90, 70, 50, 255)}
+    tie_color = tie_colors.get(theme, (70, 100, 55, 255))
     _dashed_line(c, 3, horizon_y - 9, 25, horizon_y - 9, tie_color)
     for i, x in enumerate(range(4, 24, 5)):
         c.rect(x, 76 + (i % 2) * 4, 3, 2, _shade(floor_a, 0.58))
@@ -687,13 +869,25 @@ def outdoor_background(tier, theme):
         c.vline(27, horizon_y - 14, 6, (90, 70, 40, 255))
         for dx, dy in ((-1, -15), (1, -15), (0, -17)):
             c.set(27 + dx, horizon_y + dy, (90, 150, 70, 255))
+    elif theme == "desert":
+        c.rect(26, horizon_y - 3, 5, 4, (188, 108, 74, 255))   # terracotta pot
+        c.hline(26, horizon_y - 3, 5, (150, 84, 58, 255))
+        c.rect(28, horizon_y - 8, 1, 5, (92, 128, 72, 255))    # potted cactus
+        c.set(27, horizon_y - 6, (92, 128, 72, 255)); c.set(29, horizon_y - 7, (92, 128, 72, 255))
+    elif theme == "sunset":
+        c.rect(27, horizon_y - 4, 3, 5, (66, 44, 52, 255))     # mooring bollard
+        c.hline(26, horizon_y - 4, 5, (86, 58, 64, 255))
+        c.set(27, horizon_y - 2, (170, 130, 80, 255)); c.set(29, horizon_y - 1, (170, 130, 80, 255))  # coiled rope
+        c.rect(12, horizon_y - 9, 2, 3, (255, 200, 110, 255))  # lantern glowing on the rope
     else:
         c.rect(12, horizon_y - 9, 2, 3, GOLD)             # small lantern on the rope
 
     # patio bar counter — same footprint as the indoor counter (cols 96-170,
     # rows 52-80) so CafeScene.swift's counterFront crop keeps working as-is.
-    roof_color, roof_d = ((196, 160, 90, 255), (166, 130, 66, 255)) if theme == "seaside" \
-        else ((94, 154, 84, 255), (70, 120, 62, 255))
+    roof_colors = {"seaside": ((196, 160, 90, 255), (166, 130, 66, 255)),
+                   "desert":  ((214, 162, 96, 255), (178, 128, 70, 255)),   # dried palm thatch
+                   "sunset":  ((206, 116, 88, 255), (168, 90, 70, 255))}    # warm canvas awning
+    roof_color, roof_d = roof_colors.get(theme, ((94, 154, 84, 255), (70, 120, 62, 255)))
     for i, y in enumerate(range(6, 24)):
         w = 4 + i
         c.rect(133 - w, y, w * 2, 1, roof_color if i % 2 == 0 else roof_d)
@@ -704,8 +898,12 @@ def outdoor_background(tier, theme):
     c.vline(112, 27, 18, INK); c.vline(155, 27, 18, INK)
     for i, w in enumerate((22, 16, 20)):
         c.hline(118, 31 + i * 5, w, (214, 224, 210, 255))
-    counter_top = WOOD_L if theme == "seaside" else (150, 118, 78, 255)
-    body = (196, 164, 110, 255) if theme == "seaside" else (112, 84, 58, 255)
+    counter_tops = {"seaside": WOOD_L, "desert": (216, 178, 122, 255),
+                    "sunset": (176, 122, 88, 255)}
+    counter_top = counter_tops.get(theme, (150, 118, 78, 255))
+    bodies = {"seaside": (196, 164, 110, 255), "desert": (192, 142, 94, 255),
+              "sunset": (120, 78, 62, 255)}
+    body = bodies.get(theme, (112, 84, 58, 255))
     c.rect(96, 52, 74, 6, counter_top)
     c.rect(96, 52, 74, 1, INK)
     c.rect(98, 58, 70, 22, body)
@@ -725,10 +923,10 @@ def outdoor_background(tier, theme):
             for y in range(105, 109):
                 if 0 <= x < W and 0 <= y < H and (x + y) % 2 == 0:
                     c.px[y][x] = _shade(c.px[y][x], 0.78)
-        if theme == "seaside":
-            _umbrella(c, tx + 11, 70, 15, 15, accent, _shade(accent, 0.72), post_color, 17)
-        else:
+        if theme == "forest":
             _leaf_canopy(c, tx + 11, 76, 9, (100, 162, 88, 255), (76, 128, 66, 255), (110, 78, 50, 255), 11)
+        else:
+            _umbrella(c, tx + 11, 70, 15, 15, accent, _shade(accent, 0.72), post_color, 17)
         c.rect(tx, 88, 22, 4, WOOD_L)
         c.hline(tx, 88, 22, INK)
         c.hline(tx, 91, 22, _shade(WOOD_L, 0.8))
@@ -744,6 +942,15 @@ def outdoor_background(tier, theme):
             c.rect(29, 46, 3, 22, (230, 120, 90, 255))    # surfboard leaning by the gate
             c.hline(29, 50, 3, WHITE)
             c.vline(30, 47, 20, (200, 90, 70, 255))
+        elif theme == "desert":
+            c.rect(29, 54, 4, 6, (188, 108, 74, 255))     # tall clay amphora by the gate
+            c.rect(30, 51, 2, 3, (188, 108, 74, 255))
+            c.hline(29, 54, 4, (150, 84, 58, 255))
+            c.set(30, 50, (150, 84, 58, 255)); c.set(31, 50, (150, 84, 58, 255))
+        elif theme == "sunset":
+            c.vline(30, 40, 28, (86, 58, 64, 255))        # dockside lamp post
+            c.rect(29, 37, 3, 3, (66, 44, 52, 255))
+            c.set(30, 38, (255, 210, 130, 255))           # warm lamp
         else:
             c.set(12, horizon_y - 5, (255, 220, 140, 220))  # lantern glow
 
@@ -1616,7 +1823,7 @@ def main():
         baricon(f).save(f"baricon_{f}.png"); count += 1
     for t in range(3):
         background(t).save(f"bg_tier{t}.png"); count += 1
-    OUTDOOR_THEMES = {"seaside", "forest"}
+    OUTDOOR_THEMES = {"seaside", "forest", "desert", "sunset"}
     for theme in THEMES:
         for t in range(3):
             gen = outdoor_background if theme in OUTDOOR_THEMES else background
