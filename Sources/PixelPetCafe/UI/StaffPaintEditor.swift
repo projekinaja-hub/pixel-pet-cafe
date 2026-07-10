@@ -2,9 +2,11 @@ import SwiftUI
 
 /// Freehand pixel-art editor: tap/drag to paint the same 16×20 canvas every
 /// generated staff sprite uses, with a small curated palette plus a free
-/// ColorPicker swatch, an eraser, one-step undo, and reset-to-blank (which
-/// falls back to the ordinary color-mixed look — see EconomyEngine.
-/// setStaffPaint). Changes only commit on Apply; the scrim/X/Cancel discard.
+/// ColorPicker swatch, an eraser, undo, and Restart (back to the pristine
+/// current look). The character's fundamentals — ink outline, face, and the
+/// silhouette boundary — are LOCKED (see PixelArtRenderer.protectionMask):
+/// the brush restyles fur/clothes but can never break the character itself.
+/// Changes only commit on Apply; the scrim/X discard.
 struct StaffPaintEditorSheet: View {
     let id: String
     let name: String
@@ -18,6 +20,12 @@ struct StaffPaintEditorSheet: View {
     @State private var erasing = false
     @State private var strokeStarted = false
     @State private var zoomed = false
+
+    /// The character's fundamentals (outline, face, silhouette boundary) —
+    /// see PixelArtRenderer.protectionMask. The brush and eraser skip these.
+    private let locked: [Bool]
+    /// The pristine current-look template, for the Restart tool.
+    private let template: PixelArt
 
     /// 10pt cells fit comfortably; 15pt zoom makes eye/detail work pleasant.
     /// Both sizes keep the whole sheet inside the fixed 360×544 popover.
@@ -48,8 +56,10 @@ struct StaffPaintEditorSheet: View {
         // so the player draws/recolors ON their staff instead of starting
         // from a lifeless blank grid. Clear still gives a truly empty canvas
         // for anyone who does want to draw from scratch.
-        let seed = controller.state.staffPaint[id]
-            ?? PixelArtRenderer.captureCurrentLook(id: id, pair: StaffPalette.pair(for: id, in: controller.state))
+        let currentLook = PixelArtRenderer.captureCurrentLook(id: id, pair: StaffPalette.pair(for: id, in: controller.state))
+        template = currentLook
+        locked = PixelArtRenderer.protectionMask(id: id)
+        let seed = controller.state.staffPaint[id] ?? currentLook
         _art = State(initialValue: seed)
         _selectedColor = State(initialValue: Self.palette[0])
         // dev hook: PPC_PAINT_ZOOM=1 opens pre-zoomed, for offscreen
@@ -79,6 +89,10 @@ struct StaffPaintEditorSheet: View {
 
                 canvasView
 
+                Text("Outline, face & shape are protected — paint the rest!")
+                    .font(.system(size: 8.5, design: .rounded))
+                    .foregroundColor(Theme.dim)
+
                 paletteRow
 
                 HStack(spacing: 8) {
@@ -88,9 +102,9 @@ struct StaffPaintEditorSheet: View {
                     toolButton(icon: "eraser", label: "Erase", enabled: true, active: erasing) {
                         erasing.toggle()
                     }
-                    toolButton(icon: "trash", label: "Clear", enabled: !art.isBlank) {
+                    toolButton(icon: "arrow.counterclockwise", label: "Restart", enabled: art != template) {
                         undoStack.append(art)
-                        art = .blank()
+                        art = template
                     }
                     toolButton(icon: zoomed ? "minus.magnifyingglass" : "plus.magnifyingglass",
                                label: "Zoom", enabled: true, active: zoomed) {
@@ -186,6 +200,10 @@ struct StaffPaintEditorSheet: View {
         let x = Int(point.x / cellSize)
         let y = Int(point.y / cellSize)
         guard x >= 0, x < PixelArt.width, y >= 0, y < PixelArt.height else { return }
+        // Fundamentals are untouchable: the ink outline, face, and the empty
+        // space outside the silhouette stay exactly as authored, so no amount
+        // of drawing can un-character the character.
+        guard !locked[y * PixelArt.width + x] else { return }
         art.set(x: x, y: y, color: erasing ? 0 : selectedColor)
     }
 

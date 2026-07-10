@@ -29,6 +29,33 @@ enum PixelArtRenderer {
         return image
     }
 
+    /// The character's untouchable fundamentals, per canvas cell: true where
+    /// the paint editor must refuse the brush. Locked cells are (a) the
+    /// generated "detail" layer — ink outline, eyes, ears' inner pixels,
+    /// nose, apron stitching — and (b) everything OUTSIDE the character's
+    /// silhouette (transparent in all four layers). So drawing can restyle
+    /// fur and clothes freely but can never break the character's shape or
+    /// face, and can't scribble into the empty space around them.
+    static func protectionMask(id: String) -> [Bool] {
+        let w = PixelArt.width, h = PixelArt.height
+        var detailOpaque = [Bool](repeating: false, count: w * h)
+        var anyOpaque = [Bool](repeating: false, count: w * h)
+        for suffix in ["bodylight", "bodydark", "clothes", "detail"] {
+            guard let url = Bundle.module.url(forResource: "staff_\(id)_\(suffix)_0",
+                                              withExtension: "png", subdirectory: "Sprites"),
+                  let data = try? Data(contentsOf: url),
+                  let rep = NSBitmapImageRep(data: data) else { continue }
+            for y in 0..<min(h, rep.pixelsHigh) {
+                for x in 0..<min(w, rep.pixelsWide) {
+                    guard let c = rep.colorAt(x: x, y: y), c.alphaComponent > 0.5 else { continue }
+                    anyOpaque[y * w + x] = true
+                    if suffix == "detail" { detailOpaque[y * w + x] = true }
+                }
+            }
+        }
+        return (0..<(w * h)).map { detailOpaque[$0] || !anyOpaque[$0] }
+    }
+
     /// Composites a staff member's CURRENT on-screen look (the 4 generated
     /// layers, with the player's chosen body/clothes tint applied — same
     /// stacking order as CafeScene's staffSprite and StaffLayeredIcon) into
