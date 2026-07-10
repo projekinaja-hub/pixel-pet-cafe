@@ -17,8 +17,11 @@ struct StaffPaintEditorSheet: View {
     @State private var selectedColor: UInt32
     @State private var erasing = false
     @State private var strokeStarted = false
+    @State private var zoomed = false
 
-    private static let cellSize: CGFloat = 10
+    /// 10pt cells fit comfortably; 15pt zoom makes eye/detail work pleasant.
+    /// Both sizes keep the whole sheet inside the fixed 360×544 popover.
+    private var cellSize: CGFloat { zoomed ? 15 : 10 }
     private static let palette: [UInt32] = [
         .packRGBA(r: 52, g: 34, b: 41),      // ink
         .packRGBA(r: 252, g: 250, b: 244),   // white
@@ -49,6 +52,9 @@ struct StaffPaintEditorSheet: View {
             ?? PixelArtRenderer.captureCurrentLook(id: id, pair: StaffPalette.pair(for: id, in: controller.state))
         _art = State(initialValue: seed)
         _selectedColor = State(initialValue: Self.palette[0])
+        // dev hook: PPC_PAINT_ZOOM=1 opens pre-zoomed, for offscreen
+        // PPC_SNAPSHOT verification of the zoomed layout.
+        _zoomed = State(initialValue: ProcessInfo.processInfo.environment["PPC_PAINT_ZOOM"] == "1")
     }
 
     var body: some View {
@@ -85,6 +91,10 @@ struct StaffPaintEditorSheet: View {
                     toolButton(icon: "trash", label: "Clear", enabled: !art.isBlank) {
                         undoStack.append(art)
                         art = .blank()
+                    }
+                    toolButton(icon: zoomed ? "minus.magnifyingglass" : "plus.magnifyingglass",
+                               label: "Zoom", enabled: true, active: zoomed) {
+                        zoomed.toggle()
                     }
                 }
 
@@ -125,15 +135,15 @@ struct StaffPaintEditorSheet: View {
         .transition(.opacity)
     }
 
-    private var canvasWidth: CGFloat { CGFloat(PixelArt.width) * Self.cellSize }
-    private var canvasHeight: CGFloat { CGFloat(PixelArt.height) * Self.cellSize }
+    private var canvasWidth: CGFloat { CGFloat(PixelArt.width) * cellSize }
+    private var canvasHeight: CGFloat { CGFloat(PixelArt.height) * cellSize }
 
     private var canvasView: some View {
         Canvas { context, _ in
             for y in 0..<PixelArt.height {
                 for x in 0..<PixelArt.width {
-                    let rect = CGRect(x: CGFloat(x) * Self.cellSize, y: CGFloat(y) * Self.cellSize,
-                                       width: Self.cellSize, height: Self.cellSize)
+                    let rect = CGRect(x: CGFloat(x) * cellSize, y: CGFloat(y) * cellSize,
+                                       width: cellSize, height: cellSize)
                     let checker = (x + y).isMultiple(of: 2)
                     context.fill(Path(rect), with: .color(checker ? Color.white.opacity(0.06) : Color.clear))
                     let c = art.color(x: x, y: y)
@@ -145,12 +155,12 @@ struct StaffPaintEditorSheet: View {
             }
             // grid lines
             for x in 0...PixelArt.width {
-                let px = CGFloat(x) * Self.cellSize
+                let px = CGFloat(x) * cellSize
                 context.stroke(Path { $0.move(to: CGPoint(x: px, y: 0)); $0.addLine(to: CGPoint(x: px, y: canvasHeight)) },
                                 with: .color(Theme.dim.opacity(0.15)), lineWidth: 0.5)
             }
             for y in 0...PixelArt.height {
-                let py = CGFloat(y) * Self.cellSize
+                let py = CGFloat(y) * cellSize
                 context.stroke(Path { $0.move(to: CGPoint(x: 0, y: py)); $0.addLine(to: CGPoint(x: canvasWidth, y: py)) },
                                 with: .color(Theme.dim.opacity(0.15)), lineWidth: 0.5)
             }
@@ -173,8 +183,8 @@ struct StaffPaintEditorSheet: View {
     }
 
     private func paint(at point: CGPoint) {
-        let x = Int(point.x / Self.cellSize)
-        let y = Int(point.y / Self.cellSize)
+        let x = Int(point.x / cellSize)
+        let y = Int(point.y / cellSize)
         guard x >= 0, x < PixelArt.width, y >= 0, y < PixelArt.height else { return }
         art.set(x: x, y: y, color: erasing ? 0 : selectedColor)
     }
