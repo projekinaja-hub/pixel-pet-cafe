@@ -39,7 +39,15 @@ struct StaffPaintEditorSheet: View {
         self.name = name
         self.controller = controller
         self.dismiss = dismiss
-        _art = State(initialValue: (controller.state.staffPaint[id] ?? .blank()))
+        // Seed the canvas with the staff member's CURRENT look (saved custom
+        // art if any, else their live sprite composited with the player's
+        // chosen tint) — the animal is already on the canvas, shape and all,
+        // so the player draws/recolors ON their staff instead of starting
+        // from a lifeless blank grid. Clear still gives a truly empty canvas
+        // for anyone who does want to draw from scratch.
+        let seed = controller.state.staffPaint[id]
+            ?? PixelArtRenderer.captureCurrentLook(id: id, pair: StaffPalette.pair(for: id, in: controller.state))
+        _art = State(initialValue: seed)
         _selectedColor = State(initialValue: Self.palette[0])
     }
 

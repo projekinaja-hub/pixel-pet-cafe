@@ -28,6 +28,47 @@ enum PixelArtRenderer {
         image.addRepresentation(rep)
         return image
     }
+
+    /// Composites a staff member's CURRENT on-screen look (the 4 generated
+    /// layers, with the player's chosen body/clothes tint applied — same
+    /// stacking order as CafeScene's staffSprite and StaffLayeredIcon) into
+    /// an editable PixelArt. This is what seeds the paint editor: the canvas
+    /// opens with the animal already there — shape, ears, eyes, apron — so
+    /// the player colors/draws ON their staff rather than facing a blank
+    /// grid and losing the character entirely.
+    static func captureCurrentLook(id: String, pair: StaffColorPair) -> PixelArt {
+        var art = PixelArt.blank()
+        func bitmap(_ suffix: String) -> NSBitmapImageRep? {
+            guard let url = Bundle.module.url(forResource: "staff_\(id)_\(suffix)_0",
+                                              withExtension: "png", subdirectory: "Sprites"),
+                  let data = try? Data(contentsOf: url) else { return nil }
+            return NSBitmapImageRep(data: data)
+        }
+        // (layer, flat tint) — nil tint = keep the layer's own authored colors
+        let layers: [(String, StaffColor?)] = [
+            ("bodylight", pair.body),
+            ("bodydark", pair.body.darkened),
+            ("clothes", pair.clothes),
+            ("detail", nil),
+        ]
+        for (suffix, tint) in layers {
+            guard let rep = bitmap(suffix) else { continue }
+            for y in 0..<min(PixelArt.height, rep.pixelsHigh) {
+                for x in 0..<min(PixelArt.width, rep.pixelsWide) {
+                    guard let c = rep.colorAt(x: x, y: y), c.alphaComponent > 0.5 else { continue }
+                    if let tint {
+                        art.set(x: x, y: y, color: .packRGBA(r: Int(tint.r), g: Int(tint.g), b: Int(tint.b)))
+                    } else {
+                        let rgb = c.usingColorSpace(.deviceRGB) ?? c
+                        art.set(x: x, y: y, color: .packRGBA(r: Int(rgb.redComponent * 255),
+                                                              g: Int(rgb.greenComponent * 255),
+                                                              b: Int(rgb.blueComponent * 255)))
+                    }
+                }
+            }
+        }
+        return art
+    }
 }
 
 extension UInt32 {
