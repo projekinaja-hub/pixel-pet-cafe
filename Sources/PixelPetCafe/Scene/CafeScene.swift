@@ -32,6 +32,8 @@ final class CafeScene: SKScene {
     private var tipNode: SKSpriteNode?
     private var nextTipAt: Date = .distantFuture
     private var activeCustomers = 0
+    private var casinoPatrons: [SKSpriteNode] = []
+    private var nextPatronAt: Date = .distantFuture
 
     private var currentBGTier = -1
     private var configuredStaff: Set<String> = []
@@ -52,6 +54,19 @@ final class CafeScene: SKScene {
 
     private static let doorPoint = CGPoint(x: 14, y: 32)
     private static let counterPoint = CGPoint(x: 104, y: 42)
+    /// Where ambient casino patrons appear/leave (bottom-left, mirrors the café door).
+    private static let casinoEntrancePoint = CGPoint(x: 14, y: 26)
+    /// Spots patrons linger at: in front of each slot machine (machines stand at
+    /// x 32/54/76 with their base at y 46, so patrons stand just below/in front),
+    /// and flanking the felt table (dealer at x 133 y 44; the wheel/cards render
+    /// around x 112–162, y 22–36 in `gameFocus`, so patrons stay to its sides).
+    private static let casinoAttractions: [CGPoint] = [
+        CGPoint(x: 32, y: 32),   // left slot machine
+        CGPoint(x: 54, y: 32),   // middle slot machine
+        CGPoint(x: 76, y: 32),   // right slot machine
+        CGPoint(x: 98, y: 22),   // left edge of the felt table
+        CGPoint(x: 166, y: 24),  // right edge of the felt table
+    ]
     /// Cities rendered with the open-air patio background (tools/generate_sprites.py
     /// `outdoor_background`) instead of the indoor room. Anchor points above are
     /// shared with the indoor layout, so no furniture/staff positions differ.
@@ -157,7 +172,13 @@ final class CafeScene: SKScene {
         mapLayer.isHidden = mode != .map
         if mode != .casino { focusTable(false) }
         currentBGKey = ""              // force background swap
-        if mode == .casino { buildCasinoIfNeeded() }
+        if mode == .casino {
+            buildCasinoIfNeeded()
+            // first patron wanders in quickly, then the 6–12 s cadence takes over
+            nextPatronAt = Date().addingTimeInterval(Double.random(in: 1.0...2.0))
+        } else {
+            clearCasinoPatrons()
+        }
         lastState.map { configure(with: $0) }
     }
 
@@ -1047,10 +1068,61 @@ final class CafeScene: SKScene {
     }
 
     override func update(_ currentTime: TimeInterval) {
+        if mode == .casino {
+            if !isPaused, casinoPatrons.count < 3, Date() >= nextPatronAt {
+                spawnCasinoPatron()
+                nextPatronAt = Date().addingTimeInterval(Double.random(in: 6...12))
+            }
+            return
+        }
         guard mode == .cafe else { return }
         if tipNode == nil, Date() >= nextTipAt {
             spawnTip()
         }
+    }
+
+    // MARK: ambient casino patrons
+
+    /// A little patron wanders in, lingers at one of the games, and leaves.
+    private func spawnCasinoPatron() {
+        let patron = animatedSprite(prefix: "customer_\(Int.random(in: 0...2))")
+        patron.position = Self.casinoEntrancePoint
+        patron.zPosition = 7   // in front of slots (5) & dealer (4), behind gameFocus (14)
+        patron.alpha = 0
+        casinoLayer.addChild(patron)
+        casinoPatrons.append(patron)
+
+        let spot = Self.casinoAttractions[Int.random(in: 0..<Self.casinoAttractions.count)]
+        let hop = SKAction.sequence([
+            .moveBy(x: 0, y: 3, duration: 0.14),
+            .moveBy(x: 0, y: -3, duration: 0.14),
+        ])
+        let shuffle = SKAction.sequence([
+            .moveBy(x: -2, y: 0, duration: 0.45),
+            .wait(forDuration: 0.25),
+            .moveBy(x: 2, y: 0, duration: 0.45),
+            .wait(forDuration: 0.25),
+        ])
+        var linger: [SKAction] = [hop]   // excited hop on arrival
+        linger.append(.repeat(shuffle, count: Int.random(in: 3...5)))   // ≈4–8 s
+        if Double.random(in: 0..<1) < 0.3 { linger.append(hop) }        // one more hop
+        patron.run(.sequence([
+            .fadeIn(withDuration: 0.3),
+            .move(to: spot, duration: Double.random(in: 2.0...3.0)),
+            .sequence(linger),
+            .move(to: Self.casinoEntrancePoint, duration: Double.random(in: 2.0...3.0)),
+            .fadeOut(withDuration: 0.3),
+            .removeFromParent(),
+        ])) { [weak self, weak patron] in
+            self?.casinoPatrons.removeAll { $0 === patron }
+        }
+    }
+
+    /// Leaving casino mode tears the patrons down so nothing leaks across modes.
+    private func clearCasinoPatrons() {
+        for patron in casinoPatrons { patron.removeFromParent() }
+        casinoPatrons.removeAll()
+        nextPatronAt = .distantFuture
     }
 
     private func spawnTip() {
