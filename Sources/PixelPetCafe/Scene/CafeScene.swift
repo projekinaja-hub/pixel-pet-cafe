@@ -396,6 +396,54 @@ final class CafeScene: SKScene {
 
     /// Coin shower over the table when the player wins at the casino.
     /// `jackpot` makes it a bigger, wider, longer-lingering burst.
+    /// Full-scene confetti + a few coins for big happy moments (goal claimed,
+    /// holiday starting, Lucky Hour, moving to a new country) — the systems
+    /// were exciting but the presentation was just a text banner. Attaches to
+    /// whichever layer is currently visible so it works in café AND casino.
+    func playCelebration() {
+        guard !isPaused else { return }
+        let layer = mode == .casino ? casinoLayer : cafeLayer
+        let colors: [NSColor] = [
+            NSColor(calibratedRed: 0.98, green: 0.73, blue: 0.09, alpha: 1),  // gold
+            NSColor(calibratedRed: 0.91, green: 0.62, blue: 0.63, alpha: 1),  // pink
+            NSColor(calibratedRed: 0.38, green: 0.60, blue: 0.36, alpha: 1),  // green
+            NSColor(calibratedRed: 0.37, green: 0.51, blue: 0.71, alpha: 1),  // blue
+            NSColor(calibratedRed: 0.97, green: 0.91, blue: 0.80, alpha: 1),  // cream
+        ]
+        for i in 0..<22 {
+            let piece = SKSpriteNode(color: colors[i % colors.count],
+                                     size: CGSize(width: 2, height: 2))
+            piece.position = CGPoint(x: CGFloat.random(in: 8...172), y: 124)
+            piece.zPosition = 32
+            layer.addChild(piece)
+            let sway = CGFloat.random(in: -14...14)
+            let fall = SKAction.sequence([
+                .wait(forDuration: Double(i) * 0.04),
+                .group([.moveBy(x: sway, y: -CGFloat.random(in: 78...104), duration: Double.random(in: 1.2...1.8)),
+                        .rotate(byAngle: .pi * CGFloat.random(in: 2...5), duration: 1.6),
+                        .sequence([.wait(forDuration: 1.0), .fadeOut(withDuration: 0.6)])]),
+                .removeFromParent(),
+            ])
+            fall.timingMode = .easeIn
+            piece.run(fall)
+        }
+        for i in 0..<5 {
+            let coin = SKSpriteNode(texture: SpriteLoader.texture("tip"))
+            coin.size = coin.texture!.size()
+            coin.position = CGPoint(x: CGFloat.random(in: 30...150), y: 122)
+            coin.zPosition = 32
+            layer.addChild(coin)
+            coin.run(.sequence([
+                .wait(forDuration: 0.2 + Double(i) * 0.09),
+                .group([.moveTo(y: CGFloat.random(in: 26...44), duration: 0.9),
+                        .rotate(byAngle: .pi * 2, duration: 0.9)]),
+                .wait(forDuration: 0.5),
+                .fadeOut(withDuration: 0.35),
+                .removeFromParent(),
+            ]))
+        }
+    }
+
     func playCasinoWin(_ amount: Double, jackpot: Bool = false) {
         guard mode == .casino, !isPaused else { return }
         let n = jackpot ? 28 : min(14, 5 + Int(amount / 100))

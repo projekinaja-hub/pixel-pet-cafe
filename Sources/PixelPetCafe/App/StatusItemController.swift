@@ -138,6 +138,14 @@ final class StatusItemController: NSObject {
                 SoundPlayer.shared.play("tip")
             }
             .store(in: &cancellables)
+        controller.celebrate
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                self?.scene.playCelebration()
+                self?.happyUntil = Date().addingTimeInterval(3)
+                self?.refreshIcon()
+            }
+            .store(in: &cancellables)
 
         reloadIconsIfNeeded(controller.state)
         updateTitle(controller.state)

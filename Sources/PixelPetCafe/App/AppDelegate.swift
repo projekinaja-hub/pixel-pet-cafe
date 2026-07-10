@@ -75,6 +75,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         scene.setActive(true)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak scene] in
             if scene?.mode == .casino { scene?.playCasinoWin(500) }
+            // dev hook: PPC_CELEBRATE=1 fires the confetti burst mid-fall for
+            // sceneshot verification (snapshot lands ~2.9s after this).
+            if ProcessInfo.processInfo.environment["PPC_CELEBRATE"] == "1" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) { scene?.playCelebration() }
+            }
             scene?.playSale(SaleEvent(itemIcon: "latte", itemName: "Latte", price: 15,
                                       mood: .happy, customerSpecies: 0))
             scene?.playSale(SaleEvent(itemIcon: "", itemName: "", price: 0,

@@ -19,6 +19,8 @@ final class GameController: ObservableObject {
     let mahjongDiscards = PassthroughSubject<Int, Never>()
     let casinoFocus = PassthroughSubject<Bool, Never>()
     let mapOpen = PassthroughSubject<Bool, Never>()
+    /// Big happy moments — the scene answers with a confetti burst.
+    let celebrate = PassthroughSubject<Void, Never>()
 
     private let persistence: Persistence
     private var timer: Timer?
@@ -90,6 +92,7 @@ final class GameController: ObservableObject {
             }
             showBanner(event.emoji, text)
             soundRequest.send("event")
+            if event.id == "lucky_hour" { celebrate.send() }
         }
         for def in Achievements.checkAll(&state) {
             showBanner(def.emoji, "Achievement: \(def.name)!")
@@ -117,6 +120,7 @@ final class GameController: ObservableObject {
                 let suffix = boosts.isEmpty ? "" : " \(boosts.joined(separator: ", "))!"
                 showBanner(h.emoji, "\(h.name) today!\(suffix)")
                 soundRequest.send("holiday")
+                celebrate.send()
             }
         }
         checkNotifications(now: now)
@@ -401,7 +405,12 @@ final class GameController: ObservableObject {
         if SalesEngine.buyPack(ingredient, units: units, &state) { soundRequest.send("buy") }
     }
     func renovate() { EconomyEngine.renovate(&state); saveNow() }
-    func moveToNewCountry() { EconomyEngine.moveToNewCountry(&state); saveNow() }
+    func moveToNewCountry() {
+        EconomyEngine.moveToNewCountry(&state)
+        saveNow()
+        soundRequest.send("fanfare")
+        celebrate.send()
+    }
     func toggleMuted() { state.muted.toggle() }
     func cleanSpot() { SalesEngine.cleanSpot(&state) }
     func sweepAll() {
@@ -467,6 +476,7 @@ final class GameController: ObservableObject {
         guard reward > 0 else { return }
         showBanner(Goals.def(kind).emoji, "Goal complete: \(Goals.def(kind).name)! +🪙 \(formatNumber(reward))")
         soundRequest.send("goal_done")
+        celebrate.send()
     }
 
     func collectGoldenTip() {
