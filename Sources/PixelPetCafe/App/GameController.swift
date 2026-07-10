@@ -25,6 +25,8 @@ final class GameController: ObservableObject {
     private var lastTick = Date()
     private var lastAutosave = Date()
     private var rng = SystemRandomNumberGenerator()
+    // Not persisted: only used to notice a holiday *starting* while running.
+    private var lastHolidayName: String?
 
     // work mode: count (never read) keystrokes to measure typing activity
     private var keyMonitor: Any?
@@ -94,6 +96,19 @@ final class GameController: ObservableObject {
         }
         let events = SalesEngine.tick(&state, dt: dt, now: now, boost: workBoost, rng: &rng)
         for e in events { saleEvents.send(e) }
+        // holiday jingle when a calendar holiday begins while we're running
+        let holiday = Holidays.today(state)
+        if holiday?.name != lastHolidayName {
+            lastHolidayName = holiday?.name
+            if let h = holiday {
+                var boosts: [String] = []
+                if h.customerBoost > 1 { boosts.append("customers ×\(String(format: "%.1f", h.customerBoost))") }
+                if h.priceBoost > 1 { boosts.append("prices ×\(String(format: "%.2f", h.priceBoost))") }
+                let suffix = boosts.isEmpty ? "" : " \(boosts.joined(separator: ", "))!"
+                showBanner(h.emoji, "\(h.name) today!\(suffix)")
+                soundRequest.send("holiday")
+            }
+        }
         if now.timeIntervalSince(lastAutosave) >= 30 {
             saveNow()
             lastAutosave = now
@@ -231,7 +246,7 @@ final class GameController: ObservableObject {
             casinoAward(pot)
             casinoJackpotWon.send(pot)
             showBanner("🎰", "PROGRESSIVE JACKPOT! +🪙 \(formatNumber(pot))")
-            soundRequest.send("achieve")
+            soundRequest.send("fanfare")
         }
         return true
     }
@@ -387,7 +402,7 @@ final class GameController: ObservableObject {
         let reward = Goals.claim(&state, kind)
         guard reward > 0 else { return }
         showBanner(Goals.def(kind).emoji, "Goal complete: \(Goals.def(kind).name)! +🪙 \(formatNumber(reward))")
-        soundRequest.send("achieve")
+        soundRequest.send("goal_done")
     }
 
     func collectGoldenTip() {

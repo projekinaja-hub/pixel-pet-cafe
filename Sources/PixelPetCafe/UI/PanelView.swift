@@ -145,12 +145,14 @@ struct PanelView: View {
         .onAppear {
             scene.setMode(tab == .casino ? .casino : .cafe)
             scene.configure(with: controller.state)
+            SoundPlayer.shared.startAmbient(tab == .casino ? "ambient_casino" : "ambient_cafe")
         }
         .onChange(of: controller.state) { newState in
             scene.configure(with: newState)
         }
         .onChange(of: tab) { newTab in
             scene.setMode(newTab == .casino ? .casino : .cafe)
+            SoundPlayer.shared.startAmbient(newTab == .casino ? "ambient_casino" : "ambient_cafe")
         }
         .overlay {
             if showDashboard {

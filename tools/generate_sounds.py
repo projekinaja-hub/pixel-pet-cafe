@@ -95,4 +95,93 @@ write_wav("buy.wav", seq(mix(noise(0.03, 0.3, 50, 0.2), tone(520, 0.05, 0.25, "s
 # big spender: cash register cha-ching
 write_wav("chaching.wav", seq(mix(noise(0.04, 0.35, 45, 0.2), tone(1200, 0.04, 0.2, "square", 30)),
                               mix(tone(1568, 0.22, 0.3, "tri", 8), tone(1976, 0.22, 0.2, "tri", 8))))
-print("generated 10 sounds ->", os.path.abspath(OUT))
+# jackpot fanfare: triad arpeggios climbing an octave into a held chord
+write_wav("fanfare.wav", seq(tone(523, 0.09, 0.28, "square", 10), tone(659, 0.09, 0.28, "square", 10),
+                             tone(784, 0.09, 0.28, "square", 10),
+                             tone(659, 0.09, 0.28, "square", 10), tone(784, 0.09, 0.28, "square", 10),
+                             tone(988, 0.09, 0.28, "square", 10),
+                             tone(1047, 0.08, 0.3, "square", 10), tone(1319, 0.08, 0.3, "square", 10),
+                             mix(tone(1568, 0.5, 0.22, "tri", 3), tone(1319, 0.5, 0.18, "tri", 3),
+                                 tone(1047, 0.5, 0.16, "tri", 3), tone(523, 0.5, 0.14, "tri", 3))))
+# quest complete: short bright 3-note chime
+write_wav("goal_done.wav", seq(tone(1047, 0.09, 0.28, "tri", 12), tone(1319, 0.09, 0.28, "tri", 12),
+                               tone(1760, 0.28, 0.3, "tri", 6)))
+# holiday jingle: cheerful bell-like phrase
+write_wav("holiday.wav", seq(tone(784, 0.11, 0.26, "tri", 10), tone(988, 0.11, 0.26, "tri", 10),
+                             tone(784, 0.11, 0.26, "tri", 10), tone(1175, 0.11, 0.26, "tri", 10),
+                             mix(tone(1568, 0.3, 0.26, "tri", 6), tone(988, 0.3, 0.16, "tri", 6))))
+
+
+# ---- ambient loops -----------------------------------------------------------
+# Every note uses a fully-contained attack/release envelope (zero at both
+# ends) and is placed inside a fixed-length buffer, so the loop point is
+# seamless: no decaying tail is ever cut off and there is no leading silence.
+
+def pad(freq, dur, vol=0.1, shape="tri", attack=0.05, release=0.2):
+    n = int(RATE * dur)
+    a, r = int(RATE * attack), int(RATE * release)
+    out = []
+    for i in range(n):
+        t = i / RATE
+        ph = 2 * math.pi * freq * t
+        if shape == "square":
+            v = 1.0 if math.sin(ph) > 0 else -1.0
+        elif shape == "tri":
+            v = 2 / math.pi * math.asin(math.sin(ph))
+        else:
+            v = math.sin(ph)
+        env = min(1.0, i / max(1, a), (n - 1 - i) / max(1, r))
+        out.append(v * vol * max(0.0, env))
+    return out
+
+
+def place(buf, samples, at):
+    i0 = int(RATE * at)
+    for j, s in enumerate(samples):
+        if 0 <= i0 + j < len(buf):
+            buf[i0 + j] += s
+
+
+def normalize(buf, peak):
+    top = max(abs(s) for s in buf) or 1.0
+    return [s * peak / top for s in buf]
+
+
+def midi(n):
+    return 440.0 * 2 ** ((n - 69) / 12)
+
+
+# café ambience: warm lo-fi triangle pad, I-vi-IV-V in C, sparse melody
+LOOP = 8.0
+buf = [0.0] * int(RATE * LOOP)
+progression = [  # (start, [chord midi notes]) — 2s per chord, release inside the bar
+    (0.0, [48, 55, 60, 64]),   # C
+    (2.0, [45, 52, 57, 60]),   # Am
+    (4.0, [41, 48, 53, 57]),   # F
+    (6.0, [43, 50, 55, 59]),   # G
+]
+for start, notes in progression:
+    for k, n in enumerate(notes):
+        place(buf, pad(midi(n), 1.9, 0.07 if k else 0.09, "tri", 0.25, 0.6), start)
+for start, n, dur in [(0.8, 76, 0.5), (3.2, 72, 0.6), (4.6, 74, 0.5), (6.8, 71, 0.9)]:
+    place(buf, pad(midi(n), dur, 0.05, "sine", 0.03, 0.25), start)
+write_wav("ambient_cafe.wav", normalize(buf, 0.18))
+
+# casino ambience: jazzy A-minor walking bass with swung square stabs
+buf = [0.0] * int(RATE * LOOP)
+walk = [45, 48, 50, 52, 53, 52, 50, 48,   # Am climb & back
+        43, 47, 50, 52, 53, 55, 52, 47]   # G/E7 colour walk
+for i, n in enumerate(walk):
+    place(buf, pad(midi(n), 0.42, 0.11, "tri", 0.01, 0.18), i * 0.5)
+stabs = [  # (start, chord) — swung off-beat square hits
+    (0.75, [69, 72, 76]), (2.75, [69, 72, 76]),
+    (4.75, [67, 71, 74]), (6.25, [68, 71, 76]), (7.25, [69, 72, 76]),
+]
+for start, notes in stabs:
+    for n in notes:
+        place(buf, pad(midi(n), 0.22, 0.035, "square", 0.01, 0.12), start)
+for start, n in [(1.75, 81), (5.75, 79)]:   # sparse noodle notes
+    place(buf, pad(midi(n), 0.4, 0.045, "sine", 0.02, 0.2), start)
+write_wav("ambient_casino.wav", normalize(buf, 0.18))
+
+print("generated 15 sounds ->", os.path.abspath(OUT))

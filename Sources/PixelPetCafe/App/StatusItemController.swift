@@ -127,7 +127,7 @@ final class StatusItemController: NSObject {
                 self?.scene.playCasinoWin(amount, jackpot: true)
                 self?.happyUntil = Date().addingTimeInterval(5)
                 self?.refreshIcon()
-                SoundPlayer.shared.play("achieve")
+                SoundPlayer.shared.play("fanfare")
             }
             .store(in: &cancellables)
         controller.tipCollected
