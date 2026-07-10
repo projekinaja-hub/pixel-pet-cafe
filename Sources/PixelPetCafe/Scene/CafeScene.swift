@@ -938,10 +938,17 @@ final class CafeScene: SKScene {
             n.run(.repeatForever(.animate(with: frames, timePerFrame: 0.45)))
             return n
         }
+        // Fractional z steps, NOT whole numbers: child zPositions accumulate
+        // onto the parent's in SpriteKit's render order, so offsets of 1-3 on
+        // a staff node at z 6 pushed the clothes/detail layers to effective
+        // z 8-9 — past the counterFront overlay at z 8 that hides staff
+        // bodies. That made counter staff look pasted IN FRONT of the counter
+        // (head and apron drawn over the wood). Tiny fractions keep the whole
+        // stack within (6, 6.1) — safely behind the counter.
         node.addChild(layer("bodylight", name: "bodylight", z: 0))
-        node.addChild(layer("bodydark", name: "bodydark", z: 1))
-        node.addChild(layer("clothes", name: "clothes", z: 2))
-        node.addChild(layer("detail", name: "detail", z: 3))
+        node.addChild(layer("bodydark", name: "bodydark", z: 0.01))
+        node.addChild(layer("clothes", name: "clothes", z: 0.02))
+        node.addChild(layer("detail", name: "detail", z: 0.03))
 
         let shadow = SKSpriteNode(texture: SpriteLoader.texture("shadow"))
         shadow.size = shadow.texture!.size()
