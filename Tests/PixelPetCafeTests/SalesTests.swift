@@ -113,7 +113,8 @@ final class SalesTests: XCTestCase {
         XCTAssertGreaterThan(haul, 0)
         XCTAssertEqual(s.stock["beans"], 0)
         let price = SalesEngine.price(SalesEngine.servable(GameState.newGame())[0], s)
-        XCTAssertEqual(haul, 5 * price, accuracy: 1e-6)
+        // net of staff wages (newGame starts with Mocha Lv 1 -> 0.5% share)
+        XCTAssertEqual(haul, 5 * price * (1 - EconomyEngine.wageShare(s)), accuracy: 1e-6)
     }
 
     func testOfflineSimZeroWithNoStock() {

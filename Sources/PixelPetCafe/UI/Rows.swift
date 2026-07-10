@@ -321,6 +321,8 @@ struct CafeTab: View {
             let level = controller.state.equipmentLevels[def.id] ?? 0
             let cost = EconomyEngine.equipmentCost(def.id, controller.state)
             let atCap = level >= equipCap
+            let repNeeded = EconomyEngine.requiredReputation(forLevel: level)
+            let repBlocked = !atCap && controller.state.reputation < repNeeded
             let speedNote = def.speedCategories.isEmpty ? ""
                 : String(format: " · ×%.2f prep speed/level (%@)", def.speedMultPerLevel,
                          def.speedCategories.contains(.drink) ? "drinks" : "pastries")
@@ -329,11 +331,12 @@ struct CafeTab: View {
                 name: def.name,
                 subtitle: level > 0 ? "Lv \(level)/\(equipCap)" : "New · cap \(equipCap)",
                 detail: atCap ? "Maxed for this café — a fancier café raises the cap"
+                    : repBlocked ? "Word needs to spread first — build reputation to keep upgrading"
                     : String(format: "×%.2f prices & customers per level", def.multPerLevel) + speedNote,
                 cost: cost,
                 affordable: controller.state.coins >= cost,
-                maxed: atCap,
-                maxedLabel: "MAX Lv \(equipCap)"
+                maxed: atCap || repBlocked,
+                maxedLabel: atCap ? "MAX Lv \(equipCap)" : "Needs 💖\(Int(repNeeded))"
             ) { controller.buyEquipment(def.id) }
         }
     }
@@ -426,21 +429,37 @@ struct StaffTab: View {
 
     var body: some View {
         let cap = EconomyEngine.staffLevelCap(controller.state)
+        let wagePct = Int((EconomyEngine.wageShare(controller.state) * 100).rounded())
+        if wagePct > 0 {
+            HStack {
+                Text("💸 Wages: staff take \(wagePct)% of this café's sales")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundColor(Theme.dim)
+                Spacer()
+            }
+            .padding(9)
+            .background(Theme.card)
+            .cornerRadius(9)
+        }
         ForEach(Catalog.staff, id: \.id) { def in
             if controller.state.lifetimeCoins >= def.unlockAtLifetime {
                 let level = controller.state.staffLevels[def.id] ?? 0
                 let cost = EconomyEngine.staffCost(def.id, controller.state)
                 let atCap = level >= cap
+                let repNeeded = EconomyEngine.requiredReputation(forLevel: level)
+                let repBlocked = !atCap && controller.state.reputation < repNeeded
                 PurchaseRow(
                     leading: StaffLayeredIcon(id: def.id, pair: StaffPalette.pair(for: def.id, in: controller.state),
                                                paint: controller.state.staffPaint[def.id], scale: 1.4),
                     name: def.name,
                     subtitle: level > 0 ? "\(def.role) · Lv \(level)/\(cap)" : "\(def.role) · Hire",
-                    detail: atCap ? "Maxed for this café — a fancier café raises the cap" : Self.detail(def.id),
+                    detail: atCap ? "Maxed for this café — a fancier café raises the cap"
+                        : repBlocked ? "Word needs to spread first — build reputation to keep growing"
+                        : Self.detail(def.id),
                     cost: cost,
                     affordable: controller.state.coins >= cost,
-                    maxed: atCap,
-                    maxedLabel: "MAX Lv \(cap)"
+                    maxed: atCap || repBlocked,
+                    maxedLabel: atCap ? "MAX Lv \(cap)" : "Needs 💖\(Int(repNeeded))"
                 ) { controller.buyStaff(def.id) }
             } else {
                 LockedRow(hint: "??? · unlocks at 🪙 \(formatNumber(def.unlockAtLifetime)) lifetime")

@@ -218,7 +218,10 @@ enum SalesEngine {
         guard !items.isEmpty else { return 0 }
         let avg = items.reduce(0) { $0 + price($1, s) } / Double(items.count)
         let cap = capacityPerSec(s)
+        // Net of staff wages — the header number must match what actually
+        // lands in the wallet (same honesty rule as the capacity cap above).
         return min(customerRate(s), cap.isFinite ? cap : .infinity) * avg
+            * (1 - EconomyEngine.wageShare(s))
     }
 
     // MARK: throughput / prep-time capacity
@@ -334,13 +337,42 @@ enum SalesEngine {
             }
         }
         var viewedEvents: [SaleEvent] = []
+        let repBefore = s.reputation
         for i in s.cafes.indices {
             s.activeCafe = i
             let events = tickOneCafe(&s, dt: dt, now: now, boost: i == viewedCafe ? boost : 1, rng: &rng)
             if i == viewedCafe { viewedEvents = events }
         }
         s.activeCafe = viewedCafe
+        applyReputationPhysics(&s, before: repBefore, dt: dt)
         return viewedEvents
+    }
+
+    // MARK: reputation physics
+
+    /// Reputation used to pin at 100 within seconds: every happy sale added
+    /// up to +0.3, up to 20 sales/tick/café across 6 cafés (~+10/sec) with
+    /// nothing pulling it back down — a dead mechanic. Now it behaves like
+    /// FAME: (a) per-sale gains still accrue, but the total upward movement
+    /// per real second is capped, so raw sales volume can't brute-force it;
+    /// (b) above the baseline it decays back toward it — standing still
+    /// means fading. Perfect, continuous service equilibrates around ~95
+    /// (gainCap / decayRate + baseline); reaching a true 100 takes the
+    /// extra pushes (critic raves, ads, events). Drops (angry customers,
+    /// stock-outs) remain instant and uncapped, so bad service still bites.
+    static let reputationGainCapPerSec = 0.05
+    static let reputationDecayPerSec = 0.0011
+    static let reputationBaseline = 50.0
+
+    private static func applyReputationPhysics(_ s: inout GameState, before: Double, dt: TimeInterval) {
+        let gained = s.reputation - before
+        if gained > 0 {
+            s.reputation = before + min(gained, reputationGainCapPerSec * dt)
+        }
+        if s.reputation > reputationBaseline {
+            let decay = (s.reputation - reputationBaseline) * reputationDecayPerSec * dt
+            s.reputation = max(reputationBaseline, s.reputation - decay)
+        }
     }
 
     private static func tickOneCafe<R: RandomNumberGenerator>(
@@ -354,6 +386,7 @@ enum SalesEngine {
         s.customerProgress += customerRate(s) * boost * dt
         var events: [SaleEvent] = []
         let stockBeforeServing = s.stock
+        let coinsBeforeServing = s.coins
 
         // Throughput cap: how many customers this café's staff can actually
         // prep/serve this tick. `max(1.0, ...)` floors it at one guaranteed
@@ -438,6 +471,17 @@ enum SalesEngine {
                 }
             }
             s.cafe.deliveryOrdersMissed += missed
+        }
+
+        // Staff wages: the roster takes its cut of everything this café just
+        // earned (walk-ins and delivery alike). Staff were previously pure
+        // upside — a one-time hire cost, then permanent free bonuses — which
+        // is a big part of why the economy snowballed. Now a big roster is a
+        // real tradeoff: more levels, bigger cut (see EconomyEngine.wageShare,
+        // capped so it never exceeds a quarter of gross).
+        let earnedThisTick = s.coins - coinsBeforeServing
+        if earnedThisTick > 0 {
+            s.coins -= earnedThisTick * EconomyEngine.wageShare(s)
         }
 
         updateConsumptionAndSpoilage(&s, stockBeforeServing: stockBeforeServing, dt: dt)
@@ -656,6 +700,9 @@ enum SalesEngine {
                 safety -= 1
             }
         }
+        // Wages come out of offline earnings the same as live ones — the
+        // roster doesn't work the away shift for free.
+        haul *= (1 - EconomyEngine.wageShare(s))
         s.coins += haul
         s.lifetimeCoins += haul
         s.lifetimeCoinsThisRun += haul

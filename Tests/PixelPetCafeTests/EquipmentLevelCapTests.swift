@@ -27,6 +27,7 @@ final class EquipmentLevelCapTests: XCTestCase {
     func testBuyEquipmentSucceedsOneBelowTheCap() {
         var s = GameState.newGame()
         s.coins = .infinity
+        s.reputation = 100   // clear the reputation gate; this test is about the CAP
         s.equipmentLevels["espresso"] = EconomyEngine.equipmentLevelCap(s) - 1
         let bought = EconomyEngine.buyEquipment("espresso", &s)
         XCTAssertTrue(bought)

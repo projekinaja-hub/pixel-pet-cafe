@@ -89,9 +89,38 @@ enum EconomyEngine {
         equipmentLevelCapBase + equipmentLevelCapStepPerCity * cityUnlockIndex(s)
     }
 
+    /// Staff wages: the active café's roster takes this share of its gross
+    /// sales every tick (see SalesEngine.tickOneCafe). 0.5% per staff level,
+    /// hard-capped at 25% — hiring everyone to max stops being pure upside
+    /// and becomes a payroll decision.
+    static let wagePerLevel = 0.005
+    static let wageShareCap = 0.25
+    static func wageShare(_ s: GameState) -> Double {
+        let levels = Catalog.staff.reduce(0) { $0 + (s.staffLevels[$1.id] ?? 0) }
+        return min(wageShareCap, wagePerLevel * Double(levels))
+    }
+
+    /// Upgrading past these levels requires a reputation to match — a famous
+    /// café attracts the suppliers/talent a hole-in-the-wall can't. This
+    /// makes the heart a real progression gate instead of a passive stat,
+    /// and it composes with reputation now decaying (SalesEngine's
+    /// reputation physics): you must EARN and HOLD the fame to keep
+    /// building out. Applies to both staff and equipment purchases.
+    static func requiredReputation(forLevel level: Int) -> Double {
+        switch level {
+        case ..<10: return 0
+        case ..<20: return 40
+        case ..<30: return 60
+        case ..<45: return 75
+        default: return 85
+        }
+    }
+
     @discardableResult
     static func buyStaff(_ id: String, _ s: inout GameState) -> Bool {
-        guard (s.staffLevels[id] ?? 0) < staffLevelCap(s) else { return false }
+        let level = s.staffLevels[id] ?? 0
+        guard level < staffLevelCap(s) else { return false }
+        guard s.reputation >= requiredReputation(forLevel: level) else { return false }
         let c = staffCost(id, s)
         guard s.coins >= c else { return false }
         s.coins -= c
@@ -128,7 +157,9 @@ enum EconomyEngine {
 
     @discardableResult
     static func buyEquipment(_ id: String, _ s: inout GameState) -> Bool {
-        guard (s.equipmentLevels[id] ?? 0) < equipmentLevelCap(s) else { return false }
+        let level = s.equipmentLevels[id] ?? 0
+        guard level < equipmentLevelCap(s) else { return false }
+        guard s.reputation >= requiredReputation(forLevel: level) else { return false }
         let c = equipmentCost(id, s)
         guard s.coins >= c else { return false }
         s.coins -= c

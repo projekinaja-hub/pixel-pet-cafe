@@ -40,6 +40,7 @@ final class StaffLevelCapTests: XCTestCase {
     func testBuyStaffSucceedsOneBelowTheCap() {
         var s = GameState.newGame()
         s.coins = .infinity
+        s.reputation = 100   // clear the reputation gate; this test is about the CAP
         s.staffLevels["chip"] = EconomyEngine.staffLevelCap(s) - 1
         let bought = EconomyEngine.buyStaff("chip", &s)
         XCTAssertTrue(bought)
