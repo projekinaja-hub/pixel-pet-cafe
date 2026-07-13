@@ -446,7 +446,11 @@ final class CafeScene: SKScene {
 
     func playCasinoWin(_ amount: Double, jackpot: Bool = false) {
         guard mode == .casino, !isPaused else { return }
-        let n = jackpot ? 28 : min(14, 5 + Int(amount / 100))
+        // Cap in Double space BEFORE the Int conversion: late-game win
+        // amounts exceed Int.max/100, and Int(hugeDouble) is a Swift runtime
+        // trap — this line crashed the whole app (white popover) on a big
+        // casino win. min(14, ...) first makes the conversion always safe.
+        let n = jackpot ? 28 : Int(min(14.0, 5.0 + amount / 100.0))
         for i in 0..<n {
             let coin = SKSpriteNode(texture: SpriteLoader.texture("tip"))
             coin.size = coin.texture!.size()
