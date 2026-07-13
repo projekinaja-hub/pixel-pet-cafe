@@ -173,6 +173,8 @@ struct CafeTab: View {
         .background(Theme.card)
         .cornerRadius(9)
 
+        MomentumCard(controller: controller)
+
         // locations
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -607,6 +609,54 @@ struct RenovateTab: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
+        .background(Theme.card)
+        .cornerRadius(9)
+    }
+}
+
+
+/// Live income momentum: a ~2 minute sparkline of net income/s with the
+/// percent change vs a minute ago — makes rising/falling fortunes visible
+/// at a glance instead of having to stare at the coin counter.
+struct MomentumCard: View {
+    @ObservedObject var controller: GameController
+
+    var body: some View {
+        let history = controller.incomeHistory
+        let trend = controller.incomeTrend
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text("📈 Momentum")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                Spacer()
+                if history.count >= 30 {
+                    Text(String(format: "%+.0f%% vs 1 min ago", trend * 100))
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundColor(abs(trend) < 0.03 ? Theme.dim : (trend > 0 ? Theme.dealGreen : Theme.danger))
+                } else {
+                    Text("warming up…")
+                        .font(.system(size: 9.5, design: .rounded))
+                        .foregroundColor(Theme.dim)
+                }
+            }
+            Canvas { context, size in
+                guard history.count >= 2 else { return }
+                let maxV = max(history.max() ?? 1, 1e-9)
+                let minV = history.min() ?? 0
+                let span = max(maxV - minV, maxV * 0.01)
+                var path = Path()
+                for (i, v) in history.enumerated() {
+                    let x = size.width * CGFloat(i) / CGFloat(history.count - 1)
+                    let y = size.height - size.height * CGFloat((v - minV) / span) * 0.9 - size.height * 0.05
+                    if i == 0 { path.move(to: CGPoint(x: x, y: y)) }
+                    else { path.addLine(to: CGPoint(x: x, y: y)) }
+                }
+                context.stroke(path, with: .color(Theme.gold), lineWidth: 1.5)
+            }
+            .frame(height: 30)
+        }
+        .padding(9)
         .background(Theme.card)
         .cornerRadius(9)
     }

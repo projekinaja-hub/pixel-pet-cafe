@@ -190,6 +190,13 @@ struct PanelView: View {
                 Text("+\(formatNumber(controller.incomeEstimate * controller.workBoost))/s")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundColor(Theme.dim)
+                // trend arrow: income vs ~1 minute ago (needs 30s of samples)
+                if abs(controller.incomeTrend) > 0.03 {
+                    Text(controller.incomeTrend > 0 ? "▲" : "▼")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundColor(controller.incomeTrend > 0 ? Theme.dealGreen : Theme.danger)
+                        .help(String(format: "Income %+.0f%% vs a minute ago", controller.incomeTrend * 100))
+                }
                 if controller.workBoost > 1.05 {
                     Text(String(format: "⚡%.1f×", controller.workBoost))
                         .font(.system(size: 11, weight: .heavy, design: .rounded))

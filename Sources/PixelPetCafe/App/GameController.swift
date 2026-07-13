@@ -43,6 +43,17 @@ final class GameController: ObservableObject {
     private var bannerClearAt = Date.distantPast
 
     var incomeEstimate: Double { SalesEngine.incomeEstimate(state) }
+    // Rolling per-second income samples (in-memory only): drives the header
+    // trend arrow and the Café tab momentum sparkline. ~2 minutes of data.
+    @Published private(set) var incomeHistory: [Double] = []
+    /// Fractional change vs ~60s ago: +0.10 = income up 10% in the last minute.
+    var incomeTrend: Double {
+        guard incomeHistory.count >= 30, let past = incomeHistory.first, past > 0 else { return 0 }
+        let recent = incomeHistory.suffix(5).reduce(0, +) / 5
+        let baseline = incomeHistory.prefix(5).reduce(0, +) / 5
+        guard baseline > 0 else { return 0 }
+        return recent / baseline - 1
+    }
     var isClosed: Bool { SalesEngine.isClosed(state) }
     var hasStockOut: Bool { SalesEngine.hasStockOut(state) }
 
@@ -124,6 +135,8 @@ final class GameController: ObservableObject {
             }
         }
         checkNotifications(now: now)
+        incomeHistory.append(SalesEngine.incomeEstimate(state))
+        if incomeHistory.count > 120 { incomeHistory.removeFirst(incomeHistory.count - 120) }
         if now.timeIntervalSince(lastAutosave) >= 30 {
             saveNow()
             lastAutosave = now
