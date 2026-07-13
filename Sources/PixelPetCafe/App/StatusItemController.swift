@@ -41,6 +41,7 @@ final class StatusItemController: NSObject {
 
         popover = NSPopover()
         popover.behavior = .transient
+        popover.delegate = self
         popover.animates = true
         popover.contentSize = NSSize(width: 360, height: 544)
         let host = NSHostingController(rootView: PanelView(controller: controller, scene: scene))
@@ -328,6 +329,17 @@ final class StatusItemController: NSObject {
 
     private func closePopover() {
         popover.performClose(nil)
+        popoverWentAway()
+    }
+
+    /// Runs on EVERY close, however it happens. The popover is `.transient`,
+    /// so clicking anywhere else on screen dismisses it WITHOUT going through
+    /// closePopover() — that path used to skip this cleanup entirely, leaving
+    /// the ambient music looping, the scene animating, and notifications
+    /// suppressed while the game looked closed. NSPopoverDelegate's
+    /// popoverDidClose (wired in init) now funnels both paths here;
+    /// idempotent, so the explicit-close path calling it twice is harmless.
+    private func popoverWentAway() {
         scene.setActive(false)
         SoundPlayer.shared.enabled = false
         NotificationManager.shared.suppressed = false
@@ -374,5 +386,15 @@ final class StatusItemController: NSObject {
         } catch {
             NSLog("Launch at login unavailable: \(error.localizedDescription)")
         }
+    }
+}
+
+extension StatusItemController: NSPopoverDelegate {
+    /// Catches EVERY dismissal — including the .transient auto-close when
+    /// the user clicks anywhere else on screen, which never goes through
+    /// closePopover(). Without this, ambient music kept playing and the
+    /// scene kept animating with the game visually closed.
+    func popoverDidClose(_ notification: Notification) {
+        popoverWentAway()
     }
 }

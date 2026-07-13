@@ -104,7 +104,20 @@ enum MenuCatalog {
     /// never sees the seasonal multiplier at all.
     static func currentUnitCost(_ id: String, _ s: GameState) -> Double {
         let raw = s.marketPrices[id] ?? ingredientDef(id)?.unitCost ?? 0
-        return raw * SeasonalPricing.multiplier(id, s.season)
+        return raw * SeasonalPricing.multiplier(id, s.season) * supplierTier(s)
+    }
+
+    /// Premium suppliers: sale prices scale exponentially with equipment
+    /// (equipMultiplier), but ingredient costs used to stay pinned near their
+    /// flat base — so late-game margins approached 100% and money flooded
+    /// in ("we get too much money now"). A top-tier kitchen now sources
+    /// top-tier ingredients: unit cost scales with equipMultiplier^0.9 —
+    /// slightly sub-linear so upgrading is always still net-positive, but
+    /// cost-of-goods stays a real, growing share of revenue instead of
+    /// rounding to zero. A fresh café (equipMultiplier 1) is unaffected.
+    static let supplierTierExponent = 0.9
+    static func supplierTier(_ s: GameState) -> Double {
+        pow(SalesEngine.equipMultiplier(s), supplierTierExponent)
     }
 
     /// Marble's experience shaves a bit off every pack purchase (manual or
