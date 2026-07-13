@@ -454,10 +454,14 @@ struct StaffTab: View {
         let cap = EconomyEngine.staffLevelCap(controller.state)
         let wagePct = Int((EconomyEngine.wageShare(controller.state) * 100).rounded())
         if wagePct > 0 {
+            // net income is already wage-deducted; back out the gross to show
+            // the actual coins/sec leaving the till as payroll.
+            let share = EconomyEngine.wageShare(controller.state)
+            let wagePerSec = controller.incomeEstimate * share / (1 - share)
             HStack {
-                Text("💸 Wages: staff take \(wagePct)% of this café's sales")
+                Text("💸 Payroll: \(wagePct)% of sales · paying ≈ 🪙\(formatNumber(wagePerSec))/s")
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundColor(Theme.dim)
+                    .foregroundColor(Theme.danger)
                 Spacer()
             }
             .padding(9)
