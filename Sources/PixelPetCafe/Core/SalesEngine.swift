@@ -42,11 +42,22 @@ enum SalesEngine {
 
     // MARK: rates
 
+    /// Full per-level growth for the first `tieredBonusSoftCap` (25) levels,
+    /// then each further level only contributes 35% of its usual boost —
+    /// same soft-cap philosophy as staff's tieredBonus. Uncapped exponential
+    /// compounding meant one late-game upgrade could visibly double income
+    /// ("sometimes becomes too big"): at level 60+ each raw 1.10 step is a
+    /// bigger absolute jump than the whole early game combined. Tapered
+    /// growth keeps every upgrade worthwhile but smooth.
     static func equipMultiplier(_ s: GameState) -> Double {
         var mult = 1.0
         for def in Catalog.equipment {
             let level = s.equipmentLevels[def.id] ?? 0
-            if level > 0 { mult *= pow(def.multPerLevel, Double(level)) }
+            guard level > 0 else { continue }
+            let full = min(level, tieredBonusSoftCap)
+            let tapered = max(0, level - tieredBonusSoftCap)
+            let taperedPerLevel = 1 + (def.multPerLevel - 1) * 0.35
+            mult *= pow(def.multPerLevel, Double(full)) * pow(taperedPerLevel, Double(tapered))
         }
         return mult
     }
