@@ -77,8 +77,24 @@ enum SalesEngine {
         return perLevel * Double(capped) + tieredBonusPerLevelAfterCap * Double(extra)
     }
 
+    /// Stars come from sqrt(lifetimeCoinsThisRun) — pure "the more money you
+    /// already have, the more you get," compounding on BOTH price and
+    /// customer rate at once with no ceiling (172 stars = 18.2x on each,
+    /// ~331x combined, still growing). Tapered like equipment: full
+    /// 10%/star for the first 25 stars, then 35% of that rate — a prestige
+    /// run still matters a lot, but stops being an unbounded snowball
+    /// detached from actual play.
+    static let starBonusSoftCap = 25
+    static let starBonusPerLevel = 0.10
+    static let starBonusTaperFactor = 0.35
+    static func starBonus(_ s: GameState) -> Double {
+        let full = min(s.stars, starBonusSoftCap)
+        let extra = max(0, s.stars - starBonusSoftCap)
+        return starBonusPerLevel * Double(full) + starBonusPerLevel * starBonusTaperFactor * Double(extra)
+    }
+
     static func priceMultiplier(_ s: GameState) -> Double {
-        equipMultiplier(s) * (1 + 0.10 * Double(s.stars)) * s.city.priceBonus
+        equipMultiplier(s) * (1 + starBonus(s)) * s.city.priceBonus
             * (1 + tieredBonus(level: s.staffLevels["juno"] ?? 0, perLevel: 0.02))
             // permanent world-prestige bonus — see EconomyEngine.moveToNewCountry.
             // Survives every reset (renovate and world moves alike), unlike stars.
@@ -150,7 +166,7 @@ enum SalesEngine {
             * (1 + 0.08 * Double(staffSum))
             * pow(equipMultiplier(s), 0.5)      // gear helps flow, but gently
             * realismFactor(s.cleanliness, floor: 0.08, power: 1.2)
-            * (1 + 0.10 * Double(s.stars))
+            * (1 + starBonus(s))
             * s.city.rateBonus
             * realismFactor(s.reputation, floor: 0.05, power: 1.3)
             * (s.adsActive ? 1.8 : 1.0)
