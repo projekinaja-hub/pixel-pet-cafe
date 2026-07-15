@@ -53,39 +53,53 @@ struct CostButton: View {
     var label: String = ""
     let action: () -> Void
 
+    @State private var pressing = false
+    @State private var startDelay: Timer?
     @State private var repeater: Timer?
 
     var body: some View {
-        Button(action: action) {
-            Text("\(label)🪙 \(formatNumber(cost))")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundColor(affordable ? Theme.bg : Theme.dim)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(affordable ? Theme.gold : Theme.card.opacity(0.6))
-                .cornerRadius(7)
-        }
-        .buttonStyle(.plain)
-        .disabled(!affordable)
-        // Hold to rapid-buy: after 0.45s of pressing, repeats the purchase
-        // ~12x/sec until released — one gesture to bulk-level anything
-        // (staff, equipment, packs, taste...). Each fire re-runs the same
-        // guarded action, so caps/gates/affordability still stop it cold.
-        .onLongPressGesture(minimumDuration: 0.45, pressing: { pressing in
-            if pressing { return }
-            repeater?.invalidate(); repeater = nil
-        }, perform: {
-            repeater?.invalidate()
-            let t = Timer(timeInterval: 0.085, repeats: true) { _ in
-                Task { @MainActor in action() }
-            }
-            RunLoop.main.add(t, forMode: .common)
-            repeater = t
-        })
-        .simultaneousGesture(DragGesture(minimumDistance: 0).onEnded { _ in
-            repeater?.invalidate(); repeater = nil
-        })
-        .help("Hold to rapid-upgrade")
+        Text("\(label)🪙 \(formatNumber(cost))")
+            .font(.system(size: 11, weight: .bold, design: .rounded))
+            .foregroundColor(affordable ? Theme.bg : Theme.dim)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(affordable ? Theme.gold : Theme.card.opacity(0.6))
+            .cornerRadius(7)
+            .contentShape(Rectangle())
+            .opacity(affordable ? 1 : 0.6)
+            // Plain SwiftUI Button + .onLongPressGesture don't compose
+            // reliably — Button's own built-in tap recognizer competes with
+            // the long-press one and usually wins, so holding silently did
+            // nothing. A raw press gesture avoids Button entirely: fires the
+            // purchase once immediately on press-down (so a normal tap still
+            // buys exactly once), then after a short hold starts repeating
+            // ~12x/sec until release. Each fire re-runs the same guarded
+            // action, so caps/gates/affordability still stop it cold.
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in
+                        guard !pressing, affordable else { return }
+                        pressing = true
+                        action()
+                        let delay = Timer(timeInterval: 0.45, repeats: false) { _ in
+                            Task { @MainActor in
+                                let t = Timer(timeInterval: 0.085, repeats: true) { _ in
+                                    Task { @MainActor in action() }
+                                }
+                                RunLoop.main.add(t, forMode: .common)
+                                repeater = t
+                            }
+                        }
+                        RunLoop.main.add(delay, forMode: .common)
+                        startDelay = delay
+                    }
+                    .onEnded { _ in
+                        pressing = false
+                        startDelay?.invalidate(); startDelay = nil
+                        repeater?.invalidate(); repeater = nil
+                    }
+            )
+            .help("Hold to rapid-upgrade")
     }
 }
 
