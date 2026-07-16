@@ -205,9 +205,27 @@ enum EconomyEngine {
 
     // MARK: prestige
 
+    /// Stars per renovation are LOGARITHMIC in the run's lifetime coins, not
+    /// sqrt: the old sqrt formula was unbounded and at late-game scale one
+    /// renovation granted over a BILLION stars (run of ~1e24 -> sqrt(1e18)),
+    /// exploding the star bonus past every taper — the last remaining
+    /// "grows forever off pure money" loop. Now: 1 star at the 1M
+    /// threshold, +10 per order of magnitude beyond (10M -> 11, 1B -> 31,
+    /// 1e12 -> 61, 1e24 -> 181) — every longer run still clearly pays, but
+    /// on a human scale.
     static func prestigeStars(_ s: GameState) -> Int {
         guard s.lifetimeCoinsThisRun >= prestigeThreshold else { return 0 }
-        return Int(floor(sqrt(s.lifetimeCoinsThisRun / prestigeThreshold)))
+        return 1 + Int(floor(10 * log10(s.lifetimeCoinsThisRun / prestigeThreshold)))
+    }
+
+    /// Save repair for star counts minted by the old unbounded sqrt formula:
+    /// maps an absurd old count onto what the log formula would have granted
+    /// for the same run (oldStars ~ sqrt(run/1e6), so 20*log10(oldStars)
+    /// equals 10*log10(run/1e6)). Only touches saves beyond any humanly
+    /// reachable count under the new rules.
+    static func normalizedStars(_ stars: Int) -> Int {
+        guard stars > 1000 else { return stars }
+        return max(60, Int(20 * log10(Double(stars))))
     }
 
     static func canRenovate(_ s: GameState) -> Bool { prestigeStars(s) >= 1 }

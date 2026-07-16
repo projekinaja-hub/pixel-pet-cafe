@@ -146,6 +146,8 @@ struct GameState: Codable {
     /// Fills empty café list / stock / menus (new games and migrated saves).
     func normalized() -> GameState {
         var s = self
+        // repair star counts minted by the old unbounded sqrt prestige formula
+        s.stars = EconomyEngine.normalizedStars(s.stars)
         if s.cafes.isEmpty { s.cafes = [CafeState.fresh(city: "home")] }
         s.activeCafe = min(max(0, s.activeCafe), s.cafes.count - 1)
         for i in s.cafes.indices {

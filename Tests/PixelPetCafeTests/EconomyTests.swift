@@ -41,8 +41,11 @@ final class EconomyTests: XCTestCase {
 
     func testPrestigeStarsFormula() {
         var s = GameState.newGame()
+        // log formula: 1 + floor(10 * log10(run / threshold))
         s.lifetimeCoinsThisRun = EconomyEngine.prestigeThreshold * 9
-        XCTAssertEqual(EconomyEngine.prestigeStars(s), 3)
+        XCTAssertEqual(EconomyEngine.prestigeStars(s), 10)   // 1 + floor(9.54)
+        s.lifetimeCoinsThisRun = EconomyEngine.prestigeThreshold * 1e18
+        XCTAssertEqual(EconomyEngine.prestigeStars(s), 181, "even a 1e24 run stays on a human scale")
         s.lifetimeCoinsThisRun = EconomyEngine.prestigeThreshold - 1
         XCTAssertEqual(EconomyEngine.prestigeStars(s), 0)
         XCTAssertFalse(EconomyEngine.canRenovate(s))
@@ -63,7 +66,7 @@ final class EconomyTests: XCTestCase {
                                     category: .special, ingredients: ["honey": 2])
         s.customItems = [custom]
         EconomyEngine.renovate(&s)
-        XCTAssertEqual(s.stars, 2)
+        XCTAssertEqual(s.stars, 7)   // 1 + floor(10 * log10(4))
         XCTAssertEqual(s.coins, 0)
         XCTAssertEqual(s.staffLevels, ["mocha": 1])
         XCTAssertEqual(s.stock, GameState.starterStock)
@@ -86,5 +89,27 @@ final class EconomyTests: XCTestCase {
         XCTAssertEqual(formatNumber(7.5e12), "7.5T")
         XCTAssertEqual(formatNumber(3.4e15), "3.4Qa")
         XCTAssertEqual(formatNumber(2.25e18), "2.3Qi")
+    }
+}
+
+
+final class StarMigrationTests: XCTestCase {
+    func testSaneStarCountsAreUntouched() {
+        XCTAssertEqual(EconomyEngine.normalizedStars(0), 0)
+        XCTAssertEqual(EconomyEngine.normalizedStars(172), 172)
+        XCTAssertEqual(EconomyEngine.normalizedStars(1000), 1000)
+    }
+
+    func testAbsurdSqrtEraStarCountsCollapseToLogScale() {
+        // 1.43e9 stars (a real save) -> ~183, matching what the log prestige
+        // formula would have granted for the same lifetime run.
+        XCTAssertEqual(EconomyEngine.normalizedStars(1_434_965_406), 183)
+        XCTAssertGreaterThanOrEqual(EconomyEngine.normalizedStars(1_001), 60)
+    }
+
+    func testNormalizedRepairsStarsOnLoad() {
+        var s = GameState.newGame()
+        s.stars = 1_434_965_406
+        XCTAssertEqual(s.normalized().stars, 183)
     }
 }
