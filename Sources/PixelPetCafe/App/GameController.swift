@@ -192,8 +192,26 @@ final class GameController: ObservableObject {
     /// a stale `lastPlayedRealDate` even while the user actively checks in —
     /// re-running it here keeps the streak honest (same-day calls are a safe
     /// no-op) and stops the 19:00 reminder from firing at engaged players.
-    func refreshStreakOnInteraction() {
-        EconomyEngine.updateDailyStreak(&state)
+    func refreshStreakOnInteraction(now: Date = Date()) {
+        EconomyEngine.updateDailyStreak(&state, now: now)
+        grantDailyCheckInIfNeeded(now: now)
+    }
+
+    /// Daily check-in reward: the first popover open of each REAL calendar
+    /// day (not the compressed in-game calendar) grants ~15 minutes of
+    /// current income, floored at 500 coins so a fresh café still feels it.
+    static let checkInMinCoins = 500.0
+    static let checkInIncomeSeconds = 900.0
+    private func grantDailyCheckInIfNeeded(now: Date) {
+        if let last = state.lastCheckInDate, Calendar.current.isDate(last, inSameDayAs: now) { return }
+        state.lastCheckInDate = now
+        let amount = max(Self.checkInMinCoins, Self.checkInIncomeSeconds * SalesEngine.incomeEstimate(state))
+        state.coins += amount
+        state.lifetimeCoins += amount
+        state.lifetimeCoinsThisRun += amount
+        showBanner("🎁", "Daily check-in! +🪙 \(formatNumber(amount))")
+        soundRequest.send("goal_done")
+        celebrate.send()
     }
 
     @objc private func willSleep() { saveNow() }

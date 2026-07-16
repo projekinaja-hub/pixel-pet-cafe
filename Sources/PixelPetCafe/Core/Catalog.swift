@@ -13,7 +13,10 @@ struct EquipmentDef {
     let id: String
     let name: String
     let baseCost: Double
-    let multPerLevel: Double    // income ×(multPerLevel^level) — price/rate effect, unchanged
+    /// Legacy per-level income multiplier. ECONOMY V2 no longer reads this —
+    /// every equipment level grants a flat +6% (SalesEngine.
+    /// equipBenefitPerLevel) regardless of which piece of gear it's on.
+    let multPerLevel: Double
     /// Prep-time speed effect: divides prep time by (speedMultPerLevel^level)
     /// for every item in `speedCategories`. Defaults mean "no speed role" —
     /// existing equipment definitions that don't set these behave exactly as

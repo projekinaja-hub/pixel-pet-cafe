@@ -14,7 +14,9 @@ final class SupplierTierTests: XCTestCase {
         let baseCost = MenuCatalog.livePackCost("beans", units: 25, s)
         s.equipmentLevels["espresso"] = 20
         let upgradedCost = MenuCatalog.livePackCost("beans", units: 25, s)
-        XCTAssertGreaterThan(upgradedCost, baseCost * 3,
+        // Economy v2: equipMultiplier at 20 levels = 1 + 0.06×20 = 2.2, so
+        // the supplier tier is 2.2^0.9 ≈ 2.03× the base ingredient cost.
+        XCTAssertGreaterThan(upgradedCost, baseCost * 1.9,
                               "a level-20 kitchen should pay meaningfully premium ingredient prices")
     }
 

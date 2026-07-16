@@ -369,7 +369,7 @@ struct CafeTab: View {
                 subtitle: level > 0 ? "Lv \(level)/\(equipCap)" : "New · cap \(equipCap)",
                 detail: atCap ? "Maxed for this café — a fancier café raises the cap"
                     : repBlocked ? "Word needs to spread first — build reputation to keep upgrading"
-                    : String(format: "×%.2f prices & customers per level", def.multPerLevel) + speedNote,
+                    : "+6% prices & customers per level" + speedNote,
                 cost: cost,
                 affordable: controller.state.coins >= cost,
                 maxed: atCap || repBlocked,

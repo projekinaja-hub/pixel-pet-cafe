@@ -75,6 +75,11 @@ struct GameState: Codable {
     // compressed in-game calendar) — see GameController.updateDailyStreak.
     var dailyStreak: Int = 0
     var lastPlayedRealDate: Date?
+    // v12: real-calendar-day check-in reward (see GameController.
+    // refreshStreakOnInteraction) — the last real day the player opened the
+    // popover and collected the daily check-in coins. Like
+    // lastPlayedRealDate, it's a wall-clock anchor: excluded from Equatable.
+    var lastCheckInDate: Date?
     // v10: cosmetic, free, global (not per-café) staff recoloring — id ->
     // chosen body/clothes tint. Missing entries render with StaffPalette's
     // original defaults, so this is purely additive over existing art.
@@ -183,7 +188,7 @@ struct GameState: Codable {
         case casinoWagered, casinoWon, casinoBiggestWin, casinoJackpotPot
         case marketPrices, priceHistory, season, calendarStartedAt
         case worldsVisited
-        case activeGoals, goalsDay, dailyStreak, lastPlayedRealDate
+        case activeGoals, goalsDay, dailyStreak, lastPlayedRealDate, lastCheckInDate
         case staffColors, staffPaint
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
@@ -224,6 +229,7 @@ struct GameState: Codable {
         goalsDay = try c.decodeIfPresent(Int.self, forKey: .goalsDay) ?? -1
         dailyStreak = try c.decodeIfPresent(Int.self, forKey: .dailyStreak) ?? 0
         lastPlayedRealDate = try c.decodeIfPresent(Date.self, forKey: .lastPlayedRealDate)
+        lastCheckInDate = try c.decodeIfPresent(Date.self, forKey: .lastCheckInDate)
         staffColors = try c.decodeIfPresent([String: StaffColorPair].self, forKey: .staffColors) ?? [:]
         let decodedPaint = try c.decodeIfPresent([String: PixelArt].self, forKey: .staffPaint) ?? [:]
         staffPaint = decodedPaint.mapValues { $0.normalized }
@@ -282,6 +288,7 @@ struct GameState: Codable {
         try c.encode(goalsDay, forKey: .goalsDay)
         try c.encode(dailyStreak, forKey: .dailyStreak)
         try c.encodeIfPresent(lastPlayedRealDate, forKey: .lastPlayedRealDate)
+        try c.encodeIfPresent(lastCheckInDate, forKey: .lastCheckInDate)
         try c.encode(staffColors, forKey: .staffColors)
         try c.encode(staffPaint, forKey: .staffPaint)
     }

@@ -4,8 +4,11 @@ import Foundation
 /// customer-driven — see SalesEngine.
 enum EconomyEngine {
     static let prestigeThreshold: Double = 1_000_000
-    static let staffCostGrowth: Double = 1.18
-    static let equipmentCostGrowth: Double = 1.25
+    /// ECONOMY V2: gentler exponential cost curves. Benefits are now linear
+    /// (see SalesEngine.equipMultiplier/starBonus), and linear benefits can't
+    /// outrun the old steep exponentials — every late level became pure loss.
+    static let staffCostGrowth: Double = 1.14
+    static let equipmentCostGrowth: Double = 1.17
     static let baseOfflineCap: TimeInterval = 8 * 3600
     static let earlOfflineBonusPerLevel: TimeInterval = 3600
 
@@ -76,13 +79,11 @@ enum EconomyEngine {
         staffLevelCapBase + staffLevelCapStepPerCity * cityUnlockIndex(s)
     }
 
-    /// Equipment's own multiplier compounds *exponentially* per level
-    /// (equipMultiplier multiplies pow(multPerLevel, level) across every
-    /// piece of gear), unlike staff's roughly-linear bonuses — so without a
-    /// cap it runs away far harder and faster than staff levels ever could,
-    /// same underlying problem as uncapped staff (see EconomyEngine.
-    /// staffLevelCap), just worse. Same base/step as staff for one
-    /// consistent "how far can this café go" story per city.
+    /// Equipment benefit is linear per level (SalesEngine.equipMultiplier,
+    /// +6%/level summed across gear), and these caps are what BOUND it: the
+    /// per-city ceiling is the upper end of the whole benefit curve, so a
+    /// fancier city is genuinely more headroom. Same base/step as staff for
+    /// one consistent "how far can this café go" story per city.
     static let equipmentLevelCapBase = 25
     static let equipmentLevelCapStepPerCity = 10
     static func equipmentLevelCap(_ s: GameState) -> Int {

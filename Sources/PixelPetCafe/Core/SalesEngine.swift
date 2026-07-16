@@ -34,7 +34,7 @@ struct SeededGenerator: RandomNumberGenerator {
 
 /// Customer-driven income simulation. Pure functions over GameState.
 enum SalesEngine {
-    static let baseRate = 0.05                 // customers/sec floor
+    static let baseRate = 0.08                 // customers/sec floor
     static let dirtPerSale = 0.4
     static let closedAfter: TimeInterval = 300 // unservable this long => closed
     /// customer species index -> preferred category (2x pick weight)
@@ -42,24 +42,16 @@ enum SalesEngine {
 
     // MARK: rates
 
-    /// Full per-level growth for the first `tieredBonusSoftCap` (25) levels,
-    /// then each further level only contributes 35% of its usual boost —
-    /// same soft-cap philosophy as staff's tieredBonus. Uncapped exponential
-    /// compounding meant one late-game upgrade could visibly double income
-    /// ("sometimes becomes too big"): at level 60+ each raw 1.10 step is a
-    /// bigger absolute jump than the whole early game combined. Tapered
-    /// growth keeps every upgrade worthwhile but smooth.
+    /// ECONOMY V2: strictly LINEAR equipment benefit — +6% to prices and
+    /// customer flow per equipment level, summed across every piece of gear
+    /// in the café. Bounded by the per-city level caps (25 at home up to 135
+    /// on the Moon per item), so at the home cap (125 total levels) this is
+    /// ×8.5 and at the moon cap (675 levels) ×41.5. Progression between
+    /// scales comes from unlocking CITIES, not from any one stat compounding.
+    static let equipBenefitPerLevel = 0.06
     static func equipMultiplier(_ s: GameState) -> Double {
-        var mult = 1.0
-        for def in Catalog.equipment {
-            let level = s.equipmentLevels[def.id] ?? 0
-            guard level > 0 else { continue }
-            let full = min(level, tieredBonusSoftCap)
-            let tapered = max(0, level - tieredBonusSoftCap)
-            let taperedPerLevel = 1 + (def.multPerLevel - 1) * 0.35
-            mult *= pow(def.multPerLevel, Double(full)) * pow(taperedPerLevel, Double(tapered))
-        }
-        return mult
+        let totalLevels = Catalog.equipment.reduce(0) { $0 + (s.equipmentLevels[$1.id] ?? 0) }
+        return 1 + equipBenefitPerLevel * Double(totalLevels)
     }
 
     /// Fast growth for the first `softCap` levels, then much slower (but
@@ -77,20 +69,14 @@ enum SalesEngine {
         return perLevel * Double(capped) + tieredBonusPerLevelAfterCap * Double(extra)
     }
 
-    /// Stars come from sqrt(lifetimeCoinsThisRun) — pure "the more money you
-    /// already have, the more you get," compounding on BOTH price and
-    /// customer rate at once with no ceiling (172 stars = 18.2x on each,
-    /// ~331x combined, still growing). Tapered like equipment: full
-    /// 10%/star for the first 25 stars, then 35% of that rate — a prestige
-    /// run still matters a lot, but stops being an unbounded snowball
-    /// detached from actual play.
-    static let starBonusSoftCap = 25
-    static let starBonusPerLevel = 0.10
-    static let starBonusTaperFactor = 0.35
+    /// ECONOMY V2: flat +5% per star on both prices and customer rate. Stars
+    /// are already bounded (~200 for even absurd runs) by the LOGARITHMIC
+    /// prestige formula (EconomyEngine.prestigeStars), so this tops out
+    /// around ×11 with no taper needed — linear benefit on a log-bounded
+    /// input can't snowball.
+    static let starBonusPerLevel = 0.05
     static func starBonus(_ s: GameState) -> Double {
-        let full = min(s.stars, starBonusSoftCap)
-        let extra = max(0, s.stars - starBonusSoftCap)
-        return starBonusPerLevel * Double(full) + starBonusPerLevel * starBonusTaperFactor * Double(extra)
+        starBonusPerLevel * Double(s.stars)
     }
 
     static func priceMultiplier(_ s: GameState) -> Double {
@@ -314,6 +300,15 @@ enum SalesEngine {
     /// Delivery platform fee — a distinct, slightly-discounted revenue line.
     static let deliveryFeeRetained = 0.85
 
+    /// ECONOMY V2: delivery gets its OWN capacity slice — 35% of the tick's
+    /// kitchen capacity, computed independently rather than from walk-ins'
+    /// leftover slots. Under the old leftover rule, any café whose walk-in
+    /// demand exceeded capacity had literally zero slots left over, so
+    /// delivery never filled a single order — precisely the late-game state
+    /// delivery is meant for. Walk-ins still get the FULL original capacity
+    /// (an intentional kitchen overcommit).
+    static let deliveryCapacityShare = 0.35
+
     static func hasStockOut(_ s: GameState) -> Bool {
         let all = MenuCatalog.resolve(s)
         guard !all.isEmpty else { return false }
@@ -432,7 +427,6 @@ enum SalesEngine {
             ? max(1.0, capacityPerSec(s) * boost * dt + s.cafe.serviceBuffer)
             : Double.infinity
         var slotsLeft = capacityThisTick
-        var servedThisTick = 0.0
         let hardStop = 2000.0   // bulk past this instead of looping per-customer
         var loops = 0.0
         var capacityBlocked = 0.0
@@ -457,7 +451,6 @@ enum SalesEngine {
                 continue
             }
             slotsLeft -= 1
-            servedThisTick += 1
             events.append(serveCustomer(&s, now: now, rng: &rng))
             if events.count >= 20 { s.customerProgress = 0; break }  // sanity cap per tick
         }
@@ -478,13 +471,15 @@ enum SalesEngine {
         }
         s.cafe.serviceBuffer = slotsLeft.isFinite ? max(0.0, min(1.0, slotsLeft)) : 0
 
-        // Delivery: reuses this tick's already-computed capacity/serve
-        // numbers via leftover-capacity subtraction — no separate demand
-        // pool, no second dt-scaling surface.
+        // Delivery: fills against its own dedicated capacity slice (35% of
+        // this tick's kitchen capacity) — NOT walk-ins' leftovers, which are
+        // zero exactly when delivery matters most. See deliveryCapacityShare.
         if s.deliveryUnlocked {
-            let leftoverCapacity = capacityThisTick.isFinite ? max(0, capacityThisTick - servedThisTick) : 0
+            let deliveryCapacity = capacityThisTick.isFinite
+                ? deliveryCapacityShare * capacityThisTick
+                : 0
             let demandThisTick = deliveryDemand(s) * dt
-            let filled = min(demandThisTick, leftoverCapacity)
+            let filled = min(demandThisTick, deliveryCapacity)
             let missed = max(0, demandThisTick - filled)
             if filled > 0 {
                 let items = servable(s)
