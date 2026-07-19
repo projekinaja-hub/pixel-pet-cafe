@@ -1052,7 +1052,10 @@ ACCESSORIES = {"bow": acc_bow, "cap": acc_cap, "glasses": acc_glasses, "scarf": 
 # ---------------------------------------------------------------- v2: face icons (18x18, 5 frames)
 
 def face_icon(species, fur, fur_d, frame):
-    """frames: 0 normal, 1 blink, 2 happy, 3 sleep, 4 sip"""
+    """frames: 0 normal, 1 blink, 2 happy, 3 sleep, 4 sip, 5/6 brewing
+    (5 and 6 alternate as a 2-frame 'making coffee' cycle: cup up with
+    steam that wiggles between frames — shown while the player is
+    actively typing, so the menu bar buddy visibly works the machine)"""
     c = Canvas(18, 18)
     # ears by species
     if species in ("cat", "fox"):
@@ -1122,6 +1125,24 @@ def face_icon(species, fur, fur_d, frame):
         c.vline(5, 12, 5, INK); c.vline(12, 12, 5, INK)
         c.hline(6, 17, 6, INK)
         c.set(13, 13, INK); c.set(14, 14, INK); c.set(13, 15, INK)
+    elif frame in (5, 6):                             # brewing cycle
+        # cup held up with crema + handle (like sip)...
+        c.rect(6, 13, 6, 4, (206, 106, 76, 255))
+        c.hline(6, 12, 6, WHITE)
+        c.vline(5, 12, 5, INK); c.vline(12, 12, 5, INK)
+        c.hline(6, 17, 6, INK)
+        c.set(13, 13, INK); c.set(14, 14, INK); c.set(13, 15, INK)
+        # ...plus rising steam that wiggles between the two frames
+        steam = (235, 235, 240, 225)
+        faint = (235, 235, 240, 150)
+        if frame == 5:
+            c.set(7, 11, steam); c.set(8, 10, steam); c.set(7, 9, faint)
+            c.set(10, 11, faint); c.set(11, 10, steam)
+        else:
+            c.set(8, 11, steam); c.set(7, 10, steam); c.set(8, 9, faint)
+            c.set(11, 11, steam); c.set(10, 10, faint); c.set(11, 9, faint)
+        # focused open eyes stay (default), tiny effort blush
+        c.set(4, 11, (240, 150, 150, 140)); c.set(13, 11, (240, 150, 150, 140))
     elif frame == 2:
         c.set(7, 12, INK); c.set(8, 13, INK); c.set(9, 13, INK); c.set(10, 12, INK)
         c.set(4, 11, (240, 150, 150, 200)); c.set(13, 11, (240, 150, 150, 200))  # blush
@@ -1333,10 +1354,10 @@ def main_v2():
             f0.save(f"owner_{sp}_{pal}_0.png"); f0.shifted_down().save(f"owner_{sp}_{pal}_1.png")
             count += 2
             fur, fur_d = PALETTES[pal]
-            for f in range(5):
+            for f in range(7):
                 face_icon(sp, fur, fur_d, f).save(f"bar_{sp}_{pal}_{f}.png"); count += 1
     for sid, args in STAFF.items():
-        for f in range(5):
+        for f in range(7):
             face_icon(STAFF_SPECIES[sid], args[0], args[1], f).save(f"barstaff_{sid}_{f}.png"); count += 1
     for aid, fn in ACCESSORIES.items():
         fn().save(f"acc_{aid}.png"); count += 1

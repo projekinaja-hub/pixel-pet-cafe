@@ -223,7 +223,7 @@ final class StatusItemController: NSObject {
             icons = []
         } else {
             cupIcons = []
-            icons = (0..<5).compactMap { f in loadIcon("\(prefix)_\(f)") }
+            icons = (0..<7).compactMap { f in loadIcon("\(prefix)_\(f)") }
         }
         refreshIcon()
     }
@@ -242,8 +242,19 @@ final class StatusItemController: NSObject {
             }
             return
         }
+        guard icons.count == 7 else { return }
+        // Actively typing: the buddy visibly WORKS — a fast 2-frame
+        // brewing cycle (cup + wiggling steam) instead of idling. This is
+        // the face of the typing-energy loop in the menu bar.
+        let typing = controller.keystrokesPerSec >= 1.0
+            && !SalesEngine.isClosed(controller.state)
+            && Date() >= happyUntil
+        if typing {
+            if iconInterval != 0.5 { restartIconTimer(interval: 0.5) }
+            statusItem.button?.image = icons[5 + iconTick % 2]
+            return
+        }
         if iconInterval != 2.0 { restartIconTimer(interval: 2.0) }
-        guard icons.count == 5 else { return }
         let frame: Int
         if Date() < happyUntil {
             frame = 2                                  // happy bounce after a tip
