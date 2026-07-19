@@ -58,6 +58,7 @@ struct DashboardOverlay: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 6) {
                         overallBanner
+                        moneyRow
                         streakRow
                         reputationRow
                         cleanlinessRow
@@ -174,6 +175,19 @@ struct DashboardOverlay: View {
         return DashboardRow(
             icon: seasonEmoji, title: "Season — \(s.season.rawValue.capitalized)",
             value: "", color: Theme.dim, detail: detail
+        )
+    }
+
+    /// Profit & loss at a glance: the header already shows NET income; this
+    /// row breaks out where the rest goes so the money flow is legible.
+    private var moneyRow: some View {
+        let share = EconomyEngine.wageShare(s)
+        let net = SalesEngine.incomeEstimate(s)
+        let gross = share < 1 ? net / (1 - share) : net
+        return DashboardRow(
+            icon: "💰", title: "Money flow",
+            value: "+\(formatNumber(net))/s net", color: Theme.dealGreen,
+            detail: "Gross \(formatNumber(gross))/s − wages \(formatNumber(gross - net))/s (\(Int((share * 100).rounded()))%) · ingredients & restocking billed as bought"
         )
     }
 
