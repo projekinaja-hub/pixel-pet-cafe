@@ -281,12 +281,16 @@ final class V3Tests: XCTestCase {
         XCTAssertGreaterThan(SalesEngine.customerRate(s), base)
         s.reputation = 0
         XCTAssertLessThan(SalesEngine.customerRate(s), base)
-        // angry customer drops reputation
+        // angry customer drops reputation — café unservable but still
+        // inside the open grace window (a CLOSED café gets no arrivals
+        // at all, and its rep drifts toward closedReputationFloor instead)
         s.stock = [:]
+        s.lastSaleAt = Date()
+        s.reputation = 50
         s.customerProgress = 1
         var rng = SeededGenerator(seed: 3)
         _ = SalesEngine.tick(&s, dt: 0.01, rng: &rng)
-        XCTAssertEqual(s.reputation, 0)      // was 0, floored
+        XCTAssertLessThan(s.reputation, 50)
     }
 
     func testAdsDrainCoinsAndAutoStop() {

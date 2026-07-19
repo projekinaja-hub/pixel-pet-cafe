@@ -37,6 +37,8 @@ enum SalesEngine {
     static let baseRate = 0.08                 // customers/sec floor
     static let dirtPerSale = 0.4
     static let closedAfter: TimeInterval = 300 // unservable this long => closed
+    /// Fame floor while closed — a shuttered café is forgotten, not hated.
+    static let closedReputationFloor = 25.0
     /// customer species index -> preferred category (2x pick weight)
     static let preferences: [ItemCategory] = [.drink, .special, .pastry]
 
@@ -403,7 +405,16 @@ enum SalesEngine {
         managerRestock(&s)
         janitorClean(&s, dt: dt)
         if isClosed(s, now: now) {
-            s.reputation = max(0, s.reputation - 0.01 * dt)
+            // A closed café loses fame slowly — but floored, and nobody
+            // walks into a closed café, so no arrivals and no angry dings.
+            // Previously customers kept "arriving" at an unservable café and
+            // each one dinged reputation −2, grinding a new player's rep to
+            // 0 within an unattended hour of starter stock running out — a
+            // trap: with rep 0, recovery after restocking was glacial. The
+            // floor (25) keeps a comeback story: restock and rebuild.
+            s.reputation = max(closedReputationFloor, s.reputation - 0.01 * dt)
+            s.customerProgress = 0
+            return []
         }
         s.customerProgress += customerRate(s) * boost * dt
         var events: [SaleEvent] = []

@@ -153,6 +153,10 @@ struct GameState: Codable {
         var s = self
         // repair star counts minted by the old unbounded sqrt prestige formula
         s.stars = EconomyEngine.normalizedStars(s.stars)
+        // load-time mercy for saves caught by the old closed-café reputation
+        // grind (arrivals used to ding a closed café to 0): rep below the
+        // closed floor can only have come from that trap.
+        s.reputation = max(s.reputation, SalesEngine.closedReputationFloor)
         if s.cafes.isEmpty { s.cafes = [CafeState.fresh(city: "home")] }
         s.activeCafe = min(max(0, s.activeCafe), s.cafes.count - 1)
         for i in s.cafes.indices {

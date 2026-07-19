@@ -41,6 +41,7 @@ final class SalesTests: XCTestCase {
     func testNoStockMeansAngryCustomersAndNoIncome() {
         var s = GameState.newGame()
         s.stock = [:]
+        s.lastSaleAt = Date()   // unservable but within the open grace window
         s.customerProgress = 2.5
         var rng = SeededGenerator(seed: 1)
         let coinsBefore = s.coins
