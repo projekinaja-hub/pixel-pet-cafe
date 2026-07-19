@@ -639,10 +639,10 @@ struct StyleTab: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("⚡ Work Mode")
+                    Text("⚡ Typing Energy")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.cream)
-                    Text("Typing anywhere on your Mac boosts customers up to ×2.5.\nCounts keystrokes only — never reads what you type.")
+                    Text("Your real typing anywhere on your Mac fuels the café.\nCounts keystrokes only — never reads what you type.")
                         .font(.system(size: 9, design: .rounded))
                         .foregroundColor(Theme.dim)
                 }

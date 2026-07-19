@@ -210,6 +210,8 @@ struct CafeTab: View {
 
         MomentumCard(controller: controller)
 
+        EnergyCard(controller: controller)
+
         // locations
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -653,6 +655,81 @@ struct RenovateTab: View {
     }
 }
 
+
+/// TYPING ENERGY tank: the fuel gauge for the core loop — real keystrokes
+/// (counted, never read) fill it, the café burns it constantly, and an empty
+/// tank drops everything to a crawl. Also hosts the two energy-spend actions.
+struct EnergyCard: View {
+    @ObservedObject var controller: GameController
+
+    var body: some View {
+        let energy = controller.state.energy
+        let frac = min(1, max(0, energy / EnergyEngine.energyCap))
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text("⚡ Typing Energy")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(Theme.cream)
+                Spacer()
+                Text("\(formatNumber(energy)) / \(formatNumber(EnergyEngine.energyCap))")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundColor(energy <= 0 ? Theme.danger : Theme.gold)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Theme.bg)
+                    Capsule().fill(energy <= 0 ? Theme.danger : Theme.gold)
+                        .frame(width: max(3, geo.size.width * frac))
+                }
+            }
+            .frame(height: 6)
+            Text("burns 0.5⚡/s · empty tank = café crawls at 25%")
+                .font(.system(size: 9, design: .rounded))
+                .foregroundColor(Theme.dim)
+            HStack(spacing: 6) {
+                EnergyButton(label: "⚡1000 Rush 5min",
+                             affordable: energy >= EnergyEngine.rushCost
+                                && controller.state.activeEvent == nil) {
+                    controller.spendEnergyOnRush()
+                }
+                EnergyButton(label: "⚡2000 Restock",
+                             affordable: energy >= EnergyEngine.restockCost) {
+                    controller.spendEnergyOnRestock()
+                }
+            }
+            Text("today: \(formatNumber(controller.keystrokesToday)) keys · lifetime: \(formatNumber(controller.state.lifetimeKeystrokes))")
+                .font(.system(size: 9, design: .rounded))
+                .foregroundColor(Theme.dim)
+        }
+        .padding(9)
+        .background(Theme.card)
+        .cornerRadius(9)
+    }
+}
+
+/// CostButton's look for energy-priced actions — cost is ⚡ not 🪙, and there
+/// is no hold-to-repeat (both spends are one-shot), so a plain Button does.
+struct EnergyButton: View {
+    let label: String
+    let affordable: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundColor(affordable ? Theme.bg : Theme.dim)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(affordable ? Theme.gold : Theme.card.opacity(0.6))
+                .cornerRadius(7)
+                .contentShape(Rectangle())
+                .opacity(affordable ? 1 : 0.6)
+        }
+        .buttonStyle(.plain)
+        .disabled(!affordable)
+    }
+}
 
 /// Live income momentum: a ~2 minute sparkline of net income/s with the
 /// percent change vs a minute ago — makes rising/falling fortunes visible

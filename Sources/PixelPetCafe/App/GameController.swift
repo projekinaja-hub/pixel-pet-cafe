@@ -30,14 +30,19 @@ final class GameController: ObservableObject {
     // Not persisted: only used to notice a holiday *starting* while running.
     private var lastHolidayName: String?
 
-    // work mode: count (never read) keystrokes to measure typing activity
+    // typing energy: count (never read) keystrokes to fuel the café
     private var keyMonitor: Any?
     private var localKeyMonitor: Any?
     private var keystrokes: [Date] = []
+    private var keystrokesSinceLastTick = 0
     @Published private(set) var workBoost: Double = 1
     @Published private(set) var axTrusted: Bool = AXIsProcessTrusted()
     @Published private(set) var lastKeystrokeAt: Date?
     @Published private(set) var keystrokesPerSec: Double = 0
+    // in-memory "keys typed today" stat for the EnergyCard; resets on real
+    // (wall-clock) day change, never persisted.
+    @Published private(set) var keystrokesToday: Double = 0
+    private var keystrokesTodayDate = Calendar.current.startOfDay(for: Date())
     @Published var banner: (emoji: String, text: String)?
     let soundRequest = PassthroughSubject<String, Never>()
     private var bannerClearAt = Date.distantPast
@@ -95,7 +100,7 @@ final class GameController: ObservableObject {
         let now = Date()
         let dt = min(max(0, now.timeIntervalSince(lastTick)), 5)
         lastTick = now
-        updateWorkBoost(now: now)
+        updateWorkBoost(now: now, dt: dt)
         if let event = Events.maybeSpawn(&state, dt: dt, now: now, rng: &rng) {
             var text = "\(event.name) — \(event.desc)"
             if event.id == "critic", let verdict = state.lastCriticVerdict {
@@ -246,17 +251,25 @@ final class GameController: ObservableObject {
     private func recordKeystroke() {
         keystrokes.append(Date())
         lastKeystrokeAt = Date()
+        keystrokesSinceLastTick += 1
     }
 
     private func stopKeyMonitor() {
         if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
         if let m = localKeyMonitor { NSEvent.removeMonitor(m); localKeyMonitor = nil }
         keystrokes = []
-        workBoost = 1
+        keystrokesSinceLastTick = 0
+        // the tank keeps ruling the café even with the monitor off
+        workBoost = EnergyEngine.speedFactor(energy: state.energy, kps: 0)
         keystrokesPerSec = 0
     }
 
-    private func updateWorkBoost(now: Date) {
+    /// TYPING ENERGY tick: bank the keystrokes typed since the last tick into
+    /// the tank, burn the constant running cost, and derive the café-wide
+    /// speed factor (still published as `workBoost` — header/scene/status-item
+    /// wiring all read that name). With the monitor off or no Accessibility
+    /// trust there's no gain, but the burn and the empty-tank crawl still apply.
+    private func updateWorkBoost(now: Date, dt: TimeInterval) {
         // trust can be granted while running — pick it up and (re)attach.
         // Monitors created BEFORE the grant are dead: always rebuild on change.
         let trusted = AXIsProcessTrusted()
@@ -264,22 +277,53 @@ final class GameController: ObservableObject {
             axTrusted = trusted
             if state.workMode, trusted {
                 stopKeyMonitor()
-                state.workMode = true      // stopKeyMonitor is state-agnostic; keep mode
                 startKeyMonitor()
             }
         }
         if state.workMode, trusted, keyMonitor == nil {
             startKeyMonitor()
         }
-        guard state.workMode, keyMonitor != nil else {
-            if workBoost != 1 { workBoost = 1 }
-            return
+
+        // real-day rollover for the in-memory "today" stat
+        let today = Calendar.current.startOfDay(for: now)
+        if today != keystrokesTodayDate {
+            keystrokesTodayDate = today
+            keystrokesToday = 0
         }
-        keystrokes.removeAll { now.timeIntervalSince($0) > 10 }
-        let kps = Double(keystrokes.count) / 10
-        keystrokesPerSec = kps
-        let boost = 1 + 1.5 * min(1, kps / 6)     // 6 keys/sec sustained = ×2.5
-        if abs(boost - workBoost) > 0.01 { workBoost = boost }
+
+        let typed = Double(keystrokesSinceLastTick)
+        keystrokesSinceLastTick = 0
+        if state.workMode, trusted, keyMonitor != nil, typed > 0 {
+            state.energy = min(EnergyEngine.energyCap,
+                               state.energy + typed * EnergyEngine.energyPerKeystroke)
+            state.lifetimeKeystrokes += typed
+            keystrokesToday += typed
+        }
+        state.energy = max(0, state.energy - EnergyEngine.burnPerSec * dt)
+
+        if state.workMode, keyMonitor != nil {
+            keystrokes.removeAll { now.timeIntervalSince($0) > 10 }
+            keystrokesPerSec = Double(keystrokes.count) / 10
+        } else if keystrokesPerSec != 0 {
+            keystrokesPerSec = 0
+        }
+        let factor = EnergyEngine.speedFactor(energy: state.energy, kps: keystrokesPerSec)
+        if abs(factor - workBoost) > 0.001 { workBoost = factor }
+    }
+
+    // MARK: energy spend actions (pure logic lives in EnergyEngine)
+
+    func spendEnergyOnRush() {
+        guard EnergyEngine.applyRush(&state, now: Date()) else { return }
+        showBanner("⚡", "Typing Rush! ×2 customers for 5 min")
+        soundRequest.send("event")
+        celebrate.send()
+    }
+
+    func spendEnergyOnRestock() {
+        guard EnergyEngine.applyRestock(&state) else { return }
+        showBanner("⚡", "Instant restock!")
+        soundRequest.send("buy")
     }
 
     func toggleWorkMode() {

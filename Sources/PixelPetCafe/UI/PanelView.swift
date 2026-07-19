@@ -220,6 +220,11 @@ struct PanelView: View {
                     .help("Reputation — happy sales build it, angry customers wreck it")
                 Text("🧽 \(Int(controller.state.cleanliness))%")
                     .foregroundColor(controller.state.cleanliness < 40 ? Theme.danger : Theme.dim)
+                let energyFrac = controller.state.energy / EnergyEngine.energyCap
+                Text("⚡ \(Int(energyFrac * 100))%")
+                    .foregroundColor(controller.state.energy <= 0 ? Theme.danger :
+                                        (energyFrac > 0.25 ? Theme.gold : Theme.dim))
+                    .help("Typing fills the tank; the café burns it to run at full speed")
                 if controller.state.stars > 0 {
                     Text("⭐ \(controller.state.stars)")
                         .foregroundColor(Theme.cream)

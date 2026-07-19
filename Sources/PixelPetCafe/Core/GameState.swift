@@ -89,6 +89,11 @@ struct GameState: Codable {
     // tint) entirely for that staff member. Missing entries fall back to
     // staffColors/StaffPalette exactly as before this existed.
     var staffPaint: [String: PixelArt] = [:]
+    // v13: TYPING ENERGY — real keystrokes (counted, never read) fuel the
+    // café (see EnergyEngine). Starts at half tank so a brand-new player
+    // isn't instantly crawling before they've typed anything.
+    var energy: Double = 3000
+    var lifetimeKeystrokes: Double = 0
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -145,6 +150,10 @@ struct GameState: Codable {
     static func newGame() -> GameState {
         var s = GameState()
         s.cafes = [CafeState.fresh(city: "home")]
+        // v13: typing energy is the core loop, not a mode — new games start
+        // with the key monitor on (workMode stays as the user's opt-out
+        // toggle; existing saves keep whatever they chose).
+        s.workMode = true
         return s.normalized()
     }
 
@@ -194,6 +203,7 @@ struct GameState: Codable {
         case worldsVisited
         case activeGoals, goalsDay, dailyStreak, lastPlayedRealDate, lastCheckInDate
         case staffColors, staffPaint
+        case energy, lifetimeKeystrokes
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -237,6 +247,8 @@ struct GameState: Codable {
         staffColors = try c.decodeIfPresent([String: StaffColorPair].self, forKey: .staffColors) ?? [:]
         let decodedPaint = try c.decodeIfPresent([String: PixelArt].self, forKey: .staffPaint) ?? [:]
         staffPaint = decodedPaint.mapValues { $0.normalized }
+        energy = try c.decodeIfPresent(Double.self, forKey: .energy) ?? 3000
+        lifetimeKeystrokes = try c.decodeIfPresent(Double.self, forKey: .lifetimeKeystrokes) ?? 0
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
             cafes = decoded
@@ -295,6 +307,8 @@ struct GameState: Codable {
         try c.encodeIfPresent(lastCheckInDate, forKey: .lastCheckInDate)
         try c.encode(staffColors, forKey: .staffColors)
         try c.encode(staffPaint, forKey: .staffPaint)
+        try c.encode(energy, forKey: .energy)
+        try c.encode(lifetimeKeystrokes, forKey: .lifetimeKeystrokes)
     }
 }
 
@@ -339,5 +353,7 @@ extension GameState: Equatable {
             && lhs.dailyStreak == rhs.dailyStreak
             && lhs.staffColors == rhs.staffColors
             && lhs.staffPaint == rhs.staffPaint
+            && lhs.energy == rhs.energy
+            && lhs.lifetimeKeystrokes == rhs.lifetimeKeystrokes
     }
 }
