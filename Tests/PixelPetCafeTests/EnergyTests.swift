@@ -141,3 +141,21 @@ final class EnergyTests: XCTestCase {
         XCTAssertTrue(s.workMode)   // energy is the core loop — on by default
     }
 }
+
+final class EnergyMigrationTests: XCTestCase {
+    func testPrePivotSaveGetsTypingEnabledOnLoad() throws {
+        let json = """
+        {"coins": 100, "workMode": false, "cafes": [{"city": "home"}]}
+        """
+        let s = try JSONDecoder().decode(GameState.self, from: Data(json.utf8)).normalized()
+        XCTAssertTrue(s.workMode, "a save that never typed can't have opted out — energy is the core loop")
+    }
+
+    func testExplicitOptOutAfterTypingIsRespected() throws {
+        let json = """
+        {"coins": 100, "workMode": false, "lifetimeKeystrokes": 5000, "cafes": [{"city": "home"}]}
+        """
+        let s = try JSONDecoder().decode(GameState.self, from: Data(json.utf8)).normalized()
+        XCTAssertFalse(s.workMode, "a player who typed and then turned it off keeps their choice")
+    }
+}

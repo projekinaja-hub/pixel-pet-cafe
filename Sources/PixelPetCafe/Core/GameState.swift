@@ -162,6 +162,13 @@ struct GameState: Codable {
         var s = self
         // repair star counts minted by the old unbounded sqrt prestige formula
         s.stars = EconomyEngine.normalizedStars(s.stars)
+        // Typing-energy migration: saves created before the pivot have the
+        // old opt-in workMode=false default, which silently disables the
+        // now-CORE loop (no energy gain while the tank still burns). A save
+        // that has never typed a single counted key can't have opted out —
+        // enable it. Anyone who later flips the toggle off has
+        // lifetimeKeystrokes > 0 and is never touched again.
+        if s.lifetimeKeystrokes == 0, !s.workMode { s.workMode = true }
         // load-time mercy for saves caught by the old closed-café reputation
         // grind (arrivals used to ding a closed café to 0): rep below the
         // closed floor can only have come from that trap.
