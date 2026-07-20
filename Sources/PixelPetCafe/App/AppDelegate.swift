@@ -8,6 +8,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var snapshotWindow: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // dev hook: PPC_AXCHECK=1 prints whether macOS considers this binary
+        // Accessibility-trusted (the thing global key counting hinges on).
+        if ProcessInfo.processInfo.environment["PPC_AXCHECK"] == "1" {
+            print("AXTRUSTED=\(AXIsProcessTrusted())")
+            exit(0)
+        }
         game = GameController(persistence: Persistence())
         game.start()
         statusController = StatusItemController(controller: game)
