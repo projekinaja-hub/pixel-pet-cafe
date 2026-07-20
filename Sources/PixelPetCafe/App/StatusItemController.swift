@@ -246,12 +246,17 @@ final class StatusItemController: NSObject {
         // Actively typing: the buddy visibly WORKS — a fast 2-frame
         // brewing cycle (cup + wiggling steam) instead of idling. This is
         // the face of the typing-energy loop in the menu bar.
-        let typing = controller.keystrokesPerSec >= 1.0
-            && !SalesEngine.isClosed(controller.state)
-            && Date() >= happyUntil
-        if typing {
-            if iconInterval != 0.5 { restartIconTimer(interval: 0.5) }
-            statusItem.button?.image = icons[5 + iconTick % 2]
+        // Brew speed scales with real typing speed (WPM tiers), so the menu
+        // bar visibly works harder the faster you type — at high speed the
+        // buddy alternates brew frames rapidly with happy flashes.
+        let wpm = controller.wpm
+        if wpm >= 12, !SalesEngine.isClosed(controller.state), Date() >= happyUntil {
+            let interval: TimeInterval = wpm >= 50 ? 0.18 : (wpm >= 30 ? 0.3 : 0.55)
+            if iconInterval != interval { restartIconTimer(interval: interval) }
+            // top tier: every 4th flip flashes the happy face — reads as
+            // gleeful frantic brewing rather than a subtle 2-frame shuffle
+            let frame = (wpm >= 50 && iconTick % 4 == 3) ? 2 : 5 + iconTick % 2
+            statusItem.button?.image = icons[frame]
             return
         }
         if iconInterval != 2.0 { restartIconTimer(interval: 2.0) }

@@ -39,6 +39,8 @@ final class GameController: ObservableObject {
     @Published private(set) var axTrusted: Bool = AXIsProcessTrusted()
     @Published private(set) var lastKeystrokeAt: Date?
     @Published private(set) var keystrokesPerSec: Double = 0
+    /// Standard typing speed: words-per-minute at 5 chars/word.
+    var wpm: Double { keystrokesPerSec * 12 }
     // in-memory "keys typed today" stat for the EnergyCard; resets on real
     // (wall-clock) day change, never persisted.
     @Published private(set) var keystrokesToday: Double = 0

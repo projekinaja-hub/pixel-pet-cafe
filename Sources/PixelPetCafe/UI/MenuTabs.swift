@@ -662,7 +662,7 @@ struct StyleTab: View {
                             .foregroundColor(Color(red: 0.55, green: 0.85, blue: 0.55))
                         // live proof: raw keystrokes/sec, no trust required
                         HStack(spacing: 6) {
-                            Text("⌨️ \(String(format: "%.1f", controller.keystrokesPerSec)) keys/sec")
+                            Text("⌨️ \(Int(controller.wpm.rounded())) WPM")
                                 .font(.system(size: 9, weight: .bold, design: .rounded))
                                 .foregroundColor(Theme.cream)
                             if let last = controller.lastKeystrokeAt {
@@ -696,7 +696,7 @@ struct StyleTab: View {
                     // regardless of the permission, so typing in the café-name
                     // field must always move this — if it does, the pipeline
                     // works and only the global permission is missing.
-                    Text("⌨️ \(String(format: "%.1f", controller.keystrokesPerSec)) keys/sec (type in the café name field to test)")
+                    Text("⌨️ \(Int(controller.wpm.rounded())) WPM (type in the café name field to test)")
                         .font(.system(size: 9, weight: .bold, design: .rounded))
                         .foregroundColor(Theme.cream)
                     Text("System Settings → Privacy & Security → Accessibility → enable Pixel Pet Café.\nAfter the game updates, macOS may require re-enabling it (toggle off & on).")
