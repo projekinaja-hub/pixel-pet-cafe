@@ -91,7 +91,19 @@ final class GameController: ObservableObject {
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
-        if state.workMode { startKeyMonitor() }
+        if state.workMode {
+            startKeyMonitor()
+            // Typing is the core loop now: if macOS doesn't trust this
+            // binary (fresh grant, or a stale one from an older build),
+            // summon the REAL permission dialog once at launch — it
+            // registers the current binary in the Accessibility list so
+            // the player just flips one switch instead of hunting for
+            // the app with the + button. macOS ignores repeat prompts.
+            if !AXIsProcessTrusted() {
+                let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+                _ = AXIsProcessTrustedWithOptions(opts)
+            }
+        }
 
         let wc = NSWorkspace.shared.notificationCenter
         wc.addObserver(self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil)
