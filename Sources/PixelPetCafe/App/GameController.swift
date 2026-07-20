@@ -236,15 +236,25 @@ final class GameController: ObservableObject {
     // MARK: work mode (typing boost)
 
     private func startKeyMonitor() {
-        guard keyMonitor == nil else { return }
-        // Global monitors only deliver events with Accessibility permission.
-        // We count key-down events; key content is never inspected or stored.
-        keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] _ in
-            Task { @MainActor in self?.recordKeystroke() }
+        // The two monitors are independent and must be guarded separately:
+        // addGlobalMonitorForEvents returns NIL without Accessibility trust,
+        // and a shared `guard keyMonitor == nil` both blocked nothing and
+        // let repeat calls stack DUPLICATE local monitors. Worse, other code
+        // gated all counting on the global monitor's existence — so without
+        // trust, even in-app typing (which needs no permission) was counted
+        // and then thrown away. Each monitor now stands alone.
+        if keyMonitor == nil {
+            // Global monitor: delivers events only with Accessibility trust.
+            // We count key-down events; content is never inspected or stored.
+            keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] _ in
+                Task { @MainActor in self?.recordKeystroke() }
+            }
         }
-        localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            Task { @MainActor in self?.recordKeystroke() }
-            return event
+        if localKeyMonitor == nil {
+            localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                Task { @MainActor in self?.recordKeystroke() }
+                return event
+            }
         }
     }
 
@@ -280,7 +290,7 @@ final class GameController: ObservableObject {
                 startKeyMonitor()
             }
         }
-        if state.workMode, trusted, keyMonitor == nil {
+        if state.workMode, localKeyMonitor == nil || (trusted && keyMonitor == nil) {
             startKeyMonitor()
         }
 
@@ -293,7 +303,10 @@ final class GameController: ObservableObject {
 
         let typed = Double(keystrokesSinceLastTick)
         keystrokesSinceLastTick = 0
-        if state.workMode, trusted, keyMonitor != nil, typed > 0 {
+        // Any counted keystroke is a real keystroke — local (in-app, no
+        // permission needed) and global (needs trust) both fill the tank.
+        // Gating this on the global monitor/trust made in-app typing dead.
+        if state.workMode, typed > 0 {
             state.energy = min(EnergyEngine.energyCap,
                                state.energy + typed * EnergyEngine.energyPerKeystroke)
             state.lifetimeKeystrokes += typed
@@ -301,7 +314,7 @@ final class GameController: ObservableObject {
         }
         state.energy = max(0, state.energy - EnergyEngine.burnPerSec * dt)
 
-        if state.workMode, keyMonitor != nil {
+        if state.workMode, localKeyMonitor != nil || keyMonitor != nil {
             keystrokes.removeAll { now.timeIntervalSince($0) > 10 }
             keystrokesPerSec = Double(keystrokes.count) / 10
         } else if keystrokesPerSec != 0 {

@@ -692,6 +692,13 @@ struct StyleTab: View {
                         .background(Theme.gold)
                         .cornerRadius(5)
                     }
+                    // live proof even without trust: in-app keystrokes count
+                    // regardless of the permission, so typing in the café-name
+                    // field must always move this — if it does, the pipeline
+                    // works and only the global permission is missing.
+                    Text("⌨️ \(String(format: "%.1f", controller.keystrokesPerSec)) keys/sec (type in the café name field to test)")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundColor(Theme.cream)
                     Text("System Settings → Privacy & Security → Accessibility → enable Pixel Pet Café.\nAfter the game updates, macOS may require re-enabling it (toggle off & on).")
                         .font(.system(size: 8.5, design: .rounded))
                         .foregroundColor(Theme.dim)
