@@ -247,7 +247,13 @@ final class GameController: ObservableObject {
             // Global monitor: delivers events only with Accessibility trust.
             // We count key-down events; content is never inspected or stored.
             keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] _ in
-                Task { @MainActor in self?.recordKeystroke() }
+                Task { @MainActor in
+                    // In-app keys already arrive via the LOCAL monitor; when
+                    // trusted, the global monitor sees them too — skip those
+                    // here or every in-app keystroke counts double.
+                    guard NSApp?.isActive != true else { return }
+                    self?.recordKeystroke()
+                }
             }
         }
         if localKeyMonitor == nil {

@@ -169,6 +169,10 @@ struct GameState: Codable {
         // enable it. Anyone who later flips the toggle off has
         // lifetimeKeystrokes > 0 and is never touched again.
         if s.lifetimeKeystrokes == 0, !s.workMode { s.workMode = true }
+        // Tank-drain repair: the counting bug let the tank burn to empty
+        // while no keystroke could ever refill it. A save that has never
+        // counted a key didn't spend its energy — restore the starter tank.
+        if s.lifetimeKeystrokes == 0, s.energy <= 0 { s.energy = 3000 }
         // load-time mercy for saves caught by the old closed-café reputation
         // grind (arrivals used to ding a closed café to 0): rep below the
         // closed floor can only have come from that trap.
