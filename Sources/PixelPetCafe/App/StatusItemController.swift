@@ -319,8 +319,20 @@ final class StatusItemController: NSObject {
 
     // MARK: popover
 
+    private var lastPopoverOpenAt = Date()
+
     private func openPopover() {
         guard let button = statusItem.button, !popover.isShown else { return }
+        // Self-healing: after hours unopened, the NSHostingView/SpriteView
+        // stack can go stale and open frozen (observed after ~19h uptime).
+        // Rebuilding the popover content from scratch before showing is
+        // cheap insurance — same controller, same scene, fresh view stack.
+        if Date().timeIntervalSince(lastPopoverOpenAt) > 3 * 3600 {
+            let host = NSHostingController(rootView: PanelView(controller: controller, scene: scene))
+            host.preferredContentSize = NSSize(width: 360, height: 544)
+            popover.contentViewController = host
+        }
+        lastPopoverOpenAt = Date()
         scene.configure(with: controller.state)
         scene.setActive(true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
