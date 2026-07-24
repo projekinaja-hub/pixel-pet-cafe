@@ -327,7 +327,13 @@ final class StatusItemController: NSObject {
         // stack can go stale and open frozen (observed after ~19h uptime).
         // Rebuilding the popover content from scratch before showing is
         // cheap insurance — same controller, same scene, fresh view stack.
-        if Date().timeIntervalSince(lastPopoverOpenAt) > 3 * 3600 {
+        // Revive the sim/icon timers if they died during long idle (they
+        // can stop firing on RunLoop.main). This click path always runs.
+        controller.ensureRunning()
+        if iconTimer == nil || iconTimer?.isValid != true { restartIconTimer(interval: iconInterval) }
+        // Rebuild the popover's view stack if it's been idle long enough to
+        // go stale (SpriteView/hosting freeze); 15 min is cheap insurance.
+        if Date().timeIntervalSince(lastPopoverOpenAt) > 15 * 60 {
             let host = NSHostingController(rootView: PanelView(controller: controller, scene: scene))
             host.preferredContentSize = NSSize(width: 360, height: 544)
             popover.contentViewController = host

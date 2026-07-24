@@ -86,11 +86,7 @@ final class GameController: ObservableObject {
 
     func start() {
         lastTick = Date()
-        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
-        }
-        RunLoop.main.add(t, forMode: .common)
-        timer = t
+        installTickTimer()
         if state.workMode {
             startKeyMonitor()
             // Typing is the core loop now: if macOS doesn't trust this
@@ -108,6 +104,32 @@ final class GameController: ObservableObject {
         let wc = NSWorkspace.shared.notificationCenter
         wc.addObserver(self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil)
         wc.addObserver(self, selector: #selector(didWake), name: NSWorkspace.didWakeNotification, object: nil)
+    }
+
+    private func installTickTimer() {
+        timer?.invalidate()
+        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.tick() }
+        }
+        RunLoop.main.add(t, forMode: .common)
+        timer = t
+    }
+
+    /// Watchdog recovery. Timers on RunLoop.main can silently stop firing
+    /// after long uptime or sleep/wake, freezing both the sim and the
+    /// display with no self-recovery. This runs from paths that ALWAYS work
+    /// regardless of our timers (the menu-bar click via AppKit, and the
+    /// sleep/wake notification): if the tick has gone stale, it catches the
+    /// café up on the missed time and reinstalls a live timer.
+    func ensureRunning() {
+        let gap = Date().timeIntervalSince(lastTick)
+        guard gap > 5 || timer == nil || timer?.isValid != true else { return }
+        if gap > 60, let last = state.lastSaved {
+            let haul = SalesEngine.offlineSim(&state, elapsed: Date().timeIntervalSince(last))
+            if haul > 0 { awayReport = haul }
+        }
+        lastTick = Date()
+        installTickTimer()
     }
 
     private func tick() {
@@ -243,6 +265,7 @@ final class GameController: ObservableObject {
                 if haul > 0, elapsed > 60 { awayReport = haul }
             }
             lastTick = Date()
+            installTickTimer()
             saveNow()
         }
     }
