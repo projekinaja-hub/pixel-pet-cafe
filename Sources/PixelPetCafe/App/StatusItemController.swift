@@ -20,7 +20,6 @@ final class StatusItemController: NSObject {
     private var icons: [NSImage] = []   // frames 0..4: normal, blink, happy, sleep, sip
     private var cupIcons: [[NSImage]] = []   // [steamLevel][wiggleFrame]
     private var iconInterval: TimeInterval = 2.0
-    private var barPhase = 0
 
     /// Draws a menu-bar frame nudged vertically, so the buddy physically
     /// bounces while you type instead of only swapping frames in place.
@@ -354,17 +353,26 @@ final class StatusItemController: NSObject {
     /// state signal — muted gold when fuelled, amber when low, a restrained
     /// red when empty (the café is crawling). Sized and baseline-nudged to
     /// sit cleanly inline with the coin count.
-    private func energyBarAttachment(fraction: Double, typing: Double, phase: Int) -> NSAttributedString {
-        let img = Self.energyBarImage(fraction: fraction, typing: typing, phase: phase)
+    private func energyBarAttachment(fuel: Double, speed: Double) -> NSAttributedString {
+        let img = Self.energyBarImage(fuel: fuel, speed: speed)
         let attachment = NSTextAttachment()
         attachment.image = img
         attachment.bounds = CGRect(x: 0, y: -1.5, width: img.size.width, height: img.size.height)
         return NSAttributedString(attachment: attachment)
     }
 
-    /// The capsule itself. Static so a dev hook (PPC_BARSHOT) can render the
-    /// exact production drawing offscreen for eyeball verification.
-    static func energyBarImage(fraction: Double, typing: Double, phase: Int) -> NSImage {
+    /// Typing speed that fills the bar completely. Deliberately above normal
+    /// prose speed: at the old ceiling any ordinary typing pinned the bar at
+    /// 100% and it stopped saying anything at all.
+    static let speedFullAtWPM = 100.0
+
+    /// The capsule: LENGTH is how fast you're typing right now, COLOUR is how
+    /// much fuel is left. One length, one meaning — the previous version drew
+    /// the tank as the length AND the speed as an overlay, which is why it
+    /// read as ambiguous and looked washed out.
+    /// Static so a dev hook (PPC_BARSHOT / PPC_BARFILM) can render the exact
+    /// production drawing offscreen for eyeball verification.
+    static func energyBarImage(fuel: Double, speed: Double) -> NSImage {
         let w: CGFloat = 24, h: CGFloat = 11, barH: CGFloat = 5
         let y = (h - barH) / 2
         let img = NSImage(size: NSSize(width: w, height: h))
@@ -374,41 +382,28 @@ final class StatusItemController: NSObject {
         NSColor.tertiaryLabelColor.setFill()
         track.fill()
 
-        // Both layers are plain rects clipped to the capsule, so they share
-        // one clean rounded silhouette instead of stacking rounded shapes.
+        // Plain rects clipped to the capsule, so everything shares one clean
+        // rounded silhouette instead of stacking rounded shapes.
         NSGraphicsContext.saveGraphicsState()
         track.addClip()
 
-        // Layer 1 — the tank: the slow truth. A full tank is ~20 minutes of
-        // solid typing, so this layer moves about one pixel per minute. On
-        // its own it looked completely frozen while you typed, which is
-        // exactly the "I type and type and the bar doesn't move" problem.
-        let tankW = fraction > 0 ? max(barH, w * CGFloat(fraction)) : 0
-        if tankW > 0 {
-            var color: NSColor = fraction <= 0.001
-                ? NSColor.systemRed.withAlphaComponent(0.85)
-                : (fraction < 0.25 ? .systemOrange : NSColor.systemYellow.withAlphaComponent(0.95))
-            if typing > 0.02, let lit = color.blended(withFraction: CGFloat(typing) * 0.6, of: .white) {
-                color = lit
-            }
-            color.setFill()
-            NSBezierPath(rect: NSRect(x: 0, y: y, width: tankW, height: barH)).fill()
-        }
+        let s = max(0, min(1, speed))
+        // COLOUR = fuel: gold while fuelled, amber when low, red when the tank
+        // is dry and the café is crawling.
+        let base: NSColor = fuel <= 0.001
+            ? .systemRed
+            : (fuel < 0.25 ? .systemOrange : .systemYellow)
+        // A resting pip keeps the fuel colour readable at 0 WPM — an entirely
+        // empty capsule would hide the one thing you need at a glance.
+        let fillW = max(barH, w * CGFloat(s))
+        base.withAlphaComponent(0.45 + 0.55 * CGFloat(s)).setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: y, width: fillW, height: barH)).fill()
 
-        // Layer 2 — the live crest: THIS is what answers your keyboard. It
-        // surges across the empty part of the track in proportion to how fast
-        // you're typing right now and drains back when you stop, so every
-        // burst of typing visibly moves the bar within a fraction of a second.
-        let crestW = CGFloat(typing) * (w - tankW)
-        if crestW > 0.5 {
-            NSColor.white.withAlphaComponent(0.20 + 0.38 * CGFloat(typing)).setFill()
-            NSBezierPath(rect: NSRect(x: tankW, y: y, width: crestW, height: barH)).fill()
-            // a highlight running along the crest, so the bar still reads as
-            // alive even when you hold a perfectly steady speed
-            let travel = CGFloat(phase % 12) / 12
-            let dotX = tankW + crestW * travel
-            NSColor.white.withAlphaComponent(0.45 + 0.45 * CGFloat(typing)).setFill()
-            NSBezierPath(ovalIn: NSRect(x: dotX - barH / 2, y: y, width: barH, height: barH)).fill()
+        // A brighter cap at the tip so the bar reads as a moving wavefront
+        // rather than a block that happens to change length.
+        if s > 0.04, let hot = base.blended(withFraction: 0.5, of: .white) {
+            hot.setFill()
+            NSBezierPath(rect: NSRect(x: max(0, fillW - 3), y: y, width: 3, height: barH)).fill()
         }
         NSGraphicsContext.restoreGraphicsState()
         img.unlockFocus()
@@ -432,11 +427,10 @@ final class StatusItemController: NSObject {
         // product, not a debug line: a soft translucent track that fills with
         // a single tasteful colour shifting by fuel level.
         if state.workMode {
-            let frac = max(0, min(1, state.energy / EnergyEngine.energyCap))
-            let typing = min(1, controller.wpm / 60)   // live reaction to speed
-            barPhase &+= 1
+            let fuel = max(0, min(1, state.energy / EnergyEngine.energyCap))
+            let speed = controller.wpm / Self.speedFullAtWPM
             out.append(NSAttributedString(string: "  ", attributes: [.font: font]))
-            out.append(energyBarAttachment(fraction: frac, typing: typing, phase: barPhase))
+            out.append(energyBarAttachment(fuel: fuel, speed: speed))
         }
         statusItem.button?.attributedTitle = out
     }

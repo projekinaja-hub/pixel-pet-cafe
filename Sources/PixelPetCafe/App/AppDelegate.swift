@@ -43,19 +43,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // at a range of typing speeds so the live crest can be eyeballed
         // without having to watch the real menu bar while typing.
         if let path = ProcessInfo.processInfo.environment["PPC_BARSHOT"] {
-            let speeds: [Double] = [0, 0.15, 0.35, 0.6, 0.85, 1.0]
+            // top row: rising speed at healthy fuel; bottom row: the same
+            // speeds as fuel runs out (gold -> amber -> red)
+            let speeds: [Double] = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+            let fuels: [Double] = [0.6, 0.2, 0.0]
             let scale: CGFloat = 6, pad: CGFloat = 6
-            let one = StatusItemController.energyBarImage(fraction: 0.49, typing: 0, phase: 0).size
+            let one = StatusItemController.energyBarImage(fuel: 0.6, speed: 0).size
+            let cellH = one.height * scale + pad
             let out = NSImage(size: NSSize(width: (one.width * scale + pad) * CGFloat(speeds.count) + pad,
-                                           height: one.height * scale + pad * 2))
+                                           height: cellH * CGFloat(fuels.count) + pad))
             out.lockFocus()
             NSColor.black.setFill()
             NSRect(origin: .zero, size: out.size).fill()
             NSGraphicsContext.current?.imageInterpolation = .none
-            for (i, t) in speeds.enumerated() {
-                let img = StatusItemController.energyBarImage(fraction: 0.49, typing: t, phase: 3)
-                img.draw(in: NSRect(x: pad + (one.width * scale + pad) * CGFloat(i), y: pad,
-                                    width: one.width * scale, height: one.height * scale))
+            for (row, fuel) in fuels.enumerated() {
+                for (i, t) in speeds.enumerated() {
+                    let img = StatusItemController.energyBarImage(fuel: fuel, speed: t)
+                    img.draw(in: NSRect(x: pad + (one.width * scale + pad) * CGFloat(i),
+                                        y: out.size.height - cellH * CGFloat(row + 1),
+                                        width: one.width * scale, height: one.height * scale))
+                }
+            }
+            out.unlockFocus()
+            if let tiff = out.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                try? rep.representation(using: .png, properties: [:])?
+                    .write(to: URL(fileURLWithPath: path))
+            }
+            exit(0)
+        }
+
+        // dev hook: PPC_BARFILM=/path.png simulates a real typing session
+        // (bursty keystrokes, not a clean sine) through the PRODUCTION filter
+        // and renders every 0.2s frame as a filmstrip — the only way to see
+        // whether the bar animates smoothly or jitters without typing by hand.
+        if let path = ProcessInfo.processInfo.environment["PPC_BARFILM"] {
+            let dt = 0.2, steps = 55, perRow = 11
+            var kps = 0.0, pending = 0.0, seed: UInt64 = 12345
+            var frames: [NSImage] = []
+            for i in 0..<steps {
+                let t = Double(i) * dt
+                // ~65 WPM between t=1s and t=7s, then hands off the keyboard
+                let targetKps = (t >= 1 && t < 7) ? 65.0 / 12 : 0
+                // bursty arrival: keys clump and gap the way real typing does
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                let jitter = 0.35 + 1.3 * Double((seed >> 33) % 1000) / 1000
+                pending += targetKps * dt * jitter
+                let keys = pending.rounded(.down)
+                pending -= keys
+                let credited = EnergyEngine.creditedKeys(delta: keys, dt: dt)
+                kps = EnergyEngine.nextKps(current: kps, creditedKeys: credited, dt: dt)
+                let speed = kps * 12 / StatusItemController.speedFullAtWPM
+                frames.append(StatusItemController.energyBarImage(fuel: 0.49, speed: speed))
+            }
+            let one = frames[0].size, scale: CGFloat = 5, pad: CGFloat = 5
+            let rows = (steps + perRow - 1) / perRow
+            let cellW = one.width * scale + pad, cellH = one.height * scale + pad
+            let out = NSImage(size: NSSize(width: cellW * CGFloat(perRow) + pad,
+                                           height: cellH * CGFloat(rows) + pad))
+            out.lockFocus()
+            NSColor.black.setFill()
+            NSRect(origin: .zero, size: out.size).fill()
+            NSGraphicsContext.current?.imageInterpolation = .none
+            for (i, f) in frames.enumerated() {
+                let col = i % perRow, row = i / perRow
+                f.draw(in: NSRect(x: pad + cellW * CGFloat(col),
+                                  y: out.size.height - cellH * CGFloat(row + 1),
+                                  width: one.width * scale, height: one.height * scale))
             }
             out.unlockFocus()
             if let tiff = out.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
