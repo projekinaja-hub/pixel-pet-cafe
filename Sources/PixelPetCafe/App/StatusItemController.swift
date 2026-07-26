@@ -259,12 +259,23 @@ final class StatusItemController: NSObject {
             statusItem.button?.image = icons[frame]
             return
         }
-        if iconInterval != 2.0 { restartIconTimer(interval: 2.0) }
+        // C: the face reacts to what's happening, not just idle-loops.
+        // An exciting event (rush / lucky hour) → gleeful; an empty energy
+        // tank (café crawling) → drowsy; otherwise the classic idle life.
+        let excited = Events.isActive("rush", controller.state)
+            || Events.isActive("lucky_hour", controller.state)
+        let drowsy = controller.state.workMode && controller.state.energy <= 0
+        let interval: TimeInterval = excited ? 0.6 : 2.0
+        if iconInterval != interval { restartIconTimer(interval: interval) }
         let frame: Int
         if Date() < happyUntil {
             frame = 2                                  // happy bounce after a tip
         } else if SalesEngine.isClosed(controller.state) {
             frame = 3                                  // zzz while closed
+        } else if excited {
+            frame = iconTick % 2 == 0 ? 2 : 0          // bounce between happy & alert
+        } else if drowsy {
+            frame = iconTick % 6 == 0 ? 1 : 3          // sleepy: mostly zzz, slow blinks
         } else {
             switch iconTick % 8 {                      // idle: blink & sip
             case 3: frame = 1
@@ -300,6 +311,18 @@ final class StatusItemController: NSObject {
             out.append(NSAttributedString(
                 string: String(format: "  %.1f×", controller.workBoost),
                 attributes: [.font: font, .foregroundColor: NSColor.systemYellow]))
+        }
+        // A: live energy glance — a compact ⚡ tank bar right in the menu bar,
+        // so the café's "pulse" reads at a glance without opening it. Gold
+        // when fueled, orange mid, red when the tank's empty (café crawling).
+        if state.workMode {
+            let frac = max(0, min(1, state.energy / EnergyEngine.energyCap))
+            let filled = Int((frac * 4).rounded())
+            let bar = String(repeating: "▰", count: filled) + String(repeating: "▱", count: 4 - filled)
+            let color: NSColor = frac <= 0.001 ? .systemRed
+                : (frac < 0.25 ? .systemOrange : .systemYellow)
+            out.append(NSAttributedString(string: "  ⚡\(bar)",
+                attributes: [.font: font, .foregroundColor: color]))
         }
         statusItem.button?.attributedTitle = out
     }
