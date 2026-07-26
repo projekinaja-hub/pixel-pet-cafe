@@ -58,6 +58,11 @@ final class GameController: ObservableObject {
     @Published private(set) var keystrokesPerSec: Double = 0
     /// Standard typing speed: words-per-minute at 5 chars/word.
     var wpm: Double { keystrokesPerSec * 12 }
+    /// "Are they typing right now?" — answered by recency, so the café can
+    /// react instantly without the speed number having to be twitchy.
+    var isActivelyTyping: Bool {
+        EnergyEngine.isActivelyTyping(lastKeystrokeAt: lastKeystrokeAt, now: Date())
+    }
     // in-memory "keys typed today" stat for the EnergyCard; resets on real
     // (wall-clock) day change, never persisted.
     @Published private(set) var keystrokesToday: Double = 0

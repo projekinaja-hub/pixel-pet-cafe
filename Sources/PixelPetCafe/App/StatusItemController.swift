@@ -291,16 +291,18 @@ final class StatusItemController: NSObject {
         // Brew speed scales with real typing speed (WPM tiers), so the menu
         // bar visibly works harder the faster you type — at high speed the
         // buddy alternates brew frames rapidly with happy flashes.
+        // Brewing starts the moment you type — a recency check, not a WPM
+        // threshold. Speed still sets HOW FAST the buddy brews.
         let wpm = controller.wpm
-        if wpm >= 12, !SalesEngine.isClosed(controller.state), Date() >= happyUntil {
-            let interval: TimeInterval = wpm >= 50 ? 0.16 : (wpm >= 30 ? 0.28 : 0.5)
+        if controller.isActivelyTyping, !SalesEngine.isClosed(controller.state), Date() >= happyUntil {
+            let interval: TimeInterval = wpm >= 45 ? 0.16 : (wpm >= 25 ? 0.28 : 0.5)
             if iconInterval != interval { restartIconTimer(interval: interval) }
             // Brew, brew, and every so often a burst of personality: a grin
             // when you're flying, a quick sip when you're cruising, the odd
             // blink — so it reads as a working little character rather than
             // a two-frame shuffle.
             var frame = 5 + iconTick % 2
-            if wpm >= 50, iconTick % 4 == 3 {
+            if wpm >= 45, iconTick % 4 == 3 {
                 frame = 2                                  // gleeful grin
             } else if wpm >= 30, iconTick % 9 == 8 {
                 frame = 4                                  // quick sip

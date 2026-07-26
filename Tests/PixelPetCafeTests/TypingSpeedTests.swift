@@ -35,17 +35,50 @@ final class TypingSpeedTests: XCTestCase {
 
     // MARK: responsiveness — the actual bug
 
-    /// THE regression test. A real 50 WPM typist must clear the lowest
-    /// brewing-animation threshold (12 WPM) within one second of starting.
-    /// The old 10s-window math read ~5 WPM after a second and needed ~3s to
-    /// cross 12 — so the café sat still while the player was typing.
-    func testReactsWithinOneSecond() {
-        XCTAssertGreaterThan(typeSteadily(wpm: 50, seconds: 1.0), 12)
+    /// The café must react to typing IMMEDIATELY — but via recency, not by
+    /// forcing the speed number to spike. One keystroke means "they're
+    /// typing"; it does not mean "they're typing fast".
+    func testCafeReactsToTheVeryFirstKeystroke() {
+        let now = Date()
+        XCTAssertTrue(EnergyEngine.isActivelyTyping(lastKeystrokeAt: now, now: now))
+        XCTAssertTrue(EnergyEngine.isActivelyTyping(lastKeystrokeAt: now.addingTimeInterval(-1.0), now: now))
+    }
+
+    func testStopsReactingShortlyAfterYouStop() {
+        let now = Date()
+        XCTAssertFalse(EnergyEngine.isActivelyTyping(lastKeystrokeAt: now.addingTimeInterval(-5), now: now))
+        XCTAssertFalse(EnergyEngine.isActivelyTyping(lastKeystrokeAt: nil, now: now))
+    }
+
+    /// The speed reading is allowed to take a few seconds to be confident —
+    /// that's the whole point of measuring over a window — but it must be
+    /// climbing meaningfully within a second.
+    func testSpeedClimbsPromptlyWithoutOverstating() {
+        let after1s = typeSteadily(wpm: 50, seconds: 1.0)
+        XCTAssertGreaterThan(after1s, 5)
+        XCTAssertLessThan(after1s, 50, "must not claim full speed before it has the evidence")
     }
 
     func testReachesTopAnimationTierWhileTypingFast() {
-        // 80 WPM sustained for two seconds should be well past the 50 WPM tier
-        XCTAssertGreaterThan(typeSteadily(wpm: 80, seconds: 2.0), 50)
+        // 80 WPM sustained should clear the 50 WPM tier once the measurement
+        // window has actually filled
+        XCTAssertGreaterThan(typeSteadily(wpm: 80, seconds: 4.0), 50)
+    }
+
+    /// Bursts are what made the meter read high: people fire ~8 keys/sec
+    /// inside a word then pause to think. The window has to report the
+    /// sustained pace, not the burst.
+    func testBurstsAreSmoothedToSustainedPace() {
+        var m = Meter()
+        // 0.6s of fast burst (8 keys/sec), then 1.4s of thinking — a real
+        // writing rhythm whose true sustained pace is ~4.8 keys/sec = 58 WPM
+        for _ in 0..<12 {
+            for _ in 0..<3 { m.sample(keys: 8 * dt) }
+            for _ in 0..<7 { m.sample(keys: 0) }
+        }
+        // must report the sustained pace, not the 96 WPM burst rate
+        XCTAssertLessThan(m.wpm, 45, "burst rate must not be reported as your speed")
+        XCTAssertGreaterThan(m.wpm, 15, "…but a real writing rhythm still registers")
     }
 
     func testConvergesOnTheRealSpeed() {

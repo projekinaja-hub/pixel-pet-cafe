@@ -30,12 +30,18 @@ enum EnergyEngine {
 
     /// Trailing window the speed is measured over.
     ///
-    /// This is what makes the number HONEST. The speed used to be derived from
-    /// one 0.2s sample, so a single keystroke landing in a sample read as
-    /// 5 keys/sec — 60 WPM off one key, which is why a few casual keystrokes
-    /// looked like a sprint. Rate is now "keys actually seen in the last two
-    /// seconds", so one key reads as ~6 WPM, which is what one key is worth.
-    static let rateWindow = 2.0
+    /// This is what makes the number HONEST. The speed was once derived from a
+    /// single 0.2s sample, so one keystroke read as 5 keys/sec — 60 WPM off
+    /// one key, which is why a few casual taps looked like a sprint.
+    ///
+    /// The window also has to be long enough to average out BURSTS. People
+    /// don't type at a steady rate: they fire 8–10 keys/sec inside a familiar
+    /// word, then pause to think. A short window reports those bursts as your
+    /// speed, so the meter reads far higher than the pace you feel yourself
+    /// working at. Several seconds smooths a burst-and-pause rhythm into the
+    /// sustained speed a typing test would report, while still being short
+    /// enough to react while you're typing.
+    static let rateWindow = 3.5
     /// How fast the displayed speed climbs toward the measured rate…
     static let riseTau = 0.5
     /// …and how gently it falls, so pauses between words don't make it strobe.
@@ -45,6 +51,21 @@ enum EnergyEngine {
     static func creditedKeys(delta: Double, dt: Double) -> Double {
         guard delta > 0, dt > 0 else { return 0 }
         return min(delta, maxKeysPerSecond * dt)
+    }
+
+    /// How recently a key must have been pressed to count as "still typing".
+    ///
+    /// The café reacts to this, NOT to a WPM threshold. Those are two
+    /// different questions — "are they typing right now?" (instant) and "how
+    /// fast are they going?" (needs a few seconds of evidence). Gating the
+    /// animation on a WPM number forced the speed measurement to be twitchy
+    /// enough to trip a threshold in under a second, which is exactly what
+    /// made the reported speed read far too high.
+    static let typingRecency = 1.5
+
+    static func isActivelyTyping(lastKeystrokeAt: Date?, now: Date) -> Bool {
+        guard let last = lastKeystrokeAt else { return false }
+        return now.timeIntervalSince(last) <= typingRecency
     }
 
     /// The measured typing rate: keys seen across the trailing window.

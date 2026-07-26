@@ -12,6 +12,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Accessibility-trusted (the thing global key counting hinges on).
         if ProcessInfo.processInfo.environment["PPC_AXCHECK"] == "1" {
             print("AXTRUSTED=\(AXIsProcessTrusted())")
+            // NOTE: only read .combinedSessionState here. Reading
+            // .hidSystemState or .privateState BLOCKS INDEFINITELY on this
+            // system (verified: a standalone probe compiled fine and then
+            // hung forever), so never add them to a diagnostic hook.
+            print("keyCounter=\(CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown))")
             exit(0)
         }
         game = GameController(persistence: Persistence())
