@@ -30,13 +30,27 @@ final class GameController: ObservableObject {
     // Not persisted: only used to notice a holiday *starting* while running.
     private var lastHolidayName: String?
 
-    // typing energy: count (never read) keystrokes to fuel the café
-    private var keyMonitor: Any?
-    private var localKeyMonitor: Any?
-    private var keystrokes: [Date] = []
+    // TYPING ENERGY: we read the OS-wide key-down COUNTER — a running total of
+    // how many keys have been pressed anywhere on the Mac. No event stream, no
+    // key contents, nothing that can silently go stale.
+    //
+    // This replaced a pair of NSEvent monitors, which had an unfixable flaw:
+    // a global monitor installed before macOS trusted the app stays alive but
+    // DEAD — it delivers nothing forever, and `monitor != nil` still reports
+    // healthy, so the app couldn't even tell. Granting Accessibility later
+    // didn't revive it. That's the "I already gave permission and it still
+    // does nothing" bug. A counter can't have that failure: every sample is a
+    // fresh question to the OS.
+    private var keySampler: Timer?
+    /// Diagnostic only (PPC_KEYTEST): proves the poll loop is alive.
+    private(set) var keySamplesTaken = 0
+    private var lastKeyCount: UInt32?
+    private var lastSampleAt = Date()
     private var keystrokesSinceLastTick = 0
+    /// How often we ask the OS for the counter. Fast enough that the menu bar
+    /// reacts within a keystroke or two.
+    private static let keySampleInterval: TimeInterval = 0.2
     @Published private(set) var workBoost: Double = 1
-    @Published private(set) var axTrusted: Bool = AXIsProcessTrusted()
     @Published private(set) var lastKeystrokeAt: Date?
     @Published private(set) var keystrokesPerSec: Double = 0
     /// Standard typing speed: words-per-minute at 5 chars/word.
@@ -91,19 +105,7 @@ final class GameController: ObservableObject {
     func start() {
         lastTick = Date()
         installTickTimer()
-        if state.workMode {
-            startKeyMonitor()
-            // Typing is the core loop now: if macOS doesn't trust this
-            // binary (fresh grant, or a stale one from an older build),
-            // summon the REAL permission dialog once at launch — it
-            // registers the current binary in the Accessibility list so
-            // the player just flips one switch instead of hunting for
-            // the app with the + button. macOS ignores repeat prompts.
-            if !AXIsProcessTrusted() {
-                let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-                _ = AXIsProcessTrustedWithOptions(opts)
-            }
-        }
+        if state.workMode { startKeyTracking() }
 
         let wc = NSWorkspace.shared.notificationCenter
         wc.addObserver(self, selector: #selector(willSleep), name: NSWorkspace.willSleepNotification, object: nil)
@@ -134,6 +136,7 @@ final class GameController: ObservableObject {
         }
         lastTick = Date()
         installTickTimer()
+        if state.workMode { startKeyTracking() }
     }
 
     private func tick() {
@@ -276,45 +279,45 @@ final class GameController: ObservableObject {
 
     // MARK: work mode (typing boost)
 
-    private func startKeyMonitor() {
-        // The two monitors are independent and must be guarded separately:
-        // addGlobalMonitorForEvents returns NIL without Accessibility trust,
-        // and a shared `guard keyMonitor == nil` both blocked nothing and
-        // let repeat calls stack DUPLICATE local monitors. Worse, other code
-        // gated all counting on the global monitor's existence — so without
-        // trust, even in-app typing (which needs no permission) was counted
-        // and then thrown away. Each monitor now stands alone.
-        if keyMonitor == nil {
-            // Global monitor: delivers events only with Accessibility trust.
-            // We count key-down events; content is never inspected or stored.
-            keyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] _ in
-                Task { @MainActor in
-                    // In-app keys already arrive via the LOCAL monitor; when
-                    // trusted, the global monitor sees them too — skip those
-                    // here or every in-app keystroke counts double.
-                    guard NSApp?.isActive != true else { return }
-                    self?.recordKeystroke()
-                }
-            }
+    /// Starts (or revives) the counter sampler. Safe to call repeatedly — it
+    /// always replaces the old timer, so a dead one can never linger.
+    func startKeyTracking() {
+        keySampler?.invalidate()
+        lastSampleAt = Date()
+        // Re-baseline so the first sample after a restart measures from NOW
+        // instead of crediting every key typed while we weren't looking.
+        lastKeyCount = CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
+        let t = Timer(timeInterval: Self.keySampleInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.sampleKeystrokes() }
         }
-        if localKeyMonitor == nil {
-            localKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-                Task { @MainActor in self?.recordKeystroke() }
-                return event
-            }
-        }
+        RunLoop.main.add(t, forMode: .common)
+        keySampler = t
     }
 
-    private func recordKeystroke() {
-        keystrokes.append(Date())
-        lastKeystrokeAt = Date()
-        keystrokesSinceLastTick += 1
+    /// Asks the OS how many keys have been pressed since the last look and
+    /// turns that delta into a live typing speed.
+    private func sampleKeystrokes() {
+        let now = Date()
+        let dt = max(0.01, now.timeIntervalSince(lastSampleAt))
+        lastSampleAt = now
+        keySamplesTaken += 1
+        let count = CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
+        defer { lastKeyCount = count }
+        guard let previous = lastKeyCount else { return }  // first look: baseline only
+        guard count >= previous else { return }            // counter reset (new login session)
+        let typed = EnergyEngine.creditedKeys(delta: Double(count - previous), dt: dt)
+        if typed > 0 {
+            keystrokesSinceLastTick += Int(typed.rounded())
+            lastKeystrokeAt = now
+        }
+        let next = EnergyEngine.nextKps(current: keystrokesPerSec, creditedKeys: typed, dt: dt)
+        if abs(next - keystrokesPerSec) > 0.005 { keystrokesPerSec = next }
     }
 
-    private func stopKeyMonitor() {
-        if let m = keyMonitor { NSEvent.removeMonitor(m); keyMonitor = nil }
-        if let m = localKeyMonitor { NSEvent.removeMonitor(m); localKeyMonitor = nil }
-        keystrokes = []
+    private func stopKeyTracking() {
+        keySampler?.invalidate()
+        keySampler = nil
+        lastKeyCount = nil
         keystrokesSinceLastTick = 0
         // the tank keeps ruling the café even with the monitor off
         workBoost = EnergyEngine.speedFactor(energy: state.energy, kps: 0)
@@ -327,19 +330,9 @@ final class GameController: ObservableObject {
     /// wiring all read that name). With the monitor off or no Accessibility
     /// trust there's no gain, but the burn and the empty-tank crawl still apply.
     private func updateWorkBoost(now: Date, dt: TimeInterval) {
-        // trust can be granted while running — pick it up and (re)attach.
-        // Monitors created BEFORE the grant are dead: always rebuild on change.
-        let trusted = AXIsProcessTrusted()
-        if trusted != axTrusted {
-            axTrusted = trusted
-            if state.workMode, trusted {
-                stopKeyMonitor()
-                startKeyMonitor()
-            }
-        }
-        if state.workMode, localKeyMonitor == nil || (trusted && keyMonitor == nil) {
-            startKeyMonitor()
-        }
+        // The sampler is the only thing that must stay alive; if anything ever
+        // knocks it out, the next tick puts it back.
+        if state.workMode, keySampler?.isValid != true { startKeyTracking() }
 
         // real-day rollover for the in-memory "today" stat
         let today = Calendar.current.startOfDay(for: now)
@@ -350,9 +343,7 @@ final class GameController: ObservableObject {
 
         let typed = Double(keystrokesSinceLastTick)
         keystrokesSinceLastTick = 0
-        // Any counted keystroke is a real keystroke — local (in-app, no
-        // permission needed) and global (needs trust) both fill the tank.
-        // Gating this on the global monitor/trust made in-app typing dead.
+        // Every key counted anywhere on the Mac fills the tank.
         if state.workMode, typed > 0 {
             state.energy = min(EnergyEngine.energyCap,
                                state.energy + typed * EnergyEngine.energyPerKeystroke)
@@ -361,12 +352,9 @@ final class GameController: ObservableObject {
         }
         state.energy = max(0, state.energy - EnergyEngine.burnPerSec * dt)
 
-        if state.workMode, localKeyMonitor != nil || keyMonitor != nil {
-            keystrokes.removeAll { now.timeIntervalSince($0) > 10 }
-            keystrokesPerSec = Double(keystrokes.count) / 10
-        } else if keystrokesPerSec != 0 {
-            keystrokesPerSec = 0
-        }
+        // keystrokesPerSec is maintained live by the sampler (5×/sec); the tick
+        // only has to zero it when typing isn't fuelling anything.
+        if !state.workMode, keystrokesPerSec != 0 { keystrokesPerSec = 0 }
         let factor = EnergyEngine.speedFactor(energy: state.energy, kps: keystrokesPerSec)
         if abs(factor - workBoost) > 0.001 { workBoost = factor }
     }
@@ -388,15 +376,7 @@ final class GameController: ObservableObject {
 
     func toggleWorkMode() {
         state.workMode.toggle()
-        if state.workMode {
-            if !AXIsProcessTrusted() {
-                let opts = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-                _ = AXIsProcessTrustedWithOptions(opts)   // asks once for Accessibility
-            }
-            startKeyMonitor()
-        } else {
-            stopKeyMonitor()
-        }
+        if state.workMode { startKeyTracking() } else { stopKeyTracking() }
     }
 
     /// Map pin tapped: travel to owned cafés, buy new ones on the spot.

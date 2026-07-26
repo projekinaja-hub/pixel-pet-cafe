@@ -655,53 +655,24 @@ struct StyleTab: View {
                     .labelsHidden()
             }
             if controller.state.workMode {
-                if controller.axTrusted {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("✓ listening — type fast and watch the ☕ steam & ⚡ in the menu bar")
-                            .font(.system(size: 9, weight: .semibold, design: .rounded))
-                            .foregroundColor(Color(red: 0.55, green: 0.85, blue: 0.55))
-                        // live proof: raw keystrokes/sec, no trust required
-                        HStack(spacing: 6) {
-                            Text("⌨️ \(Int(controller.wpm.rounded())) WPM")
-                                .font(.system(size: 9, weight: .bold, design: .rounded))
-                                .foregroundColor(Theme.cream)
-                            if let last = controller.lastKeystrokeAt {
-                                Text("· last key \(Int(Date().timeIntervalSince(last)))s ago")
-                                    .font(.system(size: 8.5, design: .rounded))
-                                    .foregroundColor(Theme.dim)
-                            } else {
-                                Text("· type something to test!")
-                                    .font(.system(size: 8.5, weight: .semibold, design: .rounded))
-                                    .foregroundColor(Theme.gold)
-                            }
-                        }
-                    }
-                } else {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("✓ listening in every app — no permission needed")
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundColor(Color(red: 0.55, green: 0.85, blue: 0.55))
                     HStack(spacing: 6) {
-                        Text("⚠️ macOS permission needed to hear typing in other apps")
-                            .font(.system(size: 9, weight: .semibold, design: .rounded))
-                            .foregroundColor(Theme.danger)
-                        Button("Open Settings") {
-                            NSWorkspace.shared.open(URL(string:
-                                "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                        Text("⌨️ \(Int(controller.wpm.rounded())) WPM")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundColor(Theme.cream)
+                        if let last = controller.lastKeystrokeAt {
+                            Text("· last key \(Int(Date().timeIntervalSince(last)))s ago")
+                                .font(.system(size: 8.5, design: .rounded))
+                                .foregroundColor(Theme.dim)
+                        } else {
+                            Text("· type anywhere to test!")
+                                .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                                .foregroundColor(Theme.gold)
                         }
-                        .buttonStyle(.plain)
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.bg)
-                        .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(Theme.gold)
-                        .cornerRadius(5)
                     }
-                    // live proof even without trust: in-app keystrokes count
-                    // regardless of the permission, so typing in the café-name
-                    // field must always move this — if it does, the pipeline
-                    // works and only the global permission is missing.
-                    Text("⌨️ \(Int(controller.wpm.rounded())) WPM (type in the café name field to test)")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundColor(Theme.cream)
-                    Text("System Settings → Privacy & Security → Accessibility → enable Pixel Pet Café.\nAfter the game updates, macOS may require re-enabling it (toggle off & on).")
-                        .font(.system(size: 8.5, design: .rounded))
-                        .foregroundColor(Theme.dim)
                 }
             }
         }

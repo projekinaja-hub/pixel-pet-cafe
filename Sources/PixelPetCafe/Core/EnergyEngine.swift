@@ -19,6 +19,36 @@ enum EnergyEngine {
     static let rushCost = 1000.0
     static let restockCost = 2000.0
 
+    // MARK: live typing speed
+
+    /// Ceiling on keys credited per second. Caps the catch-up after a stalled
+    /// timer or a sleep so a long gap can't dump an hour of typing in at once.
+    static let maxKeysPerSecond = 20.0
+    /// How fast the speed reading climbs while typing (seconds to ~63%)…
+    static let riseTau = 0.45
+    /// …and how gently it falls, so the meter doesn't strobe between words.
+    static let fallTau = 1.8
+
+    /// Keys we're willing to credit for a counter jump of `delta` over `dt`.
+    static func creditedKeys(delta: Double, dt: Double) -> Double {
+        guard delta > 0, dt > 0 else { return 0 }
+        return min(delta, maxKeysPerSecond * dt)
+    }
+
+    /// One step of the live typing-speed filter, in keys/sec.
+    ///
+    /// Asymmetric on purpose: springs UP fast so the café reacts within a
+    /// keystroke or two, eases DOWN slowly so brief pauses between words don't
+    /// make the meter flicker. The previous approach averaged a flat 10-second
+    /// window, which meant real typing at 50 WPM read as ~5 WPM for the first
+    /// second and took ~3 seconds just to cross the lowest animation threshold.
+    static func nextKps(current: Double, creditedKeys: Double, dt: Double) -> Double {
+        guard dt > 0 else { return current }
+        let instant = creditedKeys / dt
+        let tau = instant > current ? riseTau : fallTau
+        return max(0, current + (instant - current) * (1 - exp(-dt / tau)))
+    }
+
     /// The café-wide speed multiplier (customer arrivals AND service capacity,
     /// via SalesEngine.tick's `boost:`). Empty tank = crawl, no live bonus.
     static func speedFactor(energy: Double, kps: Double) -> Double {

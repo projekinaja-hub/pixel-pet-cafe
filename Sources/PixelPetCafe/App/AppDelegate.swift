@@ -18,25 +18,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         game.start()
         statusController = StatusItemController(controller: game)
 
-        // dev hook: PPC_KEYTEST=1 posts synthetic keyDown events through the
-        // app's own event loop (local monitors see them; zero OS permissions
-        // involved), then prints what the counting pipeline recorded — the
-        // decisive end-to-end test for "typing counts nothing".
-        if ProcessInfo.processInfo.environment["PPC_KEYTEST"] == "1" {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                for _ in 0..<15 {
-                    if let ev = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
-                                                 timestamp: ProcessInfo.processInfo.systemUptime,
-                                                 windowNumber: 0, context: nil, characters: "x",
-                                                 charactersIgnoringModifiers: "x", isARepeat: false, keyCode: 7) {
-                        NSApp.postEvent(ev, atStart: false)
-                    }
+        // dev hook: PPC_KEYTEST=N watches the live typing pipeline from INSIDE
+        // the app bundle for N seconds and prints what it sees each second.
+        // This is the decisive test for "typing counts nothing": if the OS-wide
+        // counter advances here while you type in any other app, detection
+        // works — no permission, no monitors, nothing that can go stale.
+        if let raw = ProcessInfo.processInfo.environment["PPC_KEYTEST"] {
+            let seconds = max(1, Int(raw) ?? 10)
+            let start = CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
+            print("KEYTEST start counter=\(start) workMode=\(game.state.workMode)")
+            for i in 1...seconds {
+                DispatchQueue.main.asyncAfter(deadline: .now() + Double(i)) { [weak self] in
+                    guard let g = self?.game else { exit(1) }
+                    let now = CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
+                    print(String(format: "t=%02ds counter=%d (+%d) wpm=%.1f energy=%.0f lifetimeKeys=%.0f samples=%d",
+                                 i, now, Int(now) - Int(start), g.wpm, g.state.energy,
+                                 g.state.lifetimeKeystrokes, g.keySamplesTaken))
+                    if i == seconds { exit(0) }
                 }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { [weak self] in
-                guard let g = self?.game else { exit(1) }
-                print("KEYTEST lifetimeKeys=\(g.state.lifetimeKeystrokes) kps=\(g.keystrokesPerSec) energy=\(g.state.energy)")
-                exit(0)
             }
         }
 

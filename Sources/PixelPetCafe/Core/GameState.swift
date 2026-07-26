@@ -157,8 +157,14 @@ struct GameState: Codable {
         return s.normalized()
     }
 
+    /// Below this many lifetime keystrokes, a save is treated as one whose
+    /// typing was never actually being counted (the dead-monitor era) rather
+    /// than one whose player chose not to type.
+    static let deadCountingThreshold = 500.0
+
     /// Fills empty café list / stock / menus (new games and migrated saves).
     func normalized() -> GameState {
+        let deadCountingThreshold = GameState.deadCountingThreshold
         var s = self
         // repair star counts minted by the old unbounded sqrt prestige formula
         s.stars = EconomyEngine.normalizedStars(s.stars)
@@ -168,11 +174,14 @@ struct GameState: Codable {
         // that has never typed a single counted key can't have opted out —
         // enable it. Anyone who later flips the toggle off has
         // lifetimeKeystrokes > 0 and is never touched again.
-        if s.lifetimeKeystrokes == 0, !s.workMode { s.workMode = true }
-        // Tank-drain repair: the counting bug let the tank burn to empty
-        // while no keystroke could ever refill it. A save that has never
-        // counted a key didn't spend its energy — restore the starter tank.
-        if s.lifetimeKeystrokes == 0, s.energy <= 0 { s.energy = 3000 }
+        if s.lifetimeKeystrokes < deadCountingThreshold, !s.workMode { s.workMode = true }
+        // Tank-drain repair: the counting bug let the tank burn to empty while
+        // barely any keystroke could ever refill it (the old global monitor
+        // could sit "installed" and dead forever). A save with almost no
+        // counted keys never really spent its energy — restore the starter
+        // tank so the café isn't dead on arrival. Self-limiting: once real
+        // counting banks a few hundred keys, this never fires again.
+        if s.lifetimeKeystrokes < deadCountingThreshold, s.energy <= 0 { s.energy = 3000 }
         // load-time mercy for saves caught by the old closed-café reputation
         // grind (arrivals used to ding a closed café to 0): rep below the
         // closed floor can only have come from that trap.
