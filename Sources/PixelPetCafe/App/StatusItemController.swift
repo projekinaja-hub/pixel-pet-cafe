@@ -406,6 +406,7 @@ final class StatusItemController: NSObject {
         // independent of our timers, so it's a reliable recovery point.
         controller.ensureRunning()
         if iconTimer == nil || iconTimer?.isValid != true { restartIconTimer(interval: iconInterval) }
+        controller.bumpViewReload()   // restart the scene's render loop every open
         // NOTE: previously rebuilt the popover's NSHostingController/SpriteView
         // here every 15 min "to self-heal" — but a freshly created SpriteView
         // frequently presents a frozen first frame, so that self-heal became

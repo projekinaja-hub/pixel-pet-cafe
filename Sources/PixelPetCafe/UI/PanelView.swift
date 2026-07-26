@@ -45,6 +45,35 @@ struct PixelImage: View {
     }
 }
 
+/// SKView wrapper replacing SwiftUI's SpriteView: after long idle the
+/// SpriteView's internal display link can die and never restart, leaving a
+/// frozen frame no matter what the sim does. This wrapper RE-PRESENTS the
+/// scene whenever `reloadToken` changes (bumped on every popover open),
+/// which deterministically restarts SKView's render loop — the same scene,
+/// no state loss, fresh display link.
+struct GameSpriteView: NSViewRepresentable {
+    let scene: CafeScene
+    let reloadToken: Int
+
+    final class Coordinator { var lastToken = -1 }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> SKView {
+        let v = SKView()
+        v.presentScene(scene)
+        context.coordinator.lastToken = reloadToken
+        return v
+    }
+
+    func updateNSView(_ v: SKView, context: Context) {
+        if context.coordinator.lastToken != reloadToken {
+            context.coordinator.lastToken = reloadToken
+            v.presentScene(nil)
+            v.presentScene(scene)
+        }
+    }
+}
+
 struct PanelView: View {
     @ObservedObject var controller: GameController
     let scene: CafeScene
@@ -78,7 +107,7 @@ struct PanelView: View {
     var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
-                SpriteView(scene: scene)
+                GameSpriteView(scene: scene, reloadToken: controller.viewReloadToken)
                     .frame(width: 360, height: 240)
                     .clipped()
                 if let haul = controller.awayReport {

@@ -53,6 +53,10 @@ final class GameController: ObservableObject {
     // Rolling per-second income samples (in-memory only): drives the header
     // trend arrow and the Café tab momentum sparkline. ~2 minutes of data.
     @Published private(set) var incomeHistory: [Double] = []
+    /// Bumped on every popover open: GameSpriteView re-presents the scene on
+    /// change, restarting SKView's display link (the long-idle freeze cure).
+    @Published private(set) var viewReloadToken = 0
+    func bumpViewReload() { viewReloadToken += 1 }
     /// Fractional change vs ~60s ago: +0.10 = income up 10% in the last minute.
     var incomeTrend: Double {
         guard incomeHistory.count >= 30, let past = incomeHistory.first, past > 0 else { return 0 }
