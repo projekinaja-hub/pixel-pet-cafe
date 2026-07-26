@@ -296,6 +296,50 @@ final class StatusItemController: NSObject {
         return NSAttributedString(attachment: attachment)
     }
 
+    /// A minimalist energy meter drawn as an NSImage: a soft rounded track
+    /// with a rounded fill, no emoji, no block characters. Colour is the only
+    /// state signal — muted gold when fuelled, amber when low, a restrained
+    /// red when empty (the café is crawling). Sized and baseline-nudged to
+    /// sit cleanly inline with the coin count.
+    private func energyBarAttachment(fraction: Double, typing: Double) -> NSAttributedString {
+        let w: CGFloat = 22, h: CGFloat = 11, barH: CGFloat = 5
+        let y = (h - barH) / 2
+        let img = NSImage(size: NSSize(width: w, height: h))
+        img.lockFocus()
+        let track = NSBezierPath(roundedRect: NSRect(x: 0, y: y, width: w, height: barH),
+                                 xRadius: barH / 2, yRadius: barH / 2)
+        NSColor.tertiaryLabelColor.setFill()
+        track.fill()
+        let fillW = max(fraction > 0 ? barH : 0, w * CGFloat(fraction))
+        if fillW > 0 {
+            let fill = NSBezierPath(roundedRect: NSRect(x: 0, y: y, width: fillW, height: barH),
+                                    xRadius: barH / 2, yRadius: barH / 2)
+            var color: NSColor = fraction <= 0.001
+                ? NSColor.systemRed.withAlphaComponent(0.85)
+                : (fraction < 0.25 ? .systemOrange : NSColor.systemYellow.withAlphaComponent(0.95))
+            // live reaction: the faster you type, the brighter the fill glows
+            if typing > 0.02, let lit = color.blended(withFraction: CGFloat(typing) * 0.7, of: .white) {
+                color = lit
+            }
+            color.setFill()
+            fill.fill()
+            // a bright leading spark that rides the fill edge while typing —
+            // the whole bar visibly quickens with your keystrokes
+            if typing > 0.05 {
+                let sparkX = min(w - barH, fillW - barH)
+                let spark = NSBezierPath(ovalIn: NSRect(x: max(0, sparkX), y: y, width: barH, height: barH))
+                NSColor.white.withAlphaComponent(0.35 + 0.5 * CGFloat(typing)).setFill()
+                spark.fill()
+            }
+        }
+        img.unlockFocus()
+        img.isTemplate = false
+        let attachment = NSTextAttachment()
+        attachment.image = img
+        attachment.bounds = CGRect(x: 0, y: -1.5, width: w, height: h)
+        return NSAttributedString(attachment: attachment)
+    }
+
     /// One icon, one number — the alert state is a color change on the coin
     /// itself rather than a second glyph, and the boost suffix only appears
     /// while a real boost is active instead of reserving space at rest.
@@ -307,22 +351,15 @@ final class StatusItemController: NSObject {
         var num = formatNumber(state.coins)
         while num.count < 6 { num = "\u{2007}" + num }     // figure-space pad
         out.append(NSAttributedString(string: " \(num)", attributes: [.font: font]))
-        if state.workMode, controller.workBoost > 1.1 {
-            out.append(NSAttributedString(
-                string: String(format: "  %.1f×", controller.workBoost),
-                attributes: [.font: font, .foregroundColor: NSColor.systemYellow]))
-        }
-        // A: live energy glance — a compact ⚡ tank bar right in the menu bar,
-        // so the café's "pulse" reads at a glance without opening it. Gold
-        // when fueled, orange mid, red when the tank's empty (café crawling).
+        // A: live energy glance — a minimalist capsule bar drawn as a real
+        // image (like the coin icon), not emoji + block glyphs. Reads as a
+        // product, not a debug line: a soft translucent track that fills with
+        // a single tasteful colour shifting by fuel level.
         if state.workMode {
             let frac = max(0, min(1, state.energy / EnergyEngine.energyCap))
-            let filled = Int((frac * 4).rounded())
-            let bar = String(repeating: "▰", count: filled) + String(repeating: "▱", count: 4 - filled)
-            let color: NSColor = frac <= 0.001 ? .systemRed
-                : (frac < 0.25 ? .systemOrange : .systemYellow)
-            out.append(NSAttributedString(string: "  ⚡\(bar)",
-                attributes: [.font: font, .foregroundColor: color]))
+            let typing = min(1, controller.wpm / 60)   // live reaction to speed
+            out.append(NSAttributedString(string: "  ", attributes: [.font: font]))
+            out.append(energyBarAttachment(fraction: frac, typing: typing))
         }
         statusItem.button?.attributedTitle = out
     }
