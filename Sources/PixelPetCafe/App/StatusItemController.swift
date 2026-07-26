@@ -64,6 +64,20 @@ final class StatusItemController: NSObject {
                 self.updateTitle(self.controller.state)
             }
             .store(in: &cancellables)
+        // Live typing reaction: the menu-bar energy bar (and brewing face)
+        // must redraw as typing SPEED changes — not only when coins or the
+        // boost multiplier change. Without this the bar never reacts while
+        // typing (and never at all when the tank is empty, since the boost
+        // is pinned at crawl and stops changing). keystrokesPerSec republishes
+        // every tick, so this drives a genuine per-second live reaction.
+        controller.$keystrokesPerSec
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refreshIcon()
+                self.updateTitle(self.controller.state)
+            }
+            .store(in: &cancellables)
         controller.saleEvents
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
