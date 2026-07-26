@@ -20,6 +20,35 @@ final class StatusItemController: NSObject {
     private var icons: [NSImage] = []   // frames 0..4: normal, blink, happy, sleep, sip
     private var cupIcons: [[NSImage]] = []   // [steamLevel][wiggleFrame]
     private var iconInterval: TimeInterval = 2.0
+    private var barPhase = 0
+
+    /// Draws a menu-bar frame nudged vertically, so the buddy physically
+    /// bounces while you type instead of only swapping frames in place.
+    /// Every frame goes through here (even at rest, dy = 0) so the icon never
+    /// changes size when the bounce starts or stops.
+    private func staged(_ image: NSImage, dy: CGFloat) -> NSImage {
+        let size = image.size
+        let inset: CGFloat = 2.4           // headroom so a bounce can't clip
+        let out = NSImage(size: size)
+        out.lockFocus()
+        image.draw(in: NSRect(x: inset / 2, y: inset / 2 + dy,
+                              width: size.width - inset, height: size.height - inset),
+                   from: .zero, operation: .sourceOver, fraction: 1)
+        out.unlockFocus()
+        out.isTemplate = false
+        return out
+    }
+
+    /// The bounce itself: taller and quicker the faster you type. Driven by
+    /// wall-clock rather than the frame tick so it stays smooth no matter
+    /// which animation tier is running.
+    private func bounceOffset(wpm: Double) -> CGFloat {
+        guard wpm >= 8 else { return 0 }
+        let amp = 0.45 + min(1.05, wpm / 55)
+        let hz = 1.3 + min(1.0, wpm / 60)
+        let t = Date().timeIntervalSinceReferenceDate
+        return CGFloat(sin(t * hz * 2 * .pi)) * amp
+    }
 
     init(controller: GameController) {
         self.controller = controller
@@ -245,15 +274,15 @@ final class StatusItemController: NSObject {
     private func refreshIcon() {
         // ☕ mode: steam level & wiggle speed follow the typing boost
         if !cupIcons.isEmpty {
-            let boost = controller.workBoost
-            let level = boost < 1.05 ? 0 : (boost < 1.7 ? 1 : 2)
-            let wanted: TimeInterval = [1.4, 0.8, 0.4][level]
+            // Steam follows typing SPEED, not workBoost — workBoost is pinned
+            // at the crawl value whenever the tank is empty, so the cup could
+            // never steam exactly when you were typing hardest to refill it.
+            let wpm = controller.wpm
+            let level = wpm < 12 ? 0 : (wpm < 40 ? 1 : 2)
+            let wanted: TimeInterval = [1.4, 0.5, 0.22][level]
             if wanted != iconInterval { restartIconTimer(interval: wanted) }
-            if level == 0 {
-                statusItem.button?.image = cupIcons[0][0]
-            } else {
-                statusItem.button?.image = cupIcons[level][iconTick % 2]
-            }
+            let frame = level == 0 ? cupIcons[0][0] : cupIcons[level][iconTick % 2]
+            statusItem.button?.image = staged(frame, dy: bounceOffset(wpm: wpm))
             return
         }
         guard icons.count == 7 else { return }
@@ -265,12 +294,21 @@ final class StatusItemController: NSObject {
         // buddy alternates brew frames rapidly with happy flashes.
         let wpm = controller.wpm
         if wpm >= 12, !SalesEngine.isClosed(controller.state), Date() >= happyUntil {
-            let interval: TimeInterval = wpm >= 50 ? 0.18 : (wpm >= 30 ? 0.3 : 0.55)
+            let interval: TimeInterval = wpm >= 50 ? 0.16 : (wpm >= 30 ? 0.28 : 0.5)
             if iconInterval != interval { restartIconTimer(interval: interval) }
-            // top tier: every 4th flip flashes the happy face — reads as
-            // gleeful frantic brewing rather than a subtle 2-frame shuffle
-            let frame = (wpm >= 50 && iconTick % 4 == 3) ? 2 : 5 + iconTick % 2
-            statusItem.button?.image = icons[frame]
+            // Brew, brew, and every so often a burst of personality: a grin
+            // when you're flying, a quick sip when you're cruising, the odd
+            // blink — so it reads as a working little character rather than
+            // a two-frame shuffle.
+            var frame = 5 + iconTick % 2
+            if wpm >= 50, iconTick % 4 == 3 {
+                frame = 2                                  // gleeful grin
+            } else if wpm >= 30, iconTick % 9 == 8 {
+                frame = 4                                  // quick sip
+            } else if iconTick % 13 == 12 {
+                frame = 1                                  // blink
+            }
+            statusItem.button?.image = staged(icons[frame], dy: bounceOffset(wpm: wpm))
             return
         }
         // C: the face reacts to what's happening, not just idle-loops.
@@ -297,7 +335,8 @@ final class StatusItemController: NSObject {
             default: frame = 0
             }
         }
-        statusItem.button?.image = icons[frame]
+        // an excited buddy bounces too — same motion the typing loop uses
+        statusItem.button?.image = staged(icons[frame], dy: excited ? bounceOffset(wpm: 45) : 0)
     }
 
     /// Small pixel icon (Sprites/icon_<name>.png) as an inline attachment,
@@ -315,8 +354,18 @@ final class StatusItemController: NSObject {
     /// state signal — muted gold when fuelled, amber when low, a restrained
     /// red when empty (the café is crawling). Sized and baseline-nudged to
     /// sit cleanly inline with the coin count.
-    private func energyBarAttachment(fraction: Double, typing: Double) -> NSAttributedString {
-        let w: CGFloat = 22, h: CGFloat = 11, barH: CGFloat = 5
+    private func energyBarAttachment(fraction: Double, typing: Double, phase: Int) -> NSAttributedString {
+        let img = Self.energyBarImage(fraction: fraction, typing: typing, phase: phase)
+        let attachment = NSTextAttachment()
+        attachment.image = img
+        attachment.bounds = CGRect(x: 0, y: -1.5, width: img.size.width, height: img.size.height)
+        return NSAttributedString(attachment: attachment)
+    }
+
+    /// The capsule itself. Static so a dev hook (PPC_BARSHOT) can render the
+    /// exact production drawing offscreen for eyeball verification.
+    static func energyBarImage(fraction: Double, typing: Double, phase: Int) -> NSImage {
+        let w: CGFloat = 24, h: CGFloat = 11, barH: CGFloat = 5
         let y = (h - barH) / 2
         let img = NSImage(size: NSSize(width: w, height: h))
         img.lockFocus()
@@ -324,34 +373,47 @@ final class StatusItemController: NSObject {
                                  xRadius: barH / 2, yRadius: barH / 2)
         NSColor.tertiaryLabelColor.setFill()
         track.fill()
-        let fillW = max(fraction > 0 ? barH : 0, w * CGFloat(fraction))
-        if fillW > 0 {
-            let fill = NSBezierPath(roundedRect: NSRect(x: 0, y: y, width: fillW, height: barH),
-                                    xRadius: barH / 2, yRadius: barH / 2)
+
+        // Both layers are plain rects clipped to the capsule, so they share
+        // one clean rounded silhouette instead of stacking rounded shapes.
+        NSGraphicsContext.saveGraphicsState()
+        track.addClip()
+
+        // Layer 1 — the tank: the slow truth. A full tank is ~20 minutes of
+        // solid typing, so this layer moves about one pixel per minute. On
+        // its own it looked completely frozen while you typed, which is
+        // exactly the "I type and type and the bar doesn't move" problem.
+        let tankW = fraction > 0 ? max(barH, w * CGFloat(fraction)) : 0
+        if tankW > 0 {
             var color: NSColor = fraction <= 0.001
                 ? NSColor.systemRed.withAlphaComponent(0.85)
                 : (fraction < 0.25 ? .systemOrange : NSColor.systemYellow.withAlphaComponent(0.95))
-            // live reaction: the faster you type, the brighter the fill glows
-            if typing > 0.02, let lit = color.blended(withFraction: CGFloat(typing) * 0.7, of: .white) {
+            if typing > 0.02, let lit = color.blended(withFraction: CGFloat(typing) * 0.6, of: .white) {
                 color = lit
             }
             color.setFill()
-            fill.fill()
-            // a bright leading spark that rides the fill edge while typing —
-            // the whole bar visibly quickens with your keystrokes
-            if typing > 0.05 {
-                let sparkX = min(w - barH, fillW - barH)
-                let spark = NSBezierPath(ovalIn: NSRect(x: max(0, sparkX), y: y, width: barH, height: barH))
-                NSColor.white.withAlphaComponent(0.35 + 0.5 * CGFloat(typing)).setFill()
-                spark.fill()
-            }
+            NSBezierPath(rect: NSRect(x: 0, y: y, width: tankW, height: barH)).fill()
         }
+
+        // Layer 2 — the live crest: THIS is what answers your keyboard. It
+        // surges across the empty part of the track in proportion to how fast
+        // you're typing right now and drains back when you stop, so every
+        // burst of typing visibly moves the bar within a fraction of a second.
+        let crestW = CGFloat(typing) * (w - tankW)
+        if crestW > 0.5 {
+            NSColor.white.withAlphaComponent(0.20 + 0.38 * CGFloat(typing)).setFill()
+            NSBezierPath(rect: NSRect(x: tankW, y: y, width: crestW, height: barH)).fill()
+            // a highlight running along the crest, so the bar still reads as
+            // alive even when you hold a perfectly steady speed
+            let travel = CGFloat(phase % 12) / 12
+            let dotX = tankW + crestW * travel
+            NSColor.white.withAlphaComponent(0.45 + 0.45 * CGFloat(typing)).setFill()
+            NSBezierPath(ovalIn: NSRect(x: dotX - barH / 2, y: y, width: barH, height: barH)).fill()
+        }
+        NSGraphicsContext.restoreGraphicsState()
         img.unlockFocus()
         img.isTemplate = false
-        let attachment = NSTextAttachment()
-        attachment.image = img
-        attachment.bounds = CGRect(x: 0, y: -1.5, width: w, height: h)
-        return NSAttributedString(attachment: attachment)
+        return img
     }
 
     /// One icon, one number — the alert state is a color change on the coin
@@ -372,8 +434,9 @@ final class StatusItemController: NSObject {
         if state.workMode {
             let frac = max(0, min(1, state.energy / EnergyEngine.energyCap))
             let typing = min(1, controller.wpm / 60)   // live reaction to speed
+            barPhase &+= 1
             out.append(NSAttributedString(string: "  ", attributes: [.font: font]))
-            out.append(energyBarAttachment(fraction: frac, typing: typing))
+            out.append(energyBarAttachment(fraction: frac, typing: typing, phase: barPhase))
         }
         statusItem.button?.attributedTitle = out
     }

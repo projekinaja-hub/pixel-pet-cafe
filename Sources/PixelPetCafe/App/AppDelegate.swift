@@ -39,6 +39,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        // dev hook: PPC_BARSHOT=/path.png renders the menu-bar energy capsule
+        // at a range of typing speeds so the live crest can be eyeballed
+        // without having to watch the real menu bar while typing.
+        if let path = ProcessInfo.processInfo.environment["PPC_BARSHOT"] {
+            let speeds: [Double] = [0, 0.15, 0.35, 0.6, 0.85, 1.0]
+            let scale: CGFloat = 6, pad: CGFloat = 6
+            let one = StatusItemController.energyBarImage(fraction: 0.49, typing: 0, phase: 0).size
+            let out = NSImage(size: NSSize(width: (one.width * scale + pad) * CGFloat(speeds.count) + pad,
+                                           height: one.height * scale + pad * 2))
+            out.lockFocus()
+            NSColor.black.setFill()
+            NSRect(origin: .zero, size: out.size).fill()
+            NSGraphicsContext.current?.imageInterpolation = .none
+            for (i, t) in speeds.enumerated() {
+                let img = StatusItemController.energyBarImage(fraction: 0.49, typing: t, phase: 3)
+                img.draw(in: NSRect(x: pad + (one.width * scale + pad) * CGFloat(i), y: pad,
+                                    width: one.width * scale, height: one.height * scale))
+            }
+            out.unlockFocus()
+            if let tiff = out.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) {
+                try? rep.representation(using: .png, properties: [:])?
+                    .write(to: URL(fileURLWithPath: path))
+            }
+            exit(0)
+        }
+
         // dev hook: PPC_SNAPSHOT=/path.png renders the panel offscreen and exits
         if let path = ProcessInfo.processInfo.environment["PPC_SNAPSHOT"] {
             runSnapshot(to: path)
