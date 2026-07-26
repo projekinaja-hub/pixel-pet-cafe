@@ -45,6 +45,9 @@ final class GameController: ObservableObject {
     /// Diagnostic only (PPC_KEYTEST): proves the poll loop is alive.
     private(set) var keySamplesTaken = 0
     private var lastKeyCount: UInt32?
+    /// Trailing per-sample key counts, used to measure speed over a real
+    /// window instead of a single 0.2s sample.
+    private var recentKeys: [(at: Date, keys: Double)] = []
     private var lastSampleAt = Date()
     private var keystrokesSinceLastTick = 0
     /// How often we ask the OS for the counter. Fast enough that the menu bar
@@ -310,7 +313,12 @@ final class GameController: ObservableObject {
             keystrokesSinceLastTick += Int(typed.rounded())
             lastKeystrokeAt = now
         }
-        let next = EnergyEngine.nextKps(current: keystrokesPerSec, creditedKeys: typed, dt: dt)
+        // Speed is measured over a trailing window, not off a single sample:
+        // one keystroke landing in one 0.2s sample used to read as 60 WPM.
+        recentKeys.append((now, typed))
+        recentKeys.removeAll { now.timeIntervalSince($0.at) > EnergyEngine.rateWindow }
+        let measured = EnergyEngine.windowedKps(keysInWindow: recentKeys.reduce(0) { $0 + $1.keys })
+        let next = EnergyEngine.nextKps(current: keystrokesPerSec, measured: measured, dt: dt)
         if abs(next - keystrokesPerSec) > 0.005 { keystrokesPerSec = next }
     }
 
@@ -319,6 +327,7 @@ final class GameController: ObservableObject {
         keySampler = nil
         lastKeyCount = nil
         keystrokesSinceLastTick = 0
+        recentKeys = []
         // the tank keeps ruling the café even with the monitor off
         workBoost = EnergyEngine.speedFactor(energy: state.energy, kps: 0)
         keystrokesPerSec = 0

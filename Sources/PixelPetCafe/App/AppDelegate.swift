@@ -79,6 +79,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let path = ProcessInfo.processInfo.environment["PPC_BARFILM"] {
             let dt = 0.2, steps = 55, perRow = 11
             var kps = 0.0, pending = 0.0, seed: UInt64 = 12345
+            var window: [Double] = []
+            let slots = Int(EnergyEngine.rateWindow / dt)
             var frames: [NSImage] = []
             for i in 0..<steps {
                 let t = Double(i) * dt
@@ -90,8 +92,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 pending += targetKps * dt * jitter
                 let keys = pending.rounded(.down)
                 pending -= keys
-                let credited = EnergyEngine.creditedKeys(delta: keys, dt: dt)
-                kps = EnergyEngine.nextKps(current: kps, creditedKeys: credited, dt: dt)
+                window.append(EnergyEngine.creditedKeys(delta: keys, dt: dt))
+                if window.count > slots { window.removeFirst(window.count - slots) }
+                let measured = EnergyEngine.windowedKps(keysInWindow: window.reduce(0, +))
+                kps = EnergyEngine.nextKps(current: kps, measured: measured, dt: dt)
                 let speed = kps * 12 / StatusItemController.speedFullAtWPM
                 frames.append(StatusItemController.energyBarImage(fuel: 0.49, speed: speed))
             }

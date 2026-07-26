@@ -22,12 +22,24 @@ enum EnergyEngine {
     // MARK: live typing speed
 
     /// Ceiling on keys credited per second. Caps the catch-up after a stalled
-    /// timer or a sleep so a long gap can't dump an hour of typing in at once.
-    static let maxKeysPerSecond = 20.0
-    /// How fast the speed reading climbs while typing (seconds to ~63%)…
-    static let riseTau = 0.45
-    /// …and how gently it falls, so the meter doesn't strobe between words.
-    static let fallTau = 1.8
+    /// timer or a sleep so a long gap can't dump an hour of typing in at once,
+    /// and blunts key auto-repeat (holding backspace fires ~15 keys/sec, which
+    /// is not typing). 12 keys/sec is ~144 WPM — above any sustained human
+    /// prose speed, so real typing is never clipped.
+    static let maxKeysPerSecond = 12.0
+
+    /// Trailing window the speed is measured over.
+    ///
+    /// This is what makes the number HONEST. The speed used to be derived from
+    /// one 0.2s sample, so a single keystroke landing in a sample read as
+    /// 5 keys/sec — 60 WPM off one key, which is why a few casual keystrokes
+    /// looked like a sprint. Rate is now "keys actually seen in the last two
+    /// seconds", so one key reads as ~6 WPM, which is what one key is worth.
+    static let rateWindow = 2.0
+    /// How fast the displayed speed climbs toward the measured rate…
+    static let riseTau = 0.5
+    /// …and how gently it falls, so pauses between words don't make it strobe.
+    static let fallTau = 1.5
 
     /// Keys we're willing to credit for a counter jump of `delta` over `dt`.
     static func creditedKeys(delta: Double, dt: Double) -> Double {
@@ -35,18 +47,18 @@ enum EnergyEngine {
         return min(delta, maxKeysPerSecond * dt)
     }
 
-    /// One step of the live typing-speed filter, in keys/sec.
-    ///
-    /// Asymmetric on purpose: springs UP fast so the café reacts within a
-    /// keystroke or two, eases DOWN slowly so brief pauses between words don't
-    /// make the meter flicker. The previous approach averaged a flat 10-second
-    /// window, which meant real typing at 50 WPM read as ~5 WPM for the first
-    /// second and took ~3 seconds just to cross the lowest animation threshold.
-    static func nextKps(current: Double, creditedKeys: Double, dt: Double) -> Double {
+    /// The measured typing rate: keys seen across the trailing window.
+    static func windowedKps(keysInWindow: Double) -> Double {
+        max(0, keysInWindow / rateWindow)
+    }
+
+    /// One step of the display filter, easing the shown speed toward the
+    /// measured rate. Asymmetric on purpose: climbs quickly so the café reacts
+    /// while you type, eases down slowly so brief pauses don't make it flicker.
+    static func nextKps(current: Double, measured: Double, dt: Double) -> Double {
         guard dt > 0 else { return current }
-        let instant = creditedKeys / dt
-        let tau = instant > current ? riseTau : fallTau
-        return max(0, current + (instant - current) * (1 - exp(-dt / tau)))
+        let tau = measured > current ? riseTau : fallTau
+        return max(0, current + (measured - current) * (1 - exp(-dt / tau)))
     }
 
     /// The café-wide speed multiplier (customer arrivals AND service capacity,

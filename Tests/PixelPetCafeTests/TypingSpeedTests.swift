@@ -8,16 +8,29 @@ final class TypingSpeedTests: XCTestCase {
 
     private let dt = 0.2   // the real sampler interval
 
+    /// Mirrors the production sampler: per-sample key counts go into a
+    /// trailing window, the window gives the measured rate, and the display
+    /// value eases toward it.
+    private struct Meter {
+        var shown = 0.0
+        private var window: [Double] = []
+        private let slots = Int(EnergyEngine.rateWindow / 0.2)
+
+        mutating func sample(keys: Double, dt: Double = 0.2) {
+            window.append(EnergyEngine.creditedKeys(delta: keys, dt: dt))
+            if window.count > slots { window.removeFirst(window.count - slots) }
+            let measured = EnergyEngine.windowedKps(keysInWindow: window.reduce(0, +))
+            shown = EnergyEngine.nextKps(current: shown, measured: measured, dt: dt)
+        }
+        var wpm: Double { shown * 12 }
+    }
+
     /// Simulates typing at `wpm` for `seconds` and returns the reading the
     /// menu bar would show at the end.
-    private func typeSteadily(wpm: Double, seconds: Double, from start: Double = 0) -> Double {
-        let kps = wpm / 12                    // 5 chars/word
-        var current = start
-        for _ in 0..<Int(seconds / dt) {
-            let credited = EnergyEngine.creditedKeys(delta: kps * dt, dt: dt)
-            current = EnergyEngine.nextKps(current: current, creditedKeys: credited, dt: dt)
-        }
-        return current * 12                   // back to WPM
+    private func typeSteadily(wpm: Double, seconds: Double) -> Double {
+        var m = Meter()
+        for _ in 0..<Int(seconds / dt) { m.sample(keys: (wpm / 12) * dt) }
+        return m.wpm
     }
 
     // MARK: responsiveness — the actual bug
@@ -41,31 +54,51 @@ final class TypingSpeedTests: XCTestCase {
         XCTAssertEqual(reading, 60, accuracy: 6)
     }
 
+    /// A handful of casual keystrokes must NOT read as sprinting. Measuring
+    /// off a single 0.2s sample made one key look like 60 WPM, so tapping a
+    /// few keys pinned the whole meter — this is that regression.
+    func testAFewCasualKeysDoNotReadAsFastTyping() {
+        var m = Meter()
+        m.sample(keys: 1)                      // three keys, one per sample
+        m.sample(keys: 1)
+        m.sample(keys: 1)
+        XCTAssertLessThan(m.wpm, 20, "3 keystrokes must not look like real typing")
+        // 3 keys inside a 2s window really is ~18 WPM, and it stays there
+        // until those keys age out — then it returns to rest.
+        for _ in 0..<20 { m.sample(keys: 0) }
+        XCTAssertLessThan(m.wpm, 8)
+    }
+
+    func testOneKeystrokeIsWorthAboutOneKeystroke() {
+        var m = Meter()
+        m.sample(keys: 1)
+        for _ in 0..<5 { m.sample(keys: 0) }
+        // 1 key over a 2s window = 0.5 keys/sec = 6 WPM, never 60
+        XCTAssertLessThan(m.wpm, 8)
+    }
+
     func testRisesFasterThanItFalls() {
         let rise = typeSteadily(wpm: 60, seconds: 0.6)
-        let settled = typeSteadily(wpm: 60, seconds: 6.0)
-        // decay from the settled reading with no keys at all
-        var falling = settled / 12
-        for _ in 0..<3 {
-            falling = EnergyEngine.nextKps(current: falling, creditedKeys: 0, dt: dt)
-        }
-        let dropped = settled - falling * 12
-        XCTAssertGreaterThan(rise, dropped, "meter must spring up faster than it sags")
+        var m = Meter()
+        for _ in 0..<Int(6.0 / dt) { m.sample(keys: (60.0 / 12) * dt) }
+        let settled = m.wpm
+        for _ in 0..<3 { m.sample(keys: 0) }
+        XCTAssertGreaterThan(rise, settled - m.wpm, "must spring up faster than it sags")
     }
 
     /// Brief pauses between words must not blank the meter out.
     func testShortPauseKeepsTheCafeAwake() {
-        var kps = typeSteadily(wpm: 60, seconds: 4.0) / 12
-        for _ in 0..<2 {   // 0.4s of no typing — a normal between-word gap
-            kps = EnergyEngine.nextKps(current: kps, creditedKeys: 0, dt: dt)
-        }
-        XCTAssertGreaterThan(kps * 12, 30, "a half-second pause shouldn't kill the animation")
+        var m = Meter()
+        for _ in 0..<Int(4.0 / dt) { m.sample(keys: (60.0 / 12) * dt) }
+        for _ in 0..<2 { m.sample(keys: 0) }   // 0.4s gap — a normal word break
+        XCTAssertGreaterThan(m.wpm, 30, "a half-second pause shouldn't kill the animation")
     }
 
     func testStoppingSettlesToZero() {
-        var kps = typeSteadily(wpm: 60, seconds: 4.0) / 12
-        for _ in 0..<Int(15 / dt) { kps = EnergyEngine.nextKps(current: kps, creditedKeys: 0, dt: dt) }
-        XCTAssertEqual(kps, 0, accuracy: 0.05)
+        var m = Meter()
+        for _ in 0..<Int(4.0 / dt) { m.sample(keys: (60.0 / 12) * dt) }
+        for _ in 0..<Int(15 / dt) { m.sample(keys: 0) }
+        XCTAssertEqual(m.shown, 0, accuracy: 0.05)
     }
 
     // MARK: credited keys
@@ -90,12 +123,18 @@ final class TypingSpeedTests: XCTestCase {
 
     func testSpeedReadingIsBoundedByTheCap() {
         // even an absurd counter jump can't show an impossible speed
-        var kps = 0.0
-        for _ in 0..<20 {
-            let credited = EnergyEngine.creditedKeys(delta: 9_999, dt: dt)
-            kps = EnergyEngine.nextKps(current: kps, creditedKeys: credited, dt: dt)
-        }
-        XCTAssertLessThanOrEqual(kps, EnergyEngine.maxKeysPerSecond + 0.001)
+        var m = Meter()
+        for _ in 0..<20 { m.sample(keys: 9_999) }
+        XCTAssertLessThanOrEqual(m.shown, EnergyEngine.maxKeysPerSecond + 0.001)
+    }
+
+    /// Holding a key down fires ~15 repeats/sec at the OS level; that is not
+    /// typing, so the credit ceiling has to sit below it.
+    func testKeyAutoRepeatCannotOutrunTheCeiling() {
+        XCTAssertLessThan(EnergyEngine.maxKeysPerSecond, 15)
+        var m = Meter()
+        for _ in 0..<20 { m.sample(keys: 15 * dt) }
+        XCTAssertLessThanOrEqual(m.wpm, EnergyEngine.maxKeysPerSecond * 12 + 0.1)
     }
 
     // MARK: the speed factor this all feeds
