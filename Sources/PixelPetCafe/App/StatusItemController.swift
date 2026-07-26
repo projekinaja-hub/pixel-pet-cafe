@@ -328,16 +328,16 @@ final class StatusItemController: NSObject {
         // Rebuilding the popover content from scratch before showing is
         // cheap insurance — same controller, same scene, fresh view stack.
         // Revive the sim/icon timers if they died during long idle (they
-        // can stop firing on RunLoop.main). This click path always runs.
+        // can stop firing on RunLoop.main). This click path always runs,
+        // independent of our timers, so it's a reliable recovery point.
         controller.ensureRunning()
         if iconTimer == nil || iconTimer?.isValid != true { restartIconTimer(interval: iconInterval) }
-        // Rebuild the popover's view stack if it's been idle long enough to
-        // go stale (SpriteView/hosting freeze); 15 min is cheap insurance.
-        if Date().timeIntervalSince(lastPopoverOpenAt) > 15 * 60 {
-            let host = NSHostingController(rootView: PanelView(controller: controller, scene: scene))
-            host.preferredContentSize = NSSize(width: 360, height: 544)
-            popover.contentViewController = host
-        }
+        // NOTE: previously rebuilt the popover's NSHostingController/SpriteView
+        // here every 15 min "to self-heal" — but a freshly created SpriteView
+        // frequently presents a frozen first frame, so that self-heal became
+        // the *cause* of frequent stuck-on-open. Removed: the existing view
+        // stack is reused and simply unpaused (setActive), which is the
+        // known-good common-case path.
         lastPopoverOpenAt = Date()
         scene.configure(with: controller.state)
         scene.setActive(true)
