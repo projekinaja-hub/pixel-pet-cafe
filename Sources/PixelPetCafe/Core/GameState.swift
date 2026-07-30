@@ -94,6 +94,10 @@ struct GameState: Codable {
     // isn't instantly crawling before they've typed anything.
     var energy: Double = 3000
     var lifetimeKeystrokes: Double = 0
+    // v14: schema version, so one-time repairs in migrated() run exactly once.
+    // Absent in every older save, which decodes as 0 — precisely the saves
+    // that still need the version-1 repairs.
+    var saveVersion: Int = 0
 
     static let starterStock: [String: Int] = ["beans": 40, "milk": 25, "flour": 20, "sugar": 20]
 
@@ -154,6 +158,9 @@ struct GameState: Codable {
         // with the key monitor on (workMode stays as the user's opt-out
         // toggle; existing saves keep whatever they chose).
         s.workMode = true
+        // A brand-new save has no past damage to repair, so it starts current
+        // and every migration correctly skips it.
+        s.saveVersion = currentSaveVersion
         return s.normalized()
     }
 
@@ -162,30 +169,49 @@ struct GameState: Codable {
     /// than one whose player chose not to type.
     static let deadCountingThreshold = 500.0
 
-    /// Fills empty café list / stock / menus (new games and migrated saves).
-    func normalized() -> GameState {
-        let deadCountingThreshold = GameState.deadCountingThreshold
+    /// Schema version this build writes. Bump when adding a repair to
+    /// `migrated()`; saves at or above it skip every repair.
+    static let currentSaveVersion = 1
+
+    /// ONE-TIME repairs for damage done by past bugs.
+    ///
+    /// These used to live in `normalized()`, which runs on every single load —
+    /// so a repair could fire again and again. The energy restore was outright
+    /// farmable: quit and relaunch and the tank refilled, forever, as long as
+    /// lifetime keystrokes stayed under the threshold. Version-gating makes
+    /// each repair run exactly once per save, which is what a migration is.
+    ///
+    /// Call before `normalized()`; `normalized()` stays purely idempotent.
+    func migrated() -> GameState {
         var s = self
-        // repair star counts minted by the old unbounded sqrt prestige formula
-        s.stars = EconomyEngine.normalizedStars(s.stars)
-        // Typing-energy migration: saves created before the pivot have the
-        // old opt-in workMode=false default, which silently disables the
-        // now-CORE loop (no energy gain while the tank still burns). A save
-        // that has never typed a single counted key can't have opted out —
-        // enable it. Anyone who later flips the toggle off has
-        // lifetimeKeystrokes > 0 and is never touched again.
-        if s.lifetimeKeystrokes < deadCountingThreshold, !s.workMode { s.workMode = true }
-        // Tank-drain repair: the counting bug let the tank burn to empty while
-        // barely any keystroke could ever refill it (the old global monitor
-        // could sit "installed" and dead forever). A save with almost no
-        // counted keys never really spent its energy — restore the starter
-        // tank so the café isn't dead on arrival. Self-limiting: once real
-        // counting banks a few hundred keys, this never fires again.
-        if s.lifetimeKeystrokes < deadCountingThreshold, s.energy <= 0 { s.energy = 3000 }
-        // load-time mercy for saves caught by the old closed-café reputation
-        // grind (arrivals used to ding a closed café to 0): rep below the
-        // closed floor can only have come from that trap.
-        s.reputation = max(s.reputation, SalesEngine.closedReputationFloor)
+        guard s.saveVersion < Self.currentSaveVersion else { return s }
+
+        if s.saveVersion < 1 {
+            // repair star counts minted by the old unbounded sqrt prestige formula
+            s.stars = EconomyEngine.normalizedStars(s.stars)
+            // Typing-energy pivot: saves from before it carry the old opt-in
+            // workMode=false default, which silently disables the now-CORE
+            // loop (no energy gain while the tank still burns). A save that
+            // never counted a key can't have meaningfully opted out.
+            if s.lifetimeKeystrokes < Self.deadCountingThreshold, !s.workMode { s.workMode = true }
+            // Tank-drain repair: the dead-monitor bug let the tank burn to
+            // empty while almost no keystroke could refill it, so the café
+            // would be crawling on arrival through no fault of the player.
+            if s.lifetimeKeystrokes < Self.deadCountingThreshold, s.energy <= 0 { s.energy = 3000 }
+            // Mercy for saves caught by the old closed-café reputation grind
+            // (arrivals used to ding a closed café all the way to 0).
+            s.reputation = max(s.reputation, SalesEngine.closedReputationFloor)
+        }
+
+        s.saveVersion = Self.currentSaveVersion
+        return s
+    }
+
+    /// Fills empty café list / stock / menus. Idempotent by contract: safe to
+    /// run on every load, and must never contain a one-time repair — those
+    /// belong in `migrated()`.
+    func normalized() -> GameState {
+        var s = self
         if s.cafes.isEmpty { s.cafes = [CafeState.fresh(city: "home")] }
         s.activeCafe = min(max(0, s.activeCafe), s.cafes.count - 1)
         for i in s.cafes.indices {
@@ -223,7 +249,7 @@ struct GameState: Codable {
         case worldsVisited
         case activeGoals, goalsDay, dailyStreak, lastPlayedRealDate, lastCheckInDate
         case staffColors, staffPaint
-        case energy, lifetimeKeystrokes
+        case energy, lifetimeKeystrokes, saveVersion
         // legacy root café fields (decode only)
         case staffLevels, equipmentLevels, stock, menuEnabled
         case cleanliness, customerProgress, lastSaleAt
@@ -268,6 +294,7 @@ struct GameState: Codable {
         let decodedPaint = try c.decodeIfPresent([String: PixelArt].self, forKey: .staffPaint) ?? [:]
         staffPaint = decodedPaint.mapValues { $0.normalized }
         energy = try c.decodeIfPresent(Double.self, forKey: .energy) ?? 3000
+        saveVersion = try c.decodeIfPresent(Int.self, forKey: .saveVersion) ?? 0
         lifetimeKeystrokes = try c.decodeIfPresent(Double.self, forKey: .lifetimeKeystrokes) ?? 0
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0
         if let decoded = try c.decodeIfPresent([CafeState].self, forKey: .cafes), !decoded.isEmpty {
@@ -328,6 +355,7 @@ struct GameState: Codable {
         try c.encode(staffColors, forKey: .staffColors)
         try c.encode(staffPaint, forKey: .staffPaint)
         try c.encode(energy, forKey: .energy)
+        try c.encode(saveVersion, forKey: .saveVersion)
         try c.encode(lifetimeKeystrokes, forKey: .lifetimeKeystrokes)
     }
 }
@@ -345,6 +373,7 @@ extension GameState: Equatable {
             && lhs.stars == rhs.stars
             && lhs.lastSaved == rhs.lastSaved
             && lhs.muted == rhs.muted
+            && lhs.saveVersion == rhs.saveVersion
             && lhs.customItems == rhs.customItems
             && lhs.owner == rhs.owner
             && lhs.barCharacter == rhs.barCharacter

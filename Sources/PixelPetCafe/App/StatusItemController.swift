@@ -54,6 +54,13 @@ final class StatusItemController: NSObject {
         self.scene = CafeScene()
         super.init()
 
+        // Render heartbeat for RuntimeHealth: only a scene that is supposed to
+        // be drawing can be "stalled", so an off-screen scene reports nil.
+        let watched = scene
+        controller.renderAgeProvider = { [weak watched] in
+            guard let sc = watched, sc.isRenderExpected else { return nil }
+            return Date().timeIntervalSince(sc.lastFrameAt)
+        }
         scene.onGoldenTip = { [weak controller] in controller?.collectGoldenTip() }
         scene.onCleanSpot = { [weak controller] in controller?.cleanSpot() }
         scene.onMapSelect = { [weak controller] city in controller?.mapSelect(city) }

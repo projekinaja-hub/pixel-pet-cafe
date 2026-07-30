@@ -110,6 +110,14 @@ struct PanelView: View {
                 GameSpriteView(scene: scene, reloadToken: controller.viewReloadToken)
                     .frame(width: 360, height: 240)
                     .clipped()
+                    // The app must SAY when a moving part died, rather than
+                    // sitting there looking fine (see RuntimeHealth).
+                    .overlay(alignment: .bottom) {
+                        if !controller.runtimeFaults.isEmpty {
+                            RuntimeFaultBar(faults: controller.runtimeFaults)
+                                .padding(.bottom, 6)
+                        }
+                    }
                 if let haul = controller.awayReport {
                     AwayToast(haul: haul) { controller.awayReport = nil }
                         .padding(.top, 10)
@@ -360,5 +368,27 @@ struct AwayToast: View {
         .background(Theme.bg.opacity(0.92))
         .cornerRadius(10)
         .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.gold.opacity(0.5), lineWidth: 1))
+    }
+}
+
+
+/// Visible evidence that the app noticed its own failure and is fixing it.
+struct RuntimeFaultBar: View {
+    let faults: [RuntimeHealth.Fault]
+
+    var body: some View {
+        VStack(spacing: 2) {
+            ForEach(faults, id: \.rawValue) { fault in
+                HStack(spacing: 5) {
+                    Text("🛠").font(.system(size: 9))
+                    Text(RuntimeHealth.message(for: fault))
+                        .font(.system(size: 9, weight: .semibold, design: .rounded))
+                        .foregroundColor(Theme.cream)
+                }
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Theme.danger.opacity(0.85))
+                .cornerRadius(6)
+            }
+        }
     }
 }

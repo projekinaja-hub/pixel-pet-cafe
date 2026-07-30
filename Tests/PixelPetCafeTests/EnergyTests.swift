@@ -147,7 +147,8 @@ final class EnergyMigrationTests: XCTestCase {
         let json = """
         {"coins": 100, "workMode": false, "cafes": [{"city": "home"}]}
         """
-        let s = try JSONDecoder().decode(GameState.self, from: Data(json.utf8)).normalized()
+        // repairs live in migrated() now, so they run exactly once per save
+        let s = try JSONDecoder().decode(GameState.self, from: Data(json.utf8)).migrated()
         XCTAssertTrue(s.workMode, "a save that never typed can't have opted out — energy is the core loop")
     }
 
@@ -155,7 +156,7 @@ final class EnergyMigrationTests: XCTestCase {
         let json = """
         {"coins": 100, "workMode": false, "lifetimeKeystrokes": 5000, "cafes": [{"city": "home"}]}
         """
-        let s = try JSONDecoder().decode(GameState.self, from: Data(json.utf8)).normalized()
+        let s = try JSONDecoder().decode(GameState.self, from: Data(json.utf8)).migrated()
         XCTAssertFalse(s.workMode, "a player who typed and then turned it off keeps their choice")
     }
 }

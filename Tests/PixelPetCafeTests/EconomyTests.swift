@@ -110,9 +110,10 @@ final class StarMigrationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(EconomyEngine.normalizedStars(1_001), 60)
     }
 
-    func testNormalizedRepairsStarsOnLoad() {
+    func testMigrationRepairsStarsOnLoad() {
         var s = GameState.newGame()
+        s.saveVersion = 0            // an old save, which is what needs repairing
         s.stars = 1_434_965_406
-        XCTAssertEqual(s.normalized().stars, 183)
+        XCTAssertEqual(s.migrated().stars, 183)
     }
 }

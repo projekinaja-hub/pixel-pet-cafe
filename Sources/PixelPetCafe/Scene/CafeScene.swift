@@ -1119,7 +1119,16 @@ final class CafeScene: SKScene {
         nextTipAt = Date().addingTimeInterval(Double.random(in: 120...300))
     }
 
+    /// Render heartbeat: SpriteKit's display link has died silently before
+    /// (frozen picture, live simulation) and nothing could detect it. This is
+    /// what RuntimeHealth watches to notice — see RuntimeHealth.Fault.renderStalled.
+    private(set) var lastFrameAt = Date()
+    /// True while the scene is expected to be drawing. A paused, off-screen
+    /// scene is supposed to stop, so silence is only a fault when this is set.
+    var isRenderExpected: Bool { !isPaused }
+
     override func update(_ currentTime: TimeInterval) {
+        lastFrameAt = Date()
         if mode == .casino {
             if !isPaused, casinoPatrons.count < 3, Date() >= nextPatronAt {
                 spawnCasinoPatron()

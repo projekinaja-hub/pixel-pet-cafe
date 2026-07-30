@@ -79,6 +79,40 @@ final class GameController: ObservableObject {
     /// change, restarting SKView's display link (the long-idle freeze cure).
     @Published private(set) var viewReloadToken = 0
     func bumpViewReload() { viewReloadToken += 1 }
+
+    // MARK: runtime health (see RuntimeHealth)
+
+    /// Faults detected on the last tick. Published so the panel can SAY the
+    /// app broke instead of silently looking fine — the failure mode that has
+    /// cost this project more time than any logic bug.
+    @Published private(set) var runtimeFaults: [RuntimeHealth.Fault] = []
+    /// Set by StatusItemController, which owns the scene: reports seconds since
+    /// the last drawn frame, or nil when the scene isn't meant to be drawing.
+    var renderAgeProvider: (() -> TimeInterval?)?
+    /// Count of self-heals performed, for diagnostics (PPC_KEYTEST).
+    private(set) var selfHealCount = 0
+
+    /// Compare every heartbeat against its deadline, then repair whatever died.
+    /// Runs from the tick — and because a dead tick can't check itself, the
+    /// menu-bar click path (`ensureRunning`) remains the outer backstop.
+    private func checkRuntimeHealth(now: Date) {
+        let probe = RuntimeHealth.Probe(
+            tickAge: now.timeIntervalSince(lastTick),
+            keySampleAge: state.workMode ? now.timeIntervalSince(lastSampleAt) : nil,
+            renderAge: renderAgeProvider?())
+        let faults = RuntimeHealth.faults(probe)
+        if faults != runtimeFaults { runtimeFaults = faults }
+        guard !faults.isEmpty else { return }
+        selfHealCount += 1
+        for fault in faults {
+            switch fault {
+            case .simStalled: installTickTimer()
+            case .typingNotCounting: startKeyTracking()
+            case .renderStalled: bumpViewReload()
+            }
+            showBanner("🛠", RuntimeHealth.message(for: fault))
+        }
+    }
     /// Fractional change vs ~60s ago: +0.10 = income up 10% in the last minute.
     var incomeTrend: Double {
         guard incomeHistory.count >= 30, let past = incomeHistory.first, past > 0 else { return 0 }
@@ -97,7 +131,10 @@ final class GameController: ObservableObject {
 
     init(persistence: Persistence) {
         self.persistence = persistence
-        var loaded = persistence.load().normalized()
+        // migrated() first (one-time repairs, version-gated), then normalized()
+        // (idempotent structural fills). Order matters: repairs assume the
+        // fields they touch, fills assume the repairs already ran.
+        var loaded = persistence.load().migrated().normalized()
         if let last = loaded.lastSaved {
             let elapsed = Date().timeIntervalSince(last)
             let haul = SalesEngine.offlineSim(&loaded, elapsed: elapsed)
@@ -150,6 +187,9 @@ final class GameController: ObservableObject {
     private func tick() {
         let now = Date()
         let dt = min(max(0, now.timeIntervalSince(lastTick)), 5)
+        // Health is judged BEFORE lastTick moves, so tickAge still reflects the
+        // real gap since the previous tick rather than being reset to zero.
+        checkRuntimeHealth(now: now)
         lastTick = now
         updateWorkBoost(now: now, dt: dt)
         if let event = Events.maybeSpawn(&state, dt: dt, now: now, rng: &rng) {
