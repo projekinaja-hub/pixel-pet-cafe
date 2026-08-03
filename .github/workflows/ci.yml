@@ -26,8 +26,13 @@ jobs:
       - name: Build
         run: swift build
 
+      # Plain `swift test`, NOT tools/test.sh. That wrapper exists for one
+      # developer machine, where XCTest needs explicit DYLD paths and an
+      # --enable-xctest flag that older toolchains don't even have
+      # ("error: Unknown option '--enable-xctest'"). A clean runner needs
+      # neither.
       - name: Test
-        run: swift test --enable-xctest
+        run: swift test
 
       # Proves the app bundle still assembles — catches Info.plist/resource
       # breakage that plain `swift build` cannot see. Unsigned: CI has no
