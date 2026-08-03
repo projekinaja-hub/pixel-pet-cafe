@@ -32,6 +32,10 @@ final class CafeScene: SKScene {
     private var tipNode: SKSpriteNode?
     private var nextTipAt: Date = .distantFuture
     private var activeCustomers = 0
+    /// The line at the counter, front first.
+    private var queue: [QueuedCustomer] = []
+    /// Timestamps of recent sales, trimmed to `CafePacing.rateWindow`.
+    private var recentArrivals: [Date] = []
     private var casinoPatrons: [SKSpriteNode] = []
     private var nextPatronAt: Date = .distantFuture
 
@@ -1030,12 +1034,15 @@ final class CafeScene: SKScene {
         return node
     }
 
-    private func animatedSprite(prefix: String) -> SKSpriteNode {
+    /// `legFrame` defaults to the old fixed 0.45s cadence, which is right for
+    /// the ambient casino patrons that drift between machines. Walking café
+    /// customers pass a cadence matched to their ground speed instead.
+    private func animatedSprite(prefix: String, legFrame: TimeInterval = 0.45) -> SKSpriteNode {
         let frames = [SpriteLoader.texture("\(prefix)_0"), SpriteLoader.texture("\(prefix)_1")]
         let node = SKSpriteNode(texture: frames[0])
         node.size = frames[0].size()
         node.anchorPoint = CGPoint(x: 0.5, y: 0)
-        node.run(.repeatForever(.animate(with: frames, timePerFrame: 0.45)))
+        node.run(.repeatForever(.animate(with: frames, timePerFrame: legFrame)), withKey: "legs")
         let shadow = SKSpriteNode(texture: SpriteLoader.texture("shadow"))
         shadow.size = shadow.texture!.size()
         shadow.position = CGPoint(x: 0, y: 0)
@@ -1046,44 +1053,164 @@ final class CafeScene: SKScene {
 
     // MARK: customer visits (event-driven)
 
+    /// Someone in line at the counter, waiting to be served.
+    private struct QueuedCustomer {
+        let node: SKSpriteNode
+        let frames: [SKTexture]
+        let event: SaleEvent
+        var serving = false
+    }
+
+    /// Where the `index`-th person in line stands. The line forms back toward
+    /// the door, drifting slightly down-screen so it reads as receding into
+    /// the room rather than as a flat row.
+    private static func queueSpot(_ index: Int) -> CGPoint {
+        CGPoint(x: counterPoint.x + CafePacing.queueOffset(index),
+                y: counterPoint.y - CGFloat(min(index, CafePacing.maxQueueDepth)) * 1.4)
+    }
+
+    private func walkDuration(from: CGPoint, to: CGPoint, speed: Double) -> TimeInterval {
+        let distance = Double(hypot(to.x - from.x, to.y - from.y))
+        return max(0.12, distance / CafePacing.walkPointsPerSec / speed)
+    }
+
+    /// Swaps a customer's leg cadence — brisk while walking, slow while sitting
+    /// or standing in line. Without this, faster pacing just replayed the same
+    /// glide on fast-forward instead of looking like quicker walking.
+    private func setLegs(_ node: SKSpriteNode, frames: [SKTexture], timePerFrame: TimeInterval) {
+        node.removeAction(forKey: "legs")
+        node.run(.repeatForever(.animate(with: frames, timePerFrame: timePerFrame)), withKey: "legs")
+    }
+
+    /// Sales seen in the trailing window — the café's REAL rate, measured from
+    /// the events actually arriving rather than asked of the economy, so the
+    /// picture can't drift away from what is being sold.
+    private func noteArrival() {
+        let now = Date()
+        recentArrivals.append(now)
+        recentArrivals.removeAll { now.timeIntervalSince($0) > CafePacing.rateWindow }
+    }
+
+    private var liveSalesPerSec: Double {
+        Double(recentArrivals.count) / CafePacing.rateWindow
+    }
+
     func playSale(_ event: SaleEvent) {
-        guard !isPaused, mode == .cafe, activeCustomers < 4 else { return }
+        guard !isPaused, mode == .cafe else { return }
+        // Counted even when the customer below is dropped for want of a slot:
+        // this has to measure what the café SELLS, not what it manages to show.
+        noteArrival()
+        let speed = CafePacing.speed(salesPerSec: liveSalesPerSec)
+        guard activeCustomers < CafePacing.onScreenCap(salesPerSec: liveSalesPerSec) else { return }
         activeCustomers += 1
-        let customer = animatedSprite(prefix: "customer_\(event.customerSpecies)")
+
+        let frames = [SpriteLoader.texture("customer_\(event.customerSpecies)_0"),
+                      SpriteLoader.texture("customer_\(event.customerSpecies)_1")]
+        let customer = animatedSprite(prefix: "customer_\(event.customerSpecies)",
+                                      legFrame: CafePacing.legFrame(speed: speed))
         customer.position = Self.doorPoint
         customer.zPosition = 11
         customer.alpha = 0
         cafeLayer.addChild(customer)
 
-        let toCounter = SKAction.sequence([
-            .fadeIn(withDuration: 0.3),
-            .move(to: Self.counterPoint, duration: 2.2),
-        ])
-        customer.run(toCounter) { [weak self, weak customer] in
-            guard let self, let customer else { return }
-            self.showBubble(over: customer, event: event)
-            if event.bigSpender {
-                self.sparkle(at: customer.position, color: NSColor(calibratedRed: 1, green: 0.85, blue: 0.4, alpha: 1))
-            }
-            if event.mood == .angry || event.mood == .sadLeave || event.mood == .noTable || !event.dineIn {
-                customer.run(.sequence([
-                    .wait(forDuration: 1.4),
-                    .move(to: Self.doorPoint, duration: 1.6),
-                    .fadeOut(withDuration: 0.3),
-                    .removeFromParent(),
-                ])) { [weak self] in self?.activeCustomers -= 1 }
-            } else {
-                let seat = currentSeatPoints[Int.random(in: 0..<currentSeatPoints.count)]
-                customer.run(.sequence([
-                    .wait(forDuration: 1.6),
-                    .move(to: seat, duration: 1.8),
-                    .wait(forDuration: 3.5),
-                    .move(to: Self.doorPoint, duration: 2.2),
-                    .fadeOut(withDuration: 0.3),
-                    .removeFromParent(),
-                ])) { [weak self] in self?.activeCustomers -= 1 }
-            }
+        queue.append(QueuedCustomer(node: customer, frames: frames, event: event))
+        let spot = Self.queueSpot(queue.count - 1)
+        customer.run(.sequence([
+            .fadeIn(withDuration: 0.3 / speed),
+            .move(to: spot, duration: walkDuration(from: Self.doorPoint, to: spot, speed: speed)),
+            .run { [weak self, weak customer] in
+                guard let self, let customer else { return }
+                // standing in line, not striding
+                self.setLegs(customer, frames: frames, timePerFrame: 0.5)
+            },
+        ]))
+    }
+
+    /// Serves whoever is at the front once they've actually arrived there.
+    /// Driven from `update` rather than from nested action completions: the
+    /// line has to keep advancing as people join and leave, which a fixed
+    /// chain of completion blocks can't express.
+    private func stepQueue() {
+        guard mode == .cafe, !isPaused, let front = queue.first, !front.serving else { return }
+        let spot = Self.queueSpot(0)
+        guard hypot(front.node.position.x - spot.x, front.node.position.y - spot.y) < 3 else { return }
+        queue[0].serving = true
+
+        let speed = CafePacing.speed(salesPerSec: liveSalesPerSec)
+        showBubble(over: front.node, event: front.event)
+        if front.event.bigSpender {
+            sparkle(at: front.node.position, color: NSColor(calibratedRed: 1, green: 0.85, blue: 0.4, alpha: 1))
         }
+        front.node.run(.wait(forDuration: 1.4 / speed)) { [weak self] in
+            guard let self else { return }
+            // The slot frees the moment they step away, so the next person is
+            // already walking up rather than waiting for this one to be gone.
+            if let i = self.queue.firstIndex(where: { $0.node === front.node }) {
+                self.queue.remove(at: i)
+            }
+            self.restackQueue(speed: speed)
+            self.sendOnTheirWay(front, speed: speed)
+        }
+    }
+
+    /// Everyone still in line steps forward one place.
+    private func restackQueue(speed: Double) {
+        for (i, c) in queue.enumerated() {
+            let spot = Self.queueSpot(i)
+            guard hypot(c.node.position.x - spot.x, c.node.position.y - spot.y) > 1 else { continue }
+            c.node.removeAction(forKey: "queueMove")
+            setLegs(c.node, frames: c.frames, timePerFrame: CafePacing.legFrame(speed: speed))
+            c.node.run(.sequence([
+                .move(to: spot, duration: walkDuration(from: c.node.position, to: spot, speed: speed)),
+                .run { [weak self] in self?.setLegs(c.node, frames: c.frames, timePerFrame: 0.5) },
+            ]), withKey: "queueMove")
+        }
+    }
+
+    private func sendOnTheirWay(_ c: QueuedCustomer, speed: Double) {
+        let leaving = c.event.mood == .angry || c.event.mood == .sadLeave
+            || c.event.mood == .noTable || !c.event.dineIn
+        setLegs(c.node, frames: c.frames, timePerFrame: CafePacing.legFrame(speed: speed))
+        let done: () -> Void = { [weak self] in self?.activeCustomers -= 1 }
+
+        if leaving {
+            c.node.run(.sequence([
+                .move(to: Self.doorPoint,
+                      duration: walkDuration(from: c.node.position, to: Self.doorPoint, speed: speed)),
+                .fadeOut(withDuration: 0.3 / speed),
+                .removeFromParent(),
+            ]), completion: done)
+            return
+        }
+
+        let seat = currentSeatPoints[Int.random(in: 0..<currentSeatPoints.count)]
+        c.node.run(.sequence([
+            .move(to: seat, duration: walkDuration(from: c.node.position, to: seat, speed: speed)),
+            .run { [weak self] in self?.setLegs(c.node, frames: c.frames, timePerFrame: 0.5) },
+            .wait(forDuration: 3.5 / speed),
+            .run { [weak self] in
+                self?.setLegs(c.node, frames: c.frames, timePerFrame: CafePacing.legFrame(speed: speed))
+            },
+            .move(to: Self.doorPoint,
+                  duration: walkDuration(from: seat, to: Self.doorPoint, speed: speed)),
+            .fadeOut(withDuration: 0.3 / speed),
+            .removeFromParent(),
+        ]), completion: done)
+    }
+
+    /// Clears the room. SKActions do not advance while the scene is paused, so
+    /// a customer frozen mid-visit when the popover closed would never run the
+    /// completion that releases its slot. Left alone that leaks `activeCustomers`
+    /// on every open/close cycle until the count sticks at the cap and the café
+    /// stops showing customers entirely.
+    private func clearCustomers() {
+        for c in queue { c.node.removeAllActions(); c.node.removeFromParent() }
+        queue.removeAll()
+        cafeLayer.children
+            .filter { $0.zPosition == 11 && $0 is SKSpriteNode }
+            .forEach { $0.removeAllActions(); $0.removeFromParent() }
+        activeCustomers = 0
+        recentArrivals.removeAll()
     }
 
     private func showBubble(over node: SKSpriteNode, event: SaleEvent) {
@@ -1137,6 +1264,7 @@ final class CafeScene: SKScene {
             return
         }
         guard mode == .cafe else { return }
+        stepQueue()
         if tipNode == nil, Date() >= nextTipAt {
             spawnTip()
         }
@@ -1264,6 +1392,12 @@ final class CafeScene: SKScene {
         if active {
             if tipNode?.parent == nil { tipNode = nil }
             if tipNode == nil { scheduleNextTip() }
+        } else {
+            // Empty the room on the way out. Nobody can see it, and leaving
+            // half-finished visits frozen in place leaks their on-screen slots
+            // (see clearCustomers) and would have the line resume hours later
+            // from wherever it stopped.
+            clearCustomers()
         }
     }
 }
