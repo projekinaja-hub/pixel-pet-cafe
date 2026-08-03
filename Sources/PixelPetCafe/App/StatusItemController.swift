@@ -200,8 +200,8 @@ final class StatusItemController: NSObject {
         reloadIconsIfNeeded(controller.state)
         updateTitle(controller.state)
 
-        let t = Timer(timeInterval: 2.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+        let t = Timer(timeInterval: 2.0, repeats: true) { _ in
+            Task { @MainActor [weak self] in
                 self?.iconTick += 1
                 self?.refreshIcon()
             }
@@ -489,8 +489,8 @@ final class StatusItemController: NSObject {
     private func restartIconTimer(interval: TimeInterval) {
         iconInterval = interval
         iconTimer?.invalidate()
-        let t = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+        let t = Timer(timeInterval: interval, repeats: true) { _ in
+            Task { @MainActor [weak self] in
                 self?.iconTick += 1
                 self?.refreshIcon()
             }

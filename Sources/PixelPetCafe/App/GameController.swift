@@ -159,8 +159,13 @@ final class GameController: ObservableObject {
 
     private func installTickTimer() {
         timer?.invalidate()
-        let t = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.tick() }
+        // The inner Task re-declares [weak self] rather than reaching for the
+        // outer closure's capture. Swift 6 tolerates the latter; the Swift
+        // shipped on macOS 14 rejects it outright ("reference to captured var
+        // 'self' in concurrently-executing code"), so the package built only
+        // on the machine it was written on. Same fix at every timer below.
+        let t = Timer(timeInterval: 1, repeats: true) { _ in
+            Task { @MainActor [weak self] in self?.tick() }
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
@@ -335,8 +340,8 @@ final class GameController: ObservableObject {
         // Re-baseline so the first sample after a restart measures from NOW
         // instead of crediting every key typed while we weren't looking.
         lastKeyCount = CGEventSource.counterForEventType(.combinedSessionState, eventType: .keyDown)
-        let t = Timer(timeInterval: Self.keySampleInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.sampleKeystrokes() }
+        let t = Timer(timeInterval: Self.keySampleInterval, repeats: true) { _ in
+            Task { @MainActor [weak self] in self?.sampleKeystrokes() }
         }
         RunLoop.main.add(t, forMode: .common)
         keySampler = t
