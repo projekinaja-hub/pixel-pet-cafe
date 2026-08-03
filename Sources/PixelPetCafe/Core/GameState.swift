@@ -90,9 +90,10 @@ struct GameState: Codable {
     // staffColors/StaffPalette exactly as before this existed.
     var staffPaint: [String: PixelArt] = [:]
     // v13: TYPING ENERGY — real keystrokes (counted, never read) fuel the
-    // café (see EnergyEngine). Starts at half tank so a brand-new player
-    // isn't instantly crawling before they've typed anything.
-    var energy: Double = 3000
+    // café (see EnergyEngine). Starts at EnergyEngine.startingTank: enough
+    // that a new player isn't crawling before they've typed anything, but not
+    // so much that the fuel mechanic stays invisible for their whole session.
+    var energy: Double = EnergyEngine.startingTank
     var lifetimeKeystrokes: Double = 0
     // v14: schema version, so one-time repairs in migrated() run exactly once.
     // Absent in every older save, which decodes as 0 — precisely the saves
@@ -197,7 +198,9 @@ struct GameState: Codable {
             // Tank-drain repair: the dead-monitor bug let the tank burn to
             // empty while almost no keystroke could refill it, so the café
             // would be crawling on arrival through no fault of the player.
-            if s.lifetimeKeystrokes < Self.deadCountingThreshold, s.energy <= 0 { s.energy = 3000 }
+            if s.lifetimeKeystrokes < Self.deadCountingThreshold, s.energy <= 0 {
+                s.energy = EnergyEngine.startingTank
+            }
             // Mercy for saves caught by the old closed-café reputation grind
             // (arrivals used to ding a closed café all the way to 0).
             s.reputation = max(s.reputation, SalesEngine.closedReputationFloor)
@@ -293,7 +296,7 @@ struct GameState: Codable {
         staffColors = try c.decodeIfPresent([String: StaffColorPair].self, forKey: .staffColors) ?? [:]
         let decodedPaint = try c.decodeIfPresent([String: PixelArt].self, forKey: .staffPaint) ?? [:]
         staffPaint = decodedPaint.mapValues { $0.normalized }
-        energy = try c.decodeIfPresent(Double.self, forKey: .energy) ?? 3000
+        energy = try c.decodeIfPresent(Double.self, forKey: .energy) ?? EnergyEngine.startingTank
         saveVersion = try c.decodeIfPresent(Int.self, forKey: .saveVersion) ?? 0
         lifetimeKeystrokes = try c.decodeIfPresent(Double.self, forKey: .lifetimeKeystrokes) ?? 0
         activeCafe = try c.decodeIfPresent(Int.self, forKey: .activeCafe) ?? 0

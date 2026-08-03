@@ -41,7 +41,7 @@ final class MigrationTests: XCTestCase {
         s.lifetimeKeystrokes = 10        // still under deadCountingThreshold
 
         let firstLoad = s.migrated()
-        XCTAssertEqual(firstLoad.energy, 3000, "the one legitimate repair should happen")
+        XCTAssertEqual(firstLoad.energy, EnergyEngine.startingTank, "the one legitimate repair should happen")
 
         // player burns the tank down again, then relaunches
         var spent = firstLoad

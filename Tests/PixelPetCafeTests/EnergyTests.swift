@@ -17,12 +17,31 @@ final class EnergyTests: XCTestCase {
     }
 
     func testFullTankFastTypingHitsMaxBonus() {
+        // stated relative to the constant, so tuning the bonus doesn't require
+        // editing arithmetic in three places
+        let full = 1 + EnergyEngine.liveBonusMax
         XCTAssertEqual(EnergyEngine.speedFactor(energy: EnergyEngine.energyCap,
-                                                kps: EnergyEngine.liveBonusFullAtKps), 1.5)
-        // bonus is capped — hammering faster than the full-bonus rate stays ×1.5
-        XCTAssertEqual(EnergyEngine.speedFactor(energy: 100, kps: 12), 1.5)
+                                                kps: EnergyEngine.liveBonusFullAtKps), full)
+        // bonus is capped — hammering faster than the full-bonus rate stays there
+        XCTAssertEqual(EnergyEngine.speedFactor(energy: 100, kps: 12), full)
         // half the full-bonus rate = half the bonus
-        XCTAssertEqual(EnergyEngine.speedFactor(energy: 100, kps: 2), 1.25, accuracy: 1e-9)
+        XCTAssertEqual(EnergyEngine.speedFactor(energy: 100, kps: EnergyEngine.liveBonusFullAtKps / 2),
+                       1 + EnergyEngine.liveBonusMax / 2, accuracy: 1e-9)
+    }
+
+    /// Typing must be worth clearly more than a nudge, or the core mechanic
+    /// reads as decorative. Measured at +50% it produced only ~1.5x the sales
+    /// of never typing at all.
+    func testTypingIsWorthAMeaningfulMultiplier() {
+        XCTAssertGreaterThanOrEqual(EnergyEngine.liveBonusMax, 1.0)
+    }
+
+    /// The empty-tank crawl is what teaches the mechanic, so a new player has
+    /// to be able to reach it in one sitting.
+    func testStartingTankRunsOutWithinOneSession() {
+        let minutes = EnergyEngine.startingTank / EnergyEngine.burnPerSec / 60
+        XCTAssertLessThanOrEqual(minutes, 45, "the fuel lesson must land in a first session")
+        XCTAssertGreaterThanOrEqual(minutes, 10, "…but not before the player finds their feet")
     }
 
     // MARK: tank bounds (controller-free simulation of the per-tick formulas)
@@ -121,7 +140,7 @@ final class EnergyTests: XCTestCase {
         json.removeValue(forKey: "lifetimeKeystrokes")
         let stripped = try JSONSerialization.data(withJSONObject: json)
         let decoded = try JSONDecoder().decode(GameState.self, from: stripped)
-        XCTAssertEqual(decoded.energy, 3000)
+        XCTAssertEqual(decoded.energy, EnergyEngine.startingTank)
         XCTAssertEqual(decoded.lifetimeKeystrokes, 0)
     }
 
@@ -136,7 +155,7 @@ final class EnergyTests: XCTestCase {
 
     func testNewGameStartsHalfTankWithMonitorOn() {
         let s = GameState.newGame()
-        XCTAssertEqual(s.energy, 3000)
+        XCTAssertEqual(s.energy, EnergyEngine.startingTank)
         XCTAssertEqual(s.lifetimeKeystrokes, 0)
         XCTAssertTrue(s.workMode)   // energy is the core loop — on by default
     }

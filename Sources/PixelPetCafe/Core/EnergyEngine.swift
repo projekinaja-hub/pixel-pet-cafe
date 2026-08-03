@@ -12,9 +12,23 @@ enum EnergyEngine {
     /// Empty tank: the café limps along at this fraction of normal speed.
     static let crawlFactor = 0.25
     /// Typing live on top of a non-empty tank adds up to this much bonus speed…
-    static let liveBonusMax = 0.5
+    ///
+    /// Raised from 0.5 to 1.0 (a 2x café while you work). Measured on a fresh
+    /// save, +50% produced only ~1.5x the sales of never touching the keyboard
+    /// — a nudge, not a reason. Typing is the entire game; it has to read as
+    /// worth doing within the first minutes.
+    static let liveBonusMax = 1.0
     /// …with the full bonus reached at this sustained keys/sec.
     static let liveBonusFullAtKps = 4.0
+
+    /// Fuel a brand-new café opens with.
+    ///
+    /// Was 3000, which at `burnPerSec` is 100 MINUTES of full-speed play
+    /// without pressing a single key — so the empty-tank crawl, the thing that
+    /// teaches you why typing matters, could not occur in a first session at
+    /// all. 900 puts that lesson ~30 minutes in, while leaving the cap (and
+    /// therefore every late-game ceiling) untouched.
+    static let startingTank = 900.0
 
     static let rushCost = 1000.0
     static let restockCost = 2000.0
