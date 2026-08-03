@@ -20,7 +20,16 @@ final class NotificationManager {
 
     /// Unbundled (bare `swift run` / debug binary) execution: every method
     /// no-ops so UNUserNotificationCenter is never touched.
+    ///
+    /// A bundle identifier alone is NOT enough. Under `swift test` the host
+    /// process is Xcode's `xctest` tool, which has an identifier but no app
+    /// bundle proxy — `UNUserNotificationCenter.current()` then raises
+    /// "bundleProxyForCurrentProcess is nil" and takes the test run down with
+    /// SIGABRT. That made the whole sim loop untestable: any test that called
+    /// `GameController.start()` died as soon as the first tick reached the
+    /// notification check. Requiring a real `.app` bundle covers both cases.
     private let available = Bundle.main.bundleIdentifier != nil
+        && Bundle.main.bundleURL.pathExtension == "app"
 
     private let promptedDefaultsKey = "ppc.notifications.prompted"
 

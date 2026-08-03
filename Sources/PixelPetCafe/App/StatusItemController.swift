@@ -232,7 +232,34 @@ final class StatusItemController: NSObject {
     /// crisp blocky pixels instead of smoothing them into a blurry mess —
     /// AppKit picks whichever representation matches the screen's backing
     /// scale automatically.
+    /// Decoded sprites, keyed by name+size. Sprite PNGs ship inside the app
+    /// bundle and cannot change while the app runs, so decoding one twice is
+    /// always wasted work — and this was being decoded SIX TIMES A SECOND on
+    /// an idle café.
+    ///
+    /// `loadIcon` reads a file off disk, runs a full PNG decode through
+    /// ImageIO, then allocates a second bitmap and redraws it at 2x. A
+    /// `sample` of the idle app (popover closed, nobody typing) caught the
+    /// main thread inside exactly that ImageIO decode, reached from
+    /// `updateTitle -> iconAttachment -> loadIcon`, because the menu-bar title
+    /// is rebuilt on every emission of `@Published var state` — and a struct
+    /// republishes on EVERY write, which the sim does many times per tick.
+    ///
+    /// The cache is bounded by the number of distinct sprites (a few dozen),
+    /// so it never grows with uptime.
+    private var iconCache: [String: NSImage] = [:]
+
     private func loadIcon(_ name: String, pointSize: CGFloat = 18) -> NSImage? {
+        let cacheKey = "\(name)@\(pointSize)"
+        if let hit = iconCache[cacheKey] { return hit }
+        let image = decodeIcon(name, pointSize: pointSize)
+        // Only successful decodes are cached: a transient read failure must
+        // stay retryable rather than poisoning the icon for the whole session.
+        if let image { iconCache[cacheKey] = image }
+        return image
+    }
+
+    private func decodeIcon(_ name: String, pointSize: CGFloat) -> NSImage? {
         // This fires on every icon-refresh tick (menu bar buddy animation,
         // coin/alert swap...) for as long as the app is open — a transient
         // disk read hiccup here must never take the whole app down, so a
@@ -423,21 +450,36 @@ final class StatusItemController: NSObject {
     /// One icon, one number — the alert state is a color change on the coin
     /// itself rather than a second glyph, and the boost suffix only appears
     /// while a real boost is active instead of reserving space at rest.
+    /// Signature of everything the drawn title actually depends on, so an
+    /// emission that changes nothing visible costs nothing.
+    ///
+    /// `GameController.state` is an `@Published` struct, so it republishes on
+    /// every single write — measured at 6/sec on an idle, empty café, against
+    /// a sim that only ticks once a second. Five of those six rebuilt a title
+    /// identical to the one already on screen. Fuel and speed are quantised to
+    /// the 24pt capsule's half-pixel because anything finer cannot be seen.
+    private var lastTitleKey: String?
+
     private func updateTitle(_ state: GameState) {
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
-        let out = NSMutableAttributedString(string: " ", attributes: [.font: font])
-        out.append(iconAttachment(SalesEngine.hasStockOut(state) ? "coin_alert" : "coin"))
+        let alert = SalesEngine.hasStockOut(state)
         // fixed-width segment so the menu bar never jitters as digits change
         var num = formatNumber(state.coins)
         while num.count < 6 { num = "\u{2007}" + num }     // figure-space pad
+        let fuel = max(0, min(1, state.energy / EnergyEngine.energyCap))
+        let speed = max(0, min(1, controller.wpm / Self.speedFullAtWPM))
+        let key = "\(alert)|\(num)|\(state.workMode)|\((fuel * 48).rounded())|\((speed * 48).rounded())"
+        guard key != lastTitleKey else { return }
+        lastTitleKey = key
+
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
+        let out = NSMutableAttributedString(string: " ", attributes: [.font: font])
+        out.append(iconAttachment(alert ? "coin_alert" : "coin"))
         out.append(NSAttributedString(string: " \(num)", attributes: [.font: font]))
         // A: live energy glance — a minimalist capsule bar drawn as a real
         // image (like the coin icon), not emoji + block glyphs. Reads as a
         // product, not a debug line: a soft translucent track that fills with
         // a single tasteful colour shifting by fuel level.
         if state.workMode {
-            let fuel = max(0, min(1, state.energy / EnergyEngine.energyCap))
-            let speed = controller.wpm / Self.speedFullAtWPM
             out.append(NSAttributedString(string: "  ", attributes: [.font: font]))
             out.append(energyBarAttachment(fuel: fuel, speed: speed))
         }
