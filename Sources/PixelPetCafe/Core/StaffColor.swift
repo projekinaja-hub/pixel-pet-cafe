@@ -36,6 +36,10 @@ enum StaffPalette {
         "bo":      StaffColorPair(body: StaffColor(r: 122, g: 88,  b: 62),  clothes: StaffColor(r: 150, g: 68,  b: 60)),
         "earl":    StaffColorPair(body: StaffColor(r: 138, g: 120, b: 150), clothes: StaffColor(r: 46,  g: 58,  b: 92)),
         "marble":  StaffColorPair(body: StaffColor(r: 172, g: 168, b: 178), clothes: StaffColor(r: 90,  g: 74,  b: 52)),
+        // Comet: arctic-white fur and spacesuit (they share the body layer, so
+        // a custom tint recolours the whole suit), harness and boots in grey.
+        // Must match SNOW / STRAP in tools/generate_sprites.py exactly.
+        "comet":   StaffColorPair(body: StaffColor(r: 250, g: 250, b: 253), clothes: StaffColor(r: 146, g: 154, b: 168)),
     ]
 
     static func pair(for id: String, in state: GameState) -> StaffColorPair {

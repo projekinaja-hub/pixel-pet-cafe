@@ -164,6 +164,107 @@ def character(fur, fur_d, belly, apron, species, accent=None):
     c.hline(4, 19, 3, fur_d); c.hline(9, 19, 3, fur_d)
     return c
 
+# ------------------------------------------------------- Comet the astro-fox
+# Hand-built rather than routed through character(): the bubble helmet has to
+# be drawn BEHIND the face and re-rimmed in front of it, and the suit replaces
+# the apron entirely. Both fight the parametric builder's fixed row layout, and
+# bending it here would risk all eight existing species for one character.
+
+SNOW    = (250, 250, 253, 255)   # suit + arctic fur
+SNOW_D  = (203, 212, 226, 255)
+# The glass is tinted well below the fur's value on purpose. At the first
+# attempt it was nearly white, and a white fox inside a white bubble had no
+# silhouette at all — the head simply dissolved into the helmet.
+GLASS   = (176, 218, 238, 255)   # helmet interior
+GLASS_D = (120, 178, 206, 255)   # helmet rim
+MUZZLE  = (128, 106, 116, 255)   # softer than INK; 2px of pure black at this
+                                 # size reads as a mouth, not a nose
+ICEYE   = (54, 150, 208, 255)
+EARPINK = (244, 172, 184, 255)
+BLUSH   = (246, 186, 182, 255)
+STRAP   = (146, 154, 168, 255)
+STRAP_D = (106, 114, 128, 255)
+AMBER   = (240, 148, 54, 255)
+BADGE   = (74, 168, 226, 255)
+RING    = (122, 216, 234, 255)
+
+# (x, width) of the helmet dome on each row — an ellipse wide enough to sit
+# clear of the ears without spilling off a 16px canvas.
+_DOME = {0: (5, 6), 1: (3, 10), 2: (2, 12), 3: (1, 14),
+         4: (1, 14), 5: (1, 14), 6: (1, 14), 7: (2, 12), 8: (3, 10)}
+
+
+def astro_fox(frame=0):
+    """Comet: an arctic fox barista in a bubble helmet. 16x20, like every
+    other character, so it drops straight into the existing staff pipeline.
+
+    frame 0 = open eyes, 1 = blink, 2 = waving paw raised."""
+    c = Canvas(16, 20)
+
+    for y, (x0, w) in _DOME.items():                 # glass, behind the fox
+        c.hline(x0, y, w, GLASS)
+
+    # ears — deliberately short and tucked, so the dome can arc over them
+    # rather than the ears puncturing the glass
+    # Set in one column from the dome's edge: at x3/x10 the ear tips landed on
+    # the exact pixels the dome's shoulder needs, so the helmet's top rim read
+    # as a detached bar floating above a gap.
+    for ex in (4, 9):
+        c.hline(ex, 2, 3, SNOW)
+        c.set(ex + 1, 1, SNOW)                             # tip
+        c.set(ex + 1, 2, EARPINK)
+
+    c.hline(4, 3, 8, SNOW)                           # head
+    c.rect(3, 4, 10, 3, SNOW)
+    c.hline(4, 7, 8, SNOW)
+    # Soft edge all the way round the head. Without it the white fur and the
+    # helmet glass merge into one shape at 16px.
+    c.set(3, 3, SNOW_D); c.set(12, 3, SNOW_D)
+    c.set(3, 7, SNOW_D); c.set(12, 7, SNOW_D)
+
+    if frame == 1:
+        c.hline(4, 5, 2, MUZZLE); c.hline(10, 5, 2, MUZZLE)
+    else:
+        c.rect(4, 4, 2, 2, ICEYE); c.rect(10, 4, 2, 2, ICEYE)
+        c.set(4, 4, WHITE); c.set(10, 4, WHITE)      # catchlights
+    c.set(3, 6, BLUSH); c.set(12, 6, BLUSH)
+    c.set(7, 6, MUZZLE); c.set(8, 6, MUZZLE)         # nose, and nothing else:
+    # a nose plus smile-corners on a 10px-wide face merges into one dark band
+    # that reads as a wide frown rather than a face.
+
+    for y, (x0, w) in _DOME.items():                 # rim, in front of the fox
+        if y in (0, 8):
+            c.hline(x0, y, w, GLASS_D)
+        else:
+            c.set(x0, y, GLASS_D); c.set(x0 + w - 1, y, GLASS_D)
+    c.set(4, 1, GLASS_D); c.set(11, 1, GLASS_D)   # shoulders, closing the dome
+    c.set(4, 2, WHITE); c.set(3, 3, WHITE); c.set(2, 4, WHITE)   # glass streak
+
+    c.hline(4, 9, 8, RING)                           # neck ring
+
+    c.rect(4, 10, 8, 7, SNOW)                        # suit
+    c.vline(3, 10, 7, SNOW_D); c.vline(12, 10, 7, SNOW_D)
+    c.vline(5, 10, 5, STRAP); c.vline(10, 10, 5, STRAP)          # harness
+    c.rect(6, 12, 4, 2, STRAP)                                   # chest panel
+    c.set(6, 12, AMBER); c.set(9, 13, GLASS_D)
+    c.set(4, 11, BADGE)                                          # shoulder badge
+    c.hline(4, 15, 8, STRAP); c.hline(7, 15, 2, AMBER)           # belt + buckle
+
+    c.set(3, 11, SNOW); c.set(3, 12, SNOW)                       # left arm
+    # The waving paw sits BELOW the dome (which ends at row 8) and outside the
+    # suit's outline. Tucked against the helmet it was invisible — white on
+    # glass, exactly the problem the tinting above fixes for the head.
+    paw = 10 if frame == 2 else 11
+    c.set(13, paw + 1, SNOW_D)                                   # forearm
+    c.rect(13, paw, 2, 1, SNOW)                                  # raised paw
+    c.set(14, paw, SNOW_D)
+
+    c.hline(4, 17, 3, SNOW); c.hline(9, 17, 3, SNOW)             # legs
+    c.rect(4, 18, 3, 1, STRAP); c.rect(9, 18, 3, 1, STRAP)       # boots
+    c.hline(4, 19, 3, STRAP_D); c.hline(9, 19, 3, STRAP_D)
+    return c
+
+
 STAFF = {
     #        fur                fur_dark           belly   apron   species accent
     "mocha":   ((150, 102, 66, 255), (112, 72, 46, 255), CREAM, (206, 106, 76, 255), "cat", None),
@@ -174,6 +275,7 @@ STAFF = {
     "bo":      ((122, 88, 62, 255), (88, 60, 42, 255), (168, 132, 100, 255), (150, 68, 60, 255), "bear", INK),
     "earl":    ((138, 120, 150, 255), (100, 84, 114, 255), WHITE, (46, 58, 92, 255), "owl", None),
     "marble":  ((172, 168, 178, 255), (120, 116, 130, 255), CREAM, (90, 74, 52, 255), "raccoon", INK),
+    "comet":   (SNOW, SNOW_D, WHITE, STRAP, "arcticfox", MUZZLE),
 }
 
 CUSTOMERS = [
@@ -1344,7 +1446,10 @@ def main_v6():
 
 
 STAFF_SPECIES = {"mocha": "cat", "biscuit": "corgi", "poppy": "bunny", "chip": "deer",
-                 "juno": "fox", "bo": "bear", "earl": "owl", "marble": "raccoon"}
+                 "juno": "fox", "bo": "bear", "earl": "owl", "marble": "raccoon",
+                 # the roster icon reuses the fox face; the helmet only exists
+                 # on the full-body sprite, where there are pixels to spend
+                 "comet": "fox"}
 
 def main_v2():
     count = 0
@@ -1819,7 +1924,7 @@ def main():
     count = 0
     for sid, args in STAFF.items():
         fur, fur_d, belly, apron, species, accent = args
-        f0 = character(*args)
+        f0 = astro_fox() if sid == "comet" else character(*args)
         f1 = f0.shifted_down()
         f0.save(f"staff_{sid}_0.png"); f1.save(f"staff_{sid}_1.png")
         count += 2

@@ -526,7 +526,10 @@ final class GameController: ObservableObject {
     /// snapshotting — panels like Style's staff-colors section have nothing
     /// to screenshot on an otherwise-empty fresh save.
     func debugSeedStaff() {
-        state.staffLevels = ["mocha": 3, "biscuit": 2, "poppy": 1, "chip": 1]
+        // The whole roster, Comet included — a demo that omits the newest hire
+        // can't show whether it stands in the right place or clips a neighbour.
+        state.staffLevels = ["mocha": 3, "biscuit": 2, "poppy": 1, "chip": 1,
+                             "juno": 1, "bo": 1, "earl": 1, "marble": 1, "comet": 1]
         state.lifetimeCoins = max(state.lifetimeCoins, 5000)
     }
     /// Dev-only: PPC_STAFF_MAXED=1 verification hook — puts Chip at this

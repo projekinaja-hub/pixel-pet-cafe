@@ -35,6 +35,10 @@ enum Catalog {
         StaffDef(id: "bo",      name: "Bo",      role: "Roaster",     baseRate: 900,   baseCost: 400_000,   unlockAtLifetime: 220_000),
         StaffDef(id: "earl",    name: "Earl",    role: "Night Shift", baseRate: 4_500, baseCost: 5_000_000, unlockAtLifetime: 2_500_000),
         StaffDef(id: "marble",  name: "Marble",  role: "Manager",     baseRate: 0,     baseCost: 1_000_000, unlockAtLifetime: 500_000),
+        // Comet, the arctic fox in a bubble helmet — the roster's last hire.
+        // Follows the step Earl set (~5x rate, ~10x cost, ~10x unlock), so the
+        // curve past 2.5M lifetime keeps its shape instead of flattening out.
+        StaffDef(id: "comet",   name: "Comet",   role: "Astro-Barista", baseRate: 25_000, baseCost: 60_000_000, unlockAtLifetime: 25_000_000),
     ]
 
     static let equipment: [EquipmentDef] = [
