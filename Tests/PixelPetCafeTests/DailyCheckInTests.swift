@@ -21,9 +21,23 @@ final class DailyCheckInTests: XCTestCase {
         GameController(persistence: Persistence(directory: dir))
     }
 
+    /// 09:00 LOCAL time, so "+5 hours" stays inside the same calendar day in
+    /// every timezone.
+    ///
+    /// This used to be the bare instant 1_700_000_000, which is 22:13 **UTC**.
+    /// Adding five hours to that crosses midnight in UTC while staying
+    /// mid-morning in UTC+9 — so the suite passed on the author's machine in
+    /// KST and failed in CI, claiming the check-in had paid out twice. The
+    /// production code was right: a daily check-in genuinely means a local
+    /// calendar day. Only the fixture was wrong.
+    private var day1: Date {
+        Calendar.current
+            .startOfDay(for: Date(timeIntervalSince1970: 1_700_000_000))
+            .addingTimeInterval(9 * 3600)
+    }
+
     func testFirstOpenOfTheDayGrantsCheckInCoins() {
         let controller = makeController()
-        let day1 = Date(timeIntervalSince1970: 1_700_000_000)
         let coinsBefore = controller.state.coins
         let lifetimeBefore = controller.state.lifetimeCoins
         let runBefore = controller.state.lifetimeCoinsThisRun
@@ -39,7 +53,6 @@ final class DailyCheckInTests: XCTestCase {
 
     func testSecondOpenSameDayDoesNotGrantAgain() {
         let controller = makeController()
-        let day1 = Date(timeIntervalSince1970: 1_700_000_000)
         controller.refreshStreakOnInteraction(now: day1)
         let coinsAfterFirst = controller.state.coins
         controller.refreshStreakOnInteraction(now: day1.addingTimeInterval(5 * 3600))
@@ -49,7 +62,6 @@ final class DailyCheckInTests: XCTestCase {
 
     func testNextRealDayGrantsAgain() {
         let controller = makeController()
-        let day1 = Date(timeIntervalSince1970: 1_700_000_000)
         controller.refreshStreakOnInteraction(now: day1)
         let coinsAfterFirst = controller.state.coins
         controller.refreshStreakOnInteraction(now: day1.addingTimeInterval(24 * 3600))

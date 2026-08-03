@@ -2,6 +2,16 @@ import XCTest
 @testable import PixelPetCafe
 
 final class StreakTests: XCTestCase {
+
+    /// 09:00 LOCAL time. A bare UTC instant makes these tests depend on the
+    /// machine's timezone: 1_700_000_000 is 22:13 UTC, so "an hour later"
+    /// crosses midnight there while staying mid-morning in UTC+9. The sibling
+    /// check-in suite failed in CI for exactly that reason.
+    private static var localMorning: Date {
+        Calendar.current
+            .startOfDay(for: Date(timeIntervalSince1970: 1_700_000_000))
+            .addingTimeInterval(9 * 3600)
+    }
     func testFirstLaunchStartsStreakAtOne() {
         var s = GameState.newGame()
         EconomyEngine.updateDailyStreak(&s, now: Date())
@@ -11,7 +21,7 @@ final class StreakTests: XCTestCase {
 
     func testConsecutiveDayIncrementsStreak() {
         var s = GameState.newGame()
-        let day1 = Date(timeIntervalSince1970: 1_700_000_000)
+        let day1 = Self.localMorning
         EconomyEngine.updateDailyStreak(&s, now: day1)
         XCTAssertEqual(s.dailyStreak, 1)
         let day2 = day1.addingTimeInterval(24 * 3600)
@@ -21,7 +31,7 @@ final class StreakTests: XCTestCase {
 
     func testSameDayDoesNotDoubleCount() {
         var s = GameState.newGame()
-        let day1 = Date(timeIntervalSince1970: 1_700_000_000)
+        let day1 = Self.localMorning
         EconomyEngine.updateDailyStreak(&s, now: day1)
         EconomyEngine.updateDailyStreak(&s, now: day1.addingTimeInterval(3600))
         XCTAssertEqual(s.dailyStreak, 1)
@@ -29,7 +39,7 @@ final class StreakTests: XCTestCase {
 
     func testMissedDayResetsStreak() {
         var s = GameState.newGame()
-        let day1 = Date(timeIntervalSince1970: 1_700_000_000)
+        let day1 = Self.localMorning
         EconomyEngine.updateDailyStreak(&s, now: day1)
         EconomyEngine.updateDailyStreak(&s, now: day1.addingTimeInterval(24 * 3600))
         XCTAssertEqual(s.dailyStreak, 2)
