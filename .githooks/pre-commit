@@ -1,0 +1,47 @@
+#!/bin/bash
+# Test gate: no commit lands with a failing suite.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+# Bypass when you need to: `git commit --no-verify`  or  PPC_SKIP_TESTS=1 git commit
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+
+git diff --cached --name-only --diff-filter=ACM \
+  | grep -qE '\.(swift|py)$|^Package\.swift$' || exit 0
+
+if [ "${PPC_SKIP_TESTS:-0}" = "1" ]; then
+    echo "pre-commit: PPC_SKIP_TESTS=1 — skipping tests"
+    exit 0
+fi
+
+echo "pre-commit: running tests…"
+cd "$ROOT" || exit 0
+
+# Some machines intermittently throw "accessing build database: disk I/O
+# error". Retry-on-failure rather than pre-emptively deleting build.db:
+# deleting it destroys SPM's dependency database, after which SPM can no
+# longer tell that a source file was DELETED and keeps linking its orphaned
+# object file — a deleted test once kept "failing" for exactly this reason.
+#
+# Worth knowing: when that error appears, the test run still executes — against
+# the PREVIOUS binary. A pass or failure printed after it is not about the code
+# you just edited.
+OUTPUT="$(./tools/test.sh 2>&1)"
+if echo "$OUTPUT" | grep -q "disk I/O error"; then
+    rm -f .build/build.db
+    rm -rf .build/*/debug/PixelPetCafeTests.build 2>/dev/null
+    OUTPUT="$(./tools/test.sh 2>&1)"
+fi
+if echo "$OUTPUT" | grep -qE "with [1-9][0-9]* failure|error: fatalError|error: compile"; then
+    echo "──────────────────────────────────────────────"
+    echo "pre-commit: TESTS FAILED — commit blocked."
+    echo "$OUTPUT" | grep -E "XCTAssert|error: -\\[|with [1-9][0-9]* failure" \
+        | grep -v "disk I/O error" | head -20
+    echo "──────────────────────────────────────────────"
+    echo "Fix the failures, or bypass with: git commit --no-verify"
+    exit 1
+fi
+
+echo "pre-commit: $(echo "$OUTPUT" | grep -oE "Executed [0-9]+ tests" | tail -1) passed ✓"
+exit 0

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    # SpriteKit/AppKit — must be macOS, not ubuntu
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ppc-spm-${{ hashFiles('Package.swift') }}-${{ hashFiles('Sources/**/*.swift') }}
+          restore-keys: ppc-spm-
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test --enable-xctest
+
+      # Proves the app bundle still assembles — catches Info.plist/resource
+      # breakage that plain `swift build` cannot see. Unsigned: CI has no
+      # signing identity, and signing isn't what's under test here.
+      - name: Build app bundle
+        run: swift build -c release
