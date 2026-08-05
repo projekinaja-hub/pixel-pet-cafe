@@ -145,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // check a newly added staff member rendered a café that had never
         // hired them — which reads exactly like the sprite being broken.
         demo.staffLevels = ["mocha": 3, "biscuit": 2, "poppy": 1, "juno": 1, "marble": 1,
-                            "bo": 1, "earl": 1, "chip": 1, "comet": 1]
+                            "bo": 1, "earl": 1, "chip": 1, "jeki": 1]
         demo.equipmentLevels = ["espresso": 6, "grinder": 1, "oven": 1, "decor": 1, "sound": 1]
         demo.stars = 12
         demo.cleanliness = 55

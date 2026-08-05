@@ -107,10 +107,10 @@ final class CafeScene: SKScene {
         // clipping the espresso machine. x:168 sits well clear of both the
         // customer/equipment cluster and the main y:58 counter row.
         "marble": CGPoint(x: 168, y: 46),
-        // Comet first went to x:102 on the counter row — straight into the trap
+        // Jeki first went to x:102 on the counter row — straight into the trap
         // the note above describes. That x is `counterPoint`, so the order
         // bubble (a child of the serving customer, well above every staff
-        // zPosition) covered Comet completely on every sale, and x:104 y:68 is
+        // zPosition) covered Jeki completely on every sale, and x:104 y:68 is
         // the espresso machine besides. A screenshot showed nothing but the
         // bubble, which reads exactly like a broken sprite.
         //
@@ -118,7 +118,7 @@ final class CafeScene: SKScene {
         // counter row, clear of Marble above, clear of the bar stools at x:126
         // and x:150, and well right of the counter queue, which now runs back
         // from x:104 toward the door.
-        "comet": CGPoint(x: 170, y: 24),
+        "jeki": CGPoint(x: 170, y: 24),
     ]
     private static let equipSpots: [String: (CGPoint, CGFloat)] = [
         "espresso": (CGPoint(x: 104, y: 68), 9),

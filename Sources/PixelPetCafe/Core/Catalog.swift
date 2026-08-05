@@ -35,10 +35,16 @@ enum Catalog {
         StaffDef(id: "bo",      name: "Bo",      role: "Roaster",     baseRate: 900,   baseCost: 400_000,   unlockAtLifetime: 220_000),
         StaffDef(id: "earl",    name: "Earl",    role: "Night Shift", baseRate: 4_500, baseCost: 5_000_000, unlockAtLifetime: 2_500_000),
         StaffDef(id: "marble",  name: "Marble",  role: "Manager",     baseRate: 0,     baseCost: 1_000_000, unlockAtLifetime: 500_000),
-        // Comet, the arctic fox in a bubble helmet — the roster's last hire.
-        // Follows the step Earl set (~5x rate, ~10x cost, ~10x unlock), so the
-        // curve past 2.5M lifetime keeps its shape instead of flattening out.
-        StaffDef(id: "comet",   name: "Comet",   role: "Astro-Barista", baseRate: 25_000, baseCost: 60_000_000, unlockAtLifetime: 25_000_000),
+        // Jeki, the arctic fox in a bubble helmet — the owner's own design.
+        //
+        // Deliberately an EARLY hire, at Biscuit's tier. This first shipped as
+        // the endgame hire at 25M lifetime / 60M cost, which kept the upgrade
+        // curve's shape intact and was, as a piece of game design, defensible.
+        // It was also the wrong answer: the save it shipped against had 7,616
+        // lifetime coins — 0.03% of the way there — so a character the owner
+        // designed and asked to have in the game could never actually be seen
+        // in it. Reachability beats curve purity for this one.
+        StaffDef(id: "jeki",    name: "Jeki",    role: "Astro-Barista", baseRate: 6,     baseCost: 250,       unlockAtLifetime: 120),
     ]
 
     static let equipment: [EquipmentDef] = [

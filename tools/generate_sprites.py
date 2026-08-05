@@ -164,7 +164,7 @@ def character(fur, fur_d, belly, apron, species, accent=None):
     c.hline(4, 19, 3, fur_d); c.hline(9, 19, 3, fur_d)
     return c
 
-# ------------------------------------------------------- Comet the astro-fox
+# ------------------------------------------------------- Jeki the astro-fox
 # Hand-built rather than routed through character(): the bubble helmet has to
 # be drawn BEHIND the face and re-rimmed in front of it, and the suit replaces
 # the apron entirely. Both fight the parametric builder's fixed row layout, and
@@ -195,7 +195,7 @@ _DOME = {0: (5, 6), 1: (3, 10), 2: (2, 12), 3: (1, 14),
 
 
 def astro_fox(frame=0):
-    """Comet: an arctic fox barista in a bubble helmet. 16x20, like every
+    """Jeki: an arctic fox barista in a bubble helmet. 16x20, like every
     other character, so it drops straight into the existing staff pipeline.
 
     frame 0 = open eyes, 1 = blink, 2 = waving paw raised."""
@@ -275,7 +275,7 @@ STAFF = {
     "bo":      ((122, 88, 62, 255), (88, 60, 42, 255), (168, 132, 100, 255), (150, 68, 60, 255), "bear", INK),
     "earl":    ((138, 120, 150, 255), (100, 84, 114, 255), WHITE, (46, 58, 92, 255), "owl", None),
     "marble":  ((172, 168, 178, 255), (120, 116, 130, 255), CREAM, (90, 74, 52, 255), "raccoon", INK),
-    "comet":   (SNOW, SNOW_D, WHITE, STRAP, "arcticfox", MUZZLE),
+    "jeki":   (SNOW, SNOW_D, WHITE, STRAP, "arcticfox", MUZZLE),
 }
 
 CUSTOMERS = [
@@ -1449,7 +1449,7 @@ STAFF_SPECIES = {"mocha": "cat", "biscuit": "corgi", "poppy": "bunny", "chip": "
                  "juno": "fox", "bo": "bear", "earl": "owl", "marble": "raccoon",
                  # the roster icon reuses the fox face; the helmet only exists
                  # on the full-body sprite, where there are pixels to spend
-                 "comet": "fox"}
+                 "jeki": "fox"}
 
 def main_v2():
     count = 0
@@ -1924,7 +1924,7 @@ def main():
     count = 0
     for sid, args in STAFF.items():
         fur, fur_d, belly, apron, species, accent = args
-        f0 = astro_fox() if sid == "comet" else character(*args)
+        f0 = astro_fox() if sid == "jeki" else character(*args)
         f1 = f0.shifted_down()
         f0.save(f"staff_{sid}_0.png"); f1.save(f"staff_{sid}_1.png")
         count += 2
