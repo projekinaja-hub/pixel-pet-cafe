@@ -537,7 +537,18 @@ final class CafeScene: SKScene {
         return n
     }()
 
+    /// The three overlay nodes whose tint animations are keyed. Exposed so a
+    /// test can assert the keying is actually in place — an unkeyed `run` on
+    /// these is what accumulated 238,000 actions in a 45-hour session.
+    var tintNodesForTesting: [(node: SKNode, key: String)] {
+        [(timeTint, "timeTint"), (windowTint, "windowTint"), (seasonTint, "seasonTint")]
+    }
+
     private var lastTimePhase = ""
+    /// Counts times the tint animation was actually (re)started. Exists so a
+    /// test can prove repeated `configure` calls don't restart it — see
+    /// SceneActionLeakTests.
+    private(set) var timeTintRestarts = 0
 
     private func applyTimeOfDay() {
         let hour = Calendar.current.component(.hour, from: Date())
@@ -558,9 +569,32 @@ final class CafeScene: SKScene {
             phase = "night"; tint = NSColor(calibratedRed: 0.14, green: 0.16, blue: 0.42, alpha: 1)
             alpha = 0.42; windowColor = NSColor(calibratedRed: 0.06, green: 0.07, blue: 0.22, alpha: 0.65)
         }
+        // THE GUARD THIS FUNCTION WAS ALWAYS MISSING.
+        //
+        // `lastTimePhase` was assigned here but never compared, so the two
+        // tint animations below restarted on EVERY call — and `configure` is
+        // called from PanelView's `.onChange(of: controller.state)`, which
+        // fires whenever coins tick. Worse, the popover's hosting controller
+        // lives for the whole session, so that kept firing with the café
+        // closed and the scene PAUSED.
+        //
+        // A paused SKScene does not advance its actions, so none of those
+        // groups ever completed or were released. After ~45 hours a running
+        // app had accumulated 238,000 each of SKColorize, SKFade and SKGroup
+        // — about 152 MB of SpriteKit actions, a 228 MB process with 200 MB
+        // swapped out. Drawing a frame then meant paging that back off disk,
+        // which is what "the picture is frozen" actually was.
+        //
+        // Four transitions a day, not one per coin.
+        guard phase != lastTimePhase else { return }
         lastTimePhase = phase
+        timeTintRestarts += 1
+        // Keyed, so a restart REPLACES the running animation instead of
+        // stacking another one on the same node. Belt and braces: the guard
+        // above is the fix, this bounds the damage if anything ever calls in
+        // repeatedly again.
         timeTint.run(.group([.colorize(with: tint, colorBlendFactor: 1, duration: 2.5),
-                             .fadeAlpha(to: alpha, duration: 2.5)]))
+                             .fadeAlpha(to: alpha, duration: 2.5)]), withKey: "timeTint")
         // The window-pane glass tint only makes sense over the indoor room's
         // baked-in window — outdoor cafés (seaside/forest) have no window at
         // that position at all, so this node was showing up as a big,
@@ -568,7 +602,8 @@ final class CafeScene: SKScene {
         let isOutdoor = lastState.map { Self.outdoorCities.contains($0.cafe.city) } ?? false
         let effectiveWindowColor = isOutdoor ? NSColor.clear : windowColor
         windowTint.run(.group([.colorize(with: effectiveWindowColor, colorBlendFactor: 1, duration: 2.5),
-                              .fadeAlpha(to: effectiveWindowColor == .clear ? 0 : 1, duration: 2.5)]))
+                              .fadeAlpha(to: effectiveWindowColor == .clear ? 0 : 1, duration: 2.5)]),
+                       withKey: "windowTint")
     }
 
     // MARK: seasonal overlay (spring/summer/autumn/winter)
@@ -621,7 +656,8 @@ final class CafeScene: SKScene {
             tint = NSColor(calibratedRed: 0.55, green: 0.72, blue: 0.95, alpha: 1); alpha = 0.14
         }
         seasonTint.run(.group([.colorize(with: tint, colorBlendFactor: 1, duration: 2.5),
-                               .fadeAlpha(to: alpha, duration: 2.5)]))
+                               .fadeAlpha(to: alpha, duration: 2.5)]),
+                       withKey: "seasonTint")
         updateSeasonalParticles(season)
     }
 
