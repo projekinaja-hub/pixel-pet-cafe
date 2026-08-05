@@ -461,26 +461,39 @@ final class StatusItemController: NSObject {
     private var lastTitleKey: String?
 
     private func updateTitle(_ state: GameState) {
+        let style = state.menuBarStyle
         let alert = SalesEngine.hasStockOut(state)
         // fixed-width segment so the menu bar never jitters as digits change
         var num = formatNumber(state.coins)
         while num.count < 6 { num = "\u{2007}" + num }     // figure-space pad
         let fuel = max(0, min(1, state.energy / EnergyEngine.energyCap))
         let speed = max(0, min(1, controller.wpm / Self.speedFullAtWPM))
-        let key = "\(alert)|\(num)|\(state.workMode)|\((fuel * 48).rounded())|\((speed * 48).rounded())"
+        // Hidden parts are left OUT of the key, not merely drawn as empty: with
+        // coins hidden, a coin count ticking every second must not keep
+        // invalidating a title whose visible content never changes.
+        let coinKey = style.showsCoins ? "\(alert)|\(num)" : "-"
+        let meterKey = (style.showsMeter && state.workMode)
+            ? "\((fuel * 48).rounded())|\((speed * 48).rounded())" : "-"
+        let key = "\(style.rawValue)|\(coinKey)|\(meterKey)"
         guard key != lastTitleKey else { return }
         lastTitleKey = key
 
         let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
         let out = NSMutableAttributedString(string: " ", attributes: [.font: font])
-        out.append(iconAttachment(alert ? "coin_alert" : "coin"))
-        out.append(NSAttributedString(string: " \(num)", attributes: [.font: font]))
+        if style.showsCoins {
+            out.append(iconAttachment(alert ? "coin_alert" : "coin"))
+            out.append(NSAttributedString(string: " \(num)", attributes: [.font: font]))
+        }
         // A: live energy glance — a minimalist capsule bar drawn as a real
         // image (like the coin icon), not emoji + block glyphs. Reads as a
         // product, not a debug line: a soft translucent track that fills with
         // a single tasteful colour shifting by fuel level.
-        if state.workMode {
-            out.append(NSAttributedString(string: "  ", attributes: [.font: font]))
+        if state.workMode, style.showsMeter {
+            // No leading gap when the meter is the only thing here, or it sits
+            // adrift from the buddy.
+            if style.showsCoins {
+                out.append(NSAttributedString(string: "  ", attributes: [.font: font]))
+            }
             out.append(energyBarAttachment(fuel: fuel, speed: speed))
         }
         statusItem.button?.attributedTitle = out
@@ -562,6 +575,17 @@ final class StatusItemController: NSObject {
         NotificationManager.shared.suppressed = false
     }
 
+    @objc private func pickMenuBarStyle(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let style = MenuBarStyle(rawValue: raw) else { return }
+        controller.setMenuBarStyle(style)
+        // The key guards against redundant redraws, so it must be cleared or
+        // the bar keeps the layout the user just switched away from.
+        lastTitleKey = nil
+        updateTitle(controller.state)
+        refreshIcon()
+    }
+
     private func showMenu() {
         let menu = NSMenu()
         let mute = NSMenuItem(title: "Mute Sounds", action: #selector(toggleMute), keyEquivalent: "")
@@ -573,6 +597,18 @@ final class StatusItemController: NSObject {
         work.target = self
         work.state = controller.state.workMode ? .on : .off
         menu.addItem(work)
+
+        let barItem = NSMenuItem(title: "Menu Bar Shows", action: nil, keyEquivalent: "")
+        let barMenu = NSMenu()
+        for style in MenuBarStyle.menuOrder {
+            let item = NSMenuItem(title: style.label, action: #selector(pickMenuBarStyle(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = style.rawValue
+            item.state = controller.state.menuBarStyle == style ? .on : .off
+            barMenu.addItem(item)
+        }
+        barItem.submenu = barMenu
+        menu.addItem(barItem)
 
         let login = NSMenuItem(title: "Launch at Login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self

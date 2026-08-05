@@ -664,6 +664,15 @@ final class GameController: ObservableObject {
         tipCollected.send()
     }
 
+    /// Menu-bar layout preference. Saved immediately: it's a deliberate
+    /// settings change, not incidental state, and losing it to a crash before
+    /// the next autosave would read as the setting not working.
+    func setMenuBarStyle(_ style: MenuBarStyle) {
+        guard state.menuBarStyle != style else { return }
+        state.menuBarStyle = style
+        saveNow()
+    }
+
     func saveNow() {
         try? persistence.save(state)
         state.lastSaved = Date()
