@@ -74,3 +74,63 @@ final class MenuBarStyleTests: XCTestCase {
         XCTAssertEqual(a, b)
     }
 }
+
+/// Blending in means behaving like a native menu-bar icon: monochrome, and
+/// redrawn by AppKit to suit the bar rather than pasted on top of it.
+final class MenuBarAppearanceTests: XCTestCase {
+
+    func testSubtleRendersAsATemplateAndColourfulDoesNot() {
+        XCTAssertTrue(MenuBarAppearance.subtle.isTemplate,
+                      "subtle must be a template, or it can't follow light/dark")
+        XCTAssertFalse(MenuBarAppearance.colorful.isTemplate)
+    }
+
+    func testDefaultKeepsTheExistingLook() {
+        XCTAssertEqual(GameState.newGame().menuBarAppearance, .colorful,
+                       "an existing player's menu bar must not change on upgrade")
+    }
+
+    func testEveryAppearanceIsOfferedInTheMenu() {
+        XCTAssertEqual(Set(MenuBarAppearance.menuOrder), Set(MenuBarAppearance.allCases))
+        let labels = MenuBarAppearance.allCases.map(\.label)
+        XCTAssertEqual(Set(labels).count, labels.count)
+        XCTAssertFalse(labels.contains { $0.isEmpty })
+    }
+
+    func testChoiceSurvivesEncodeDecode() throws {
+        var s = GameState.newGame()
+        s.menuBarAppearance = .subtle
+        let back = try JSONDecoder().decode(GameState.self, from: try JSONEncoder().encode(s))
+        XCTAssertEqual(back.menuBarAppearance, .subtle)
+    }
+
+    func testOldSaveWithoutTheKeyDecodesToColourful() throws {
+        let json = #"{"coins": 100, "cafes": [{"city": "home"}]}"#
+        let s = try JSONDecoder().decode(GameState.self, from: Data(json.utf8))
+        XCTAssertEqual(s.menuBarAppearance, .colorful)
+    }
+
+    func testUnknownAppearanceFallsBackInsteadOfThrowing() throws {
+        let json = #"{"coins": 100, "menuBarAppearance": "neon", "cafes": [{"city": "home"}]}"#
+        let s = try JSONDecoder().decode(GameState.self, from: Data(json.utf8))
+        XCTAssertEqual(s.menuBarAppearance, .colorful)
+    }
+
+    /// Appearance and layout are independent axes — picking a quieter look
+    /// must not silently change which parts are shown.
+    func testAppearanceAndLayoutAreIndependent() {
+        var s = GameState.newGame()
+        s.menuBarStyle = .meterOnly
+        s.menuBarAppearance = .subtle
+        XCTAssertEqual(s.menuBarStyle, .meterOnly)
+        XCTAssertFalse(s.menuBarStyle.showsCoins)
+        XCTAssertTrue(s.menuBarAppearance.isTemplate)
+    }
+
+    func testAppearanceIsPartOfEquality() {
+        var a = GameState.newGame()
+        let b = a
+        a.menuBarAppearance = .subtle
+        XCTAssertNotEqual(a, b, "the menu bar wouldn't refresh when the look changed")
+    }
+}

@@ -26,6 +26,8 @@ struct GameState: Codable {
     /// What the menu bar shows besides the buddy. Defaults to the historic
     /// layout so an existing save is unchanged by the upgrade.
     var menuBarStyle: MenuBarStyle = .full
+    /// Colour vs. monochrome menu-bar art. Defaults to the historic look.
+    var menuBarAppearance: MenuBarAppearance = .colorful
     var customItems: [CustomMenuItem] = []
     var owner: OwnerConfig = OwnerConfig()
     var barCharacter: String = "owner"   // "owner" or a staff id
@@ -245,7 +247,7 @@ struct GameState: Codable {
     // MARK: codable (v1/v2 saves migrate root café fields into cafes[0])
 
     enum CodingKeys: String, CodingKey {
-        case coins, lifetimeCoins, lifetimeCoinsThisRun, stars, lastSaved, muted, menuBarStyle
+        case coins, lifetimeCoins, lifetimeCoinsThisRun, stars, lastSaved, muted, menuBarStyle, menuBarAppearance
         case customItems, owner, barCharacter
         case cafes, activeCafe, reputation, adsActive, workMode
         case menuTaste, salesCount, tasteKnown
@@ -272,6 +274,8 @@ struct GameState: Codable {
         // Unknown/absent value falls back to .full rather than throwing, so a
         // save written by a newer build can still be opened by an older one.
         menuBarStyle = (try? c.decodeIfPresent(MenuBarStyle.self, forKey: .menuBarStyle)) as? MenuBarStyle ?? .full
+        menuBarAppearance = (try? c.decodeIfPresent(MenuBarAppearance.self, forKey: .menuBarAppearance))
+            as? MenuBarAppearance ?? .colorful
         customItems = try c.decodeIfPresent([CustomMenuItem].self, forKey: .customItems) ?? []
         owner = try c.decodeIfPresent(OwnerConfig.self, forKey: .owner) ?? OwnerConfig()
         barCharacter = try c.decodeIfPresent(String.self, forKey: .barCharacter) ?? "owner"
@@ -333,6 +337,7 @@ struct GameState: Codable {
         try c.encodeIfPresent(lastSaved, forKey: .lastSaved)
         try c.encode(muted, forKey: .muted)
         try c.encode(menuBarStyle, forKey: .menuBarStyle)
+        try c.encode(menuBarAppearance, forKey: .menuBarAppearance)
         try c.encode(customItems, forKey: .customItems)
         try c.encode(owner, forKey: .owner)
         try c.encode(barCharacter, forKey: .barCharacter)
@@ -384,6 +389,7 @@ extension GameState: Equatable {
             && lhs.lastSaved == rhs.lastSaved
             && lhs.muted == rhs.muted
             && lhs.menuBarStyle == rhs.menuBarStyle
+            && lhs.menuBarAppearance == rhs.menuBarAppearance
             && lhs.saveVersion == rhs.saveVersion
             && lhs.customItems == rhs.customItems
             && lhs.owner == rhs.owner

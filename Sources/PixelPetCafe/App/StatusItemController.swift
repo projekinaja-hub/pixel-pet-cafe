@@ -25,6 +25,90 @@ final class StatusItemController: NSObject {
     /// bounces while you type instead of only swapping frames in place.
     /// Every frame goes through here (even at rest, dy = 0) so the icon never
     /// changes size when the bounce starts or stops.
+    /// Repaints an image as flat monochrome ink.
+    ///
+    /// Colour is discarded and DARKNESS BECOMES INK COVERAGE, so the sprite's
+    /// outline, eyes and shading stay legible as a glyph rather than
+    /// flattening into one solid blob (which is what a plain alpha-only
+    /// template does to art with no interior holes).
+    ///
+    /// Straight CoreGraphics, deliberately. Two AppKit routes were tried first
+    /// and BOTH produced a fully transparent image — an invisible menu-bar
+    /// icon, which doesn't read as subtle, it reads as the app having crashed.
+    /// `setColor`/`colorAt` disagree about colourspace and premultiplication,
+    /// and `NSGraphicsContext(bitmapImageRep:)` returns nil for some formats,
+    /// after which every draw silently goes nowhere. A CGContext over a buffer
+    /// this function owns has neither failure mode. TemplateIconTests pins the
+    /// visibility, because "looks fine" isn't observable from a unit test.
+    static func monochrome(_ image: NSImage, ink: NSColor, template: Bool) -> NSImage {
+        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return image }
+        let w = cg.width, h = cg.height, count = w * h * 4
+        guard w > 0, h > 0 else { return image }
+        let rgb = ink.usingColorSpace(.deviceRGB) ?? .black
+        let ir = CGFloat(rgb.redComponent), ig = CGFloat(rgb.greenComponent), ib = CGFloat(rgb.blueComponent)
+
+        let src = UnsafeMutablePointer<UInt8>.allocate(capacity: count)
+        src.initialize(repeating: 0, count: count); defer { src.deallocate() }
+        let dst = UnsafeMutablePointer<UInt8>.allocate(capacity: count)
+        dst.initialize(repeating: 0, count: count); defer { dst.deallocate() }
+
+        let space = CGColorSpaceCreateDeviceRGB()
+        let fmt = CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let inCtx = CGContext(data: src, width: w, height: h, bitsPerComponent: 8,
+                                    bytesPerRow: w * 4, space: space, bitmapInfo: fmt)
+        else { return image }
+        inCtx.interpolationQuality = .none
+        inCtx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+
+        for i in stride(from: 0, to: count, by: 4) {
+            let a = CGFloat(src[i + 3]) / 255
+            guard a > 0.004 else { continue }        // empty space stays empty
+            // Premultiplied buffer: undo that before judging brightness, or
+            // every soft edge pixel reads darker than it really is.
+            let r = CGFloat(src[i]) / 255 / a
+            let g = CGFloat(src[i + 1]) / 255 / a
+            let b = CGFloat(src[i + 2]) / 255 / a
+            let lum = 0.299 * r + 0.587 * g + 0.114 * b
+            // Lifted off zero so pale fur still belongs to the silhouette
+            // instead of punching a hole through the middle of the animal.
+            let cover = min(1, 0.34 + 0.66 * (1 - lum))
+            let outA = a * cover
+            dst[i]     = UInt8(max(0, min(255, ir * outA * 255)))   // premultiplied
+            dst[i + 1] = UInt8(max(0, min(255, ig * outA * 255)))
+            dst[i + 2] = UInt8(max(0, min(255, ib * outA * 255)))
+            dst[i + 3] = UInt8(max(0, min(255, outA * 255)))
+        }
+
+        guard let outCtx = CGContext(data: dst, width: w, height: h, bitsPerComponent: 8,
+                                     bytesPerRow: w * 4, space: space, bitmapInfo: fmt),
+              let outCG = outCtx.makeImage()          // copies, so dst may die with us
+        else { return image }
+        let result = NSImage(cgImage: outCG, size: image.size)
+        result.isTemplate = template
+        return result
+    }
+
+    /// The button image: AppKit recolours templates itself, so the ink colour
+    /// is irrelevant and black is conventional.
+    static func templated(_ image: NSImage) -> NSImage {
+        monochrome(image, ink: .black, template: true)
+    }
+
+    /// Images inside the TITLE are text attachments, and AppKit does NOT apply
+    /// template recolouring to those — it draws them exactly as given. A black
+    /// template meter therefore rendered as a near-invisible dark capsule on a
+    /// dark menu bar. Text attachments have to bake in the resolved label
+    /// colour themselves, which means resolving it against the bar's CURRENT
+    /// appearance rather than trusting a dynamic NSColor to adapt later.
+    private var menuBarInk: NSColor {
+        let appearance = statusItem.button?.effectiveAppearance ?? NSApp.effectiveAppearance
+        var ink = NSColor.labelColor
+        appearance.performAsCurrentDrawingAppearance {
+            ink = NSColor.labelColor.usingColorSpace(.deviceRGB) ?? .labelColor
+        }
+        return ink
+    }
+
     private func staged(_ image: NSImage, dy: CGFloat) -> NSImage {
         let size = image.size
         let inset: CGFloat = 2.4           // headroom so a bounce can't clip
@@ -35,7 +119,7 @@ final class StatusItemController: NSObject {
                    from: .zero, operation: .sourceOver, fraction: 1)
         out.unlockFocus()
         out.isTemplate = false
-        return out
+        return controller.state.menuBarAppearance.isTemplate ? Self.templated(out) : out
     }
 
     /// The bounce itself: taller and quicker the faster you type. Driven by
@@ -390,7 +474,14 @@ final class StatusItemController: NSObject {
     /// red when empty (the café is crawling). Sized and baseline-nudged to
     /// sit cleanly inline with the coin count.
     private func energyBarAttachment(fuel: Double, speed: Double) -> NSAttributedString {
-        let img = Self.energyBarImage(fuel: fuel, speed: speed)
+        var img = Self.energyBarImage(fuel: fuel, speed: speed)
+        // The meter's whole colour language is fuel level (gold -> amber ->
+        // red), which a template throws away. That's the intended trade in
+        // subtle mode: length still carries typing speed, and the bar stops
+        // being the brightest object in the menu bar.
+        if controller.state.menuBarAppearance.isTemplate {
+            img = Self.monochrome(img, ink: menuBarInk, template: false)
+        }
         let attachment = NSTextAttachment()
         attachment.image = img
         attachment.bounds = CGRect(x: 0, y: -1.5, width: img.size.width, height: img.size.height)
@@ -474,7 +565,8 @@ final class StatusItemController: NSObject {
         let coinKey = style.showsCoins ? "\(alert)|\(num)" : "-"
         let meterKey = (style.showsMeter && state.workMode)
             ? "\((fuel * 48).rounded())|\((speed * 48).rounded())" : "-"
-        let key = "\(style.rawValue)|\(coinKey)|\(meterKey)"
+        let key = "\(style.rawValue)|\(state.menuBarAppearance.rawValue)"
+            + "|\(statusItem.button?.effectiveAppearance.name.rawValue ?? "")|\(coinKey)|\(meterKey)"
         guard key != lastTitleKey else { return }
         lastTitleKey = key
 
@@ -586,6 +678,21 @@ final class StatusItemController: NSObject {
         refreshIcon()
     }
 
+    @objc private func pickMenuBarLook(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let look = MenuBarAppearance(rawValue: raw) else { return }
+        controller.setMenuBarAppearance(look)
+        // Cached sprites were built for the old look, and the title key guards
+        // against redundant redraws — both have to be dropped or the bar keeps
+        // rendering the appearance just switched away from.
+        iconCache.removeAll()
+        iconCharacterKey = ""
+        lastTitleKey = nil
+        reloadIconsIfNeeded(controller.state)
+        updateTitle(controller.state)
+        refreshIcon()
+    }
+
     private func showMenu() {
         let menu = NSMenu()
         let mute = NSMenuItem(title: "Mute Sounds", action: #selector(toggleMute), keyEquivalent: "")
@@ -609,6 +716,18 @@ final class StatusItemController: NSObject {
         }
         barItem.submenu = barMenu
         menu.addItem(barItem)
+
+        let lookItem = NSMenuItem(title: "Menu Bar Look", action: nil, keyEquivalent: "")
+        let lookMenu = NSMenu()
+        for look in MenuBarAppearance.menuOrder {
+            let item = NSMenuItem(title: look.label, action: #selector(pickMenuBarLook(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = look.rawValue
+            item.state = controller.state.menuBarAppearance == look ? .on : .off
+            lookMenu.addItem(item)
+        }
+        lookItem.submenu = lookMenu
+        menu.addItem(lookItem)
 
         let login = NSMenuItem(title: "Launch at Login", action: #selector(toggleLogin), keyEquivalent: "")
         login.target = self

@@ -673,6 +673,12 @@ final class GameController: ObservableObject {
         saveNow()
     }
 
+    func setMenuBarAppearance(_ look: MenuBarAppearance) {
+        guard state.menuBarAppearance != look else { return }
+        state.menuBarAppearance = look
+        saveNow()
+    }
+
     func saveNow() {
         try? persistence.save(state)
         state.lastSaved = Date()
