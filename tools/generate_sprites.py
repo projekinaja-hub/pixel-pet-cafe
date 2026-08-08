@@ -170,7 +170,15 @@ def character(fur, fur_d, belly, apron, species, accent=None):
 # the apron entirely. Both fight the parametric builder's fixed row layout, and
 # bending it here would risk all eight existing species for one character.
 
-SNOW    = (250, 250, 253, 255)   # suit + arctic fur
+SNOW    = (250, 250, 253, 255)   # arctic fur
+# The suit was drawn in SNOW too — the exact same white as the fur — so the
+# fox and his spacesuit merged into one featureless blob and nothing about him
+# read as "wearing" anything. A cool off-white separates the two while still
+# looking like a white spacesuit, and because it maps to the `clothes` layer
+# the Style tab can now recolour fur and suit independently instead of moving
+# them together.
+SUIT    = (223, 231, 242, 255)   # spacesuit body
+SUIT_D  = (176, 189, 208, 255)
 SNOW_D  = (203, 212, 226, 255)
 # The glass is tinted well below the fur's value on purpose. At the first
 # attempt it was nearly white, and a white fox inside a white bubble had no
@@ -247,8 +255,8 @@ def astro_fox_bare(frame=0):
     c.set(0, 13, SNOW_D); c.set(3, 13, SNOW_D)
     c.set(3, 14, SNOW_D)
 
-    c.rect(4, 11, 8, 6, SNOW)                        # suit
-    c.vline(3, 11, 6, SNOW_D); c.vline(12, 11, 6, SNOW_D)
+    c.rect(4, 11, 8, 6, SUIT)                        # suit
+    c.vline(3, 11, 6, SUIT_D); c.vline(12, 11, 6, SUIT_D)
     c.vline(5, 11, 5, STRAP); c.vline(10, 11, 5, STRAP)
     c.rect(6, 13, 4, 2, STRAP)
     c.set(6, 13, AMBER); c.set(9, 14, GLASS_D)
@@ -260,7 +268,7 @@ def astro_fox_bare(frame=0):
     c.rect(13, paw, 2, 1, SNOW)
     c.set(14, paw, SNOW_D)
 
-    c.hline(4, 17, 3, SNOW); c.hline(9, 17, 3, SNOW)
+    c.hline(4, 17, 3, SUIT); c.hline(9, 17, 3, SUIT)             # suit legs
     c.rect(4, 18, 3, 1, STRAP); c.rect(9, 18, 3, 1, STRAP)
     c.hline(4, 19, 3, STRAP_D); c.hline(9, 19, 3, STRAP_D)
     return c
@@ -276,7 +284,7 @@ STAFF = {
     "bo":      ((122, 88, 62, 255), (88, 60, 42, 255), (168, 132, 100, 255), (150, 68, 60, 255), "bear", INK),
     "earl":    ((138, 120, 150, 255), (100, 84, 114, 255), WHITE, (46, 58, 92, 255), "owl", None),
     "marble":  ((172, 168, 178, 255), (120, 116, 130, 255), CREAM, (90, 74, 52, 255), "raccoon", INK),
-    "jeki":   (SNOW, SNOW_D, WHITE, STRAP, "arcticfox", MUZZLE),
+    "jeki":   (SNOW, SNOW_D, WHITE, SUIT, "arcticfox", MUZZLE),
 }
 
 CUSTOMERS = [
