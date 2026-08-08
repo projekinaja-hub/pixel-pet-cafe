@@ -188,79 +188,80 @@ AMBER   = (240, 148, 54, 255)
 BADGE   = (74, 168, 226, 255)
 RING    = (122, 216, 234, 255)
 
-# (x, width) of the helmet dome on each row — an ellipse wide enough to sit
-# clear of the ears without spilling off a 16px canvas.
-_DOME = {0: (5, 6), 1: (3, 10), 2: (2, 12), 3: (1, 14),
-         4: (1, 14), 5: (1, 14), 6: (1, 14), 7: (2, 12), 8: (3, 10)}
+def astro_fox_bare(frame=0):
+    """Jeki as he appears in the café: helmet off, so the face can actually be
+    a fox's.
 
-
-def astro_fox(frame=0):
-    """Jeki: an arctic fox barista in a bubble helmet. 16x20, like every
-    other character, so it drops straight into the existing staff pipeline.
+    A dome over a 16x20 body leaves roughly 10x5 pixels for an entire face —
+    enough for eyes and a nose and nothing else, which is why the helmeted
+    version could only ever suggest the species. Bare, there is room for the
+    three things that say FOX: ears that are tall sharp triangles, a face that
+    TAPERS to a pointed muzzle, and a cheek ruff. The brush tail does the rest.
 
     frame 0 = open eyes, 1 = blink, 2 = waving paw raised."""
     c = Canvas(16, 20)
 
-    for y, (x0, w) in _DOME.items():                 # glass, behind the fox
-        c.hline(x0, y, w, GLASS)
-
-    # ears — deliberately short and tucked, so the dome can arc over them
-    # rather than the ears puncturing the glass
-    # Set in one column from the dome's edge: at x3/x10 the ear tips landed on
-    # the exact pixels the dome's shoulder needs, so the helmet's top rim read
-    # as a detached bar floating above a gap.
-    for ex in (4, 9):
+    # EARS — big, sharp, angled outward. A fox's ears are enormous relative to
+    # its head, and that proportion is most of the silhouette.
+    for ex, outer in ((2, 2), (11, 12)):
+        c.set(ex + 1, 0, SNOW)                       # tip
+        c.hline(ex, 1, 3, SNOW)
         c.hline(ex, 2, 3, SNOW)
-        c.set(ex + 1, 1, SNOW)                             # tip
+        c.set(ex + 1, 1, EARPINK)
         c.set(ex + 1, 2, EARPINK)
+        c.set(outer, 0, SNOW_D)                      # outer edge, angled out
+        c.set(ex, 2, SNOW_D); c.set(ex + 2, 2, SNOW_D)
 
-    c.hline(4, 3, 8, SNOW)                           # head
-    c.rect(3, 4, 10, 3, SNOW)
-    c.hline(4, 7, 8, SNOW)
-    # Soft edge all the way round the head. Without it the white fur and the
-    # helmet glass merge into one shape at 16px.
+    c.hline(4, 2, 8, SNOW)                           # brow
+    c.rect(3, 3, 10, 3, SNOW)                        # skull, widest at the eyes
     c.set(3, 3, SNOW_D); c.set(12, 3, SNOW_D)
-    c.set(3, 7, SNOW_D); c.set(12, 7, SNOW_D)
+    c.set(2, 4, SNOW); c.set(13, 4, SNOW)            # CHEEK RUFF flare
+    c.set(2, 5, SNOW_D); c.set(13, 5, SNOW_D)
+
+    # MUZZLE — the taper. Three narrowing rows to a pointed nose.
+    c.hline(4, 6, 8, SNOW)
+    c.hline(5, 7, 6, SNOW)
+    c.hline(6, 8, 4, WHITE)
+    c.set(4, 6, SNOW_D); c.set(11, 6, SNOW_D)
+    c.set(5, 7, SNOW_D); c.set(10, 7, SNOW_D)
+    c.set(7, 8, MUZZLE); c.set(8, 8, MUZZLE)         # nose at the tip
 
     if frame == 1:
-        c.hline(4, 5, 2, MUZZLE); c.hline(10, 5, 2, MUZZLE)
+        c.hline(4, 4, 2, MUZZLE); c.hline(10, 4, 2, MUZZLE)
     else:
-        c.rect(4, 4, 2, 2, ICEYE); c.rect(10, 4, 2, 2, ICEYE)
-        c.set(4, 4, WHITE); c.set(10, 4, WHITE)      # catchlights
-    c.set(3, 6, BLUSH); c.set(12, 6, BLUSH)
-    c.set(7, 6, MUZZLE); c.set(8, 6, MUZZLE)         # nose, and nothing else:
-    # a nose plus smile-corners on a 10px-wide face merges into one dark band
-    # that reads as a wide frown rather than a face.
+        c.rect(4, 3, 2, 2, ICEYE); c.rect(10, 3, 2, 2, ICEYE)
+        c.set(4, 3, WHITE); c.set(10, 3, WHITE)      # catchlights
+    c.set(3, 5, BLUSH); c.set(12, 5, BLUSH)
 
-    for y, (x0, w) in _DOME.items():                 # rim, in front of the fox
-        if y in (0, 8):
-            c.hline(x0, y, w, GLASS_D)
-        else:
-            c.set(x0, y, GLASS_D); c.set(x0 + w - 1, y, GLASS_D)
-    c.set(4, 1, GLASS_D); c.set(11, 1, GLASS_D)   # shoulders, closing the dome
-    c.set(4, 2, WHITE); c.set(3, 3, WHITE); c.set(2, 4, WHITE)   # glass streak
+    # NECK — without it the tapered head floated above the suit like a mask.
+    c.hline(6, 9, 4, SNOW)
+    c.set(6, 9, SNOW_D); c.set(9, 9, SNOW_D)
 
-    c.hline(4, 9, 8, RING)                           # neck ring
+    c.hline(4, 10, 8, RING)                          # suit collar
 
-    c.rect(4, 10, 8, 7, SNOW)                        # suit
-    c.vline(3, 10, 7, SNOW_D); c.vline(12, 10, 7, SNOW_D)
-    c.vline(5, 10, 5, STRAP); c.vline(10, 10, 5, STRAP)          # harness
-    c.rect(6, 12, 4, 2, STRAP)                                   # chest panel
-    c.set(6, 12, AMBER); c.set(9, 13, GLASS_D)
-    c.set(4, 11, BADGE)                                          # shoulder badge
-    c.hline(4, 15, 8, STRAP); c.hline(7, 15, 2, AMBER)           # belt + buckle
+    c.set(2, 12, SNOW_D)                             # BRUSH TAIL
+    c.hline(1, 13, 3, SNOW)
+    c.hline(0, 14, 3, SNOW)
+    c.hline(0, 15, 3, WHITE)                         # the pale tip
+    c.hline(0, 16, 2, SNOW_D)
+    c.set(0, 13, SNOW_D); c.set(3, 13, SNOW_D)
+    c.set(3, 14, SNOW_D)
 
-    c.set(3, 11, SNOW); c.set(3, 12, SNOW)                       # left arm
-    # The waving paw sits BELOW the dome (which ends at row 8) and outside the
-    # suit's outline. Tucked against the helmet it was invisible — white on
-    # glass, exactly the problem the tinting above fixes for the head.
-    paw = 10 if frame == 2 else 11
-    c.set(13, paw + 1, SNOW_D)                                   # forearm
-    c.rect(13, paw, 2, 1, SNOW)                                  # raised paw
+    c.rect(4, 11, 8, 6, SNOW)                        # suit
+    c.vline(3, 11, 6, SNOW_D); c.vline(12, 11, 6, SNOW_D)
+    c.vline(5, 11, 5, STRAP); c.vline(10, 11, 5, STRAP)
+    c.rect(6, 13, 4, 2, STRAP)
+    c.set(6, 13, AMBER); c.set(9, 14, GLASS_D)
+    c.set(4, 12, BADGE)
+    c.hline(4, 16, 8, STRAP); c.hline(7, 16, 2, AMBER)
+
+    paw = 11 if frame == 2 else 12
+    c.set(13, paw + 1, SNOW_D)
+    c.rect(13, paw, 2, 1, SNOW)
     c.set(14, paw, SNOW_D)
 
-    c.hline(4, 17, 3, SNOW); c.hline(9, 17, 3, SNOW)             # legs
-    c.rect(4, 18, 3, 1, STRAP); c.rect(9, 18, 3, 1, STRAP)       # boots
+    c.hline(4, 17, 3, SNOW); c.hline(9, 17, 3, SNOW)
+    c.rect(4, 18, 3, 1, STRAP); c.rect(9, 18, 3, 1, STRAP)
     c.hline(4, 19, 3, STRAP_D); c.hline(9, 19, 3, STRAP_D)
     return c
 
@@ -1255,6 +1256,44 @@ def face_icon(species, fur, fur_d, frame):
 
 # ---------------------------------------------------------------- v2: ingredient icons (10x10)
 
+def astro_face_icon(frame):
+    """Jeki's menu-bar and roster face: the fox, wearing the helmet.
+
+    The café sprite goes bare-headed because a dome and a snout can't share a
+    16x20 body. Here there's no conflict — the icon is head-only — so the
+    helmet stays as his identity in the one place he is always visible.
+
+    `face_icon`'s fox ears use fur_dark as the inner colour, which on an arctic
+    fox's white palette is a pale grey that reads as no marking at all. Pink is
+    what makes an ear look like an ear."""
+    c = face_icon("fox", SNOW, SNOW_D, frame)
+    for x0 in (2, 12):
+        c.set(x0 + 1, 2, EARPINK)
+
+    # A round bubble. Straight sides with clipped corners read as a picture
+    # FRAME at this size — the face ended up looking mounted on a wall rather
+    # than inside a helmet. A circle is the only shape that says "glass dome".
+    cx, cy, r = 8.5, 9.0, 8.4
+    for y in range(18):
+        dy = (y - cy) / r
+        if abs(dy) > 1:
+            continue
+        half = r * (1 - dy * dy) ** 0.5
+        c.set(int(round(cx - half)), y, GLASS_D)
+        c.set(int(round(cx + half)), y, GLASS_D)
+
+    # Ears redrawn on top: the ring crosses exactly where they sit, and a
+    # helmet rim cutting through both ears looks like damage, not glass.
+    for x0 in (2, 12):
+        c.set(x0 + 1, 0, INK)
+        c.set(x0, 1, INK); c.set(x0 + 2, 1, INK); c.set(x0 + 1, 1, SNOW)
+        c.set(x0, 2, INK); c.set(x0 + 2, 2, INK); c.set(x0 + 1, 2, EARPINK)
+
+    c.set(3, 4, WHITE); c.set(4, 3, WHITE)           # glass streak
+    c.hline(5, 16, 8, RING)                          # collar ring
+    return c
+
+
 def _icon(draw):
     c = Canvas(10, 10)
     draw(c)
@@ -1463,7 +1502,9 @@ def main_v2():
                 face_icon(sp, fur, fur_d, f).save(f"bar_{sp}_{pal}_{f}.png"); count += 1
     for sid, args in STAFF.items():
         for f in range(7):
-            face_icon(STAFF_SPECIES[sid], args[0], args[1], f).save(f"barstaff_{sid}_{f}.png"); count += 1
+            icon = astro_face_icon(f) if sid == "jeki" \
+                else face_icon(STAFF_SPECIES[sid], args[0], args[1], f)
+            icon.save(f"barstaff_{sid}_{f}.png"); count += 1
     for aid, fn in ACCESSORIES.items():
         fn().save(f"acc_{aid}.png"); count += 1
     for iid, draw in ING_ICONS.items():
@@ -1924,7 +1965,7 @@ def main():
     count = 0
     for sid, args in STAFF.items():
         fur, fur_d, belly, apron, species, accent = args
-        f0 = astro_fox() if sid == "jeki" else character(*args)
+        f0 = astro_fox_bare() if sid == "jeki" else character(*args)
         f1 = f0.shifted_down()
         f0.save(f"staff_{sid}_0.png"); f1.save(f"staff_{sid}_1.png")
         count += 2
