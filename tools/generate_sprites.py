@@ -273,27 +273,26 @@ def astro_fox_bare(frame=0):
 
     c.hline(5, 10, 6, RING)                          # collar, under the chin
 
-    # BRUSH TAIL — orange with the pale tip every fox has.
-    c.set(2, 12, SNOW_D)
-    c.hline(0, 13, 3, SNOW)
-    c.hline(0, 14, 3, SNOW)
-    c.hline(0, 15, 3, WHITE)                         # the tip
-    c.hline(0, 16, 2, SNOW_D)
-    c.set(0, 12, SNOW_D)
+    # BRUSH TAIL — two columns wide so the belly can take the third.
+    c.hline(0, 12, 2, SNOW)
+    c.hline(0, 13, 2, SNOW)
+    c.hline(0, 14, 2, WHITE)                         # the pale tip
+    c.set(0, 15, SNOW_D)
 
-    # BODY — a dumpling, widest at the belly. No outlined columns at x2/x13:
-    # they read as little wings rather than as a rounder body.
-    c.hline(4, 11, 8, SUIT)
-    c.rect(3, 12, 10, 4, SUIT)
-    c.hline(4, 16, 8, SUIT)
-    c.set(3, 12, SUIT_D); c.set(12, 12, SUIT_D)
-    c.set(3, 15, SUIT_D); c.set(12, 15, SUIT_D)
+    # BODY — a proper dumpling. It was 8px under a 12px head, which reads as
+    # top-heavy rather than chubby; the belly is now as wide as the cheeks and
+    # the corners are cut so it's round rather than a box.
+    c.hline(4, 11, 8, SUIT)                          # shoulders, narrower
+    c.rect(2, 12, 12, 4, SUIT)                       # the belly, full width
+    c.hline(4, 16, 8, SUIT)                          # hips pull back in
+    c.set(2, 12, SUIT_D); c.set(13, 12, SUIT_D)      # cut corners = round
+    c.set(2, 15, SUIT_D); c.set(13, 15, SUIT_D)
 
     c.vline(5, 11, 4, STRAP); c.vline(10, 11, 4, STRAP)          # harness
     c.rect(6, 13, 4, 2, STRAP)                                   # chest panel
     c.set(6, 13, AMBER); c.set(9, 14, GLASS_D)
     c.set(4, 12, BADGE)                                          # shoulder badge
-    c.hline(4, 15, 8, STRAP); c.hline(7, 15, 2, AMBER)           # belt + buckle
+    c.hline(3, 15, 10, STRAP); c.hline(7, 15, 2, AMBER)          # belt + buckle
 
     paw = 12 if frame == 2 else 13                               # waving paw
     c.set(13, paw + 1, SUIT_D)
