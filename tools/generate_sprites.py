@@ -170,7 +170,16 @@ def character(fur, fur_d, belly, apron, species, accent=None):
 # the apron entirely. Both fight the parametric builder's fixed row layout, and
 # bending it here would risk all eight existing species for one character.
 
-SNOW    = (250, 250, 253, 255)   # arctic fur
+# Jeki is a RED fox, not an arctic one.
+#
+# He was white, faithful to the reference image, and it did not survive being
+# made chubby. The species was carried entirely by SILHOUETTE — a sharp
+# triangular head — and rounding him off for the café's dumpling proportions
+# deleted exactly that, leaving a featureless white blob. Colour carries it
+# instead: an orange head against a white spacesuit has internal contrast that
+# doesn't depend on outline, and the pale muzzle and tail-tip become real fox
+# markings rather than more white on white.
+SNOW    = (232, 140, 72, 255)    # fox fur
 # The suit was drawn in SNOW too — the exact same white as the fur — so the
 # fox and his spacesuit merged into one featureless blob and nothing about him
 # read as "wearing" anything. A cool off-white separates the two while still
@@ -179,7 +188,7 @@ SNOW    = (250, 250, 253, 255)   # arctic fur
 # them together.
 SUIT    = (223, 231, 242, 255)   # spacesuit body
 SUIT_D  = (176, 189, 208, 255)
-SNOW_D  = (203, 212, 226, 255)
+SNOW_D  = (186, 100, 48, 255)
 # The glass is tinted well below the fur's value on purpose. At the first
 # attempt it was nearly white, and a white fox inside a white bubble had no
 # silhouette at all — the head simply dissolved into the helmet.
@@ -209,67 +218,67 @@ def astro_fox_bare(frame=0):
     frame 0 = open eyes, 1 = blink, 2 = waving paw raised."""
     c = Canvas(16, 20)
 
-    # EARS — big, sharp, angled outward. A fox's ears are enormous relative to
-    # its head, and that proportion is most of the silhouette.
-    for ex, outer in ((2, 2), (11, 12)):
+    # EARS — tall triangles with their bases sitting ON the skull. Set further
+    # out they detach and float beside the head.
+    for ex in (2, 11):
         c.set(ex + 1, 0, SNOW)                       # tip
         c.hline(ex, 1, 3, SNOW)
         c.hline(ex, 2, 3, SNOW)
         c.set(ex + 1, 1, EARPINK)
         c.set(ex + 1, 2, EARPINK)
-        c.set(outer, 0, SNOW_D)                      # outer edge, angled out
         c.set(ex, 2, SNOW_D); c.set(ex + 2, 2, SNOW_D)
 
-    c.hline(4, 2, 8, SNOW)                           # brow
-    c.rect(3, 3, 10, 3, SNOW)                        # skull, widest at the eyes
-    c.set(3, 3, SNOW_D); c.set(12, 3, SNOW_D)
-    c.set(2, 4, SNOW); c.set(13, 4, SNOW)            # CHEEK RUFF flare
-    c.set(2, 5, SNOW_D); c.set(13, 5, SNOW_D)
-
-    # MUZZLE — the taper. Three narrowing rows to a pointed nose.
-    c.hline(4, 6, 8, SNOW)
-    c.hline(5, 7, 6, SNOW)
-    c.hline(6, 8, 4, WHITE)
-    c.set(4, 6, SNOW_D); c.set(11, 6, SNOW_D)
-    c.set(5, 7, SNOW_D); c.set(10, 7, SNOW_D)
-    c.set(7, 8, MUZZLE); c.set(8, 8, MUZZLE)         # nose at the tip
+    # HEAD — round through the cheeks, then STILL tapering to a muzzle. Drawn
+    # as plain wide rectangles it becomes a box with eyes; the taper is what
+    # keeps a chubby animal a fox.
+    c.hline(5, 2, 6, SNOW)                           # crown, between the ears
+    c.hline(3, 3, 10, SNOW)                          # meets the ear bases
+    c.rect(2, 4, 12, 3, SNOW)                        # widest: chubby cheeks
+    c.hline(3, 7, 10, SNOW)                          # cheeks pull in
+    c.hline(5, 8, 6, SNOW)                           # muzzle
+    c.hline(6, 9, 4, WHITE)                          # pale snout
+    c.set(2, 4, SNOW_D); c.set(13, 4, SNOW_D)
+    c.set(2, 6, SNOW_D); c.set(13, 6, SNOW_D)
+    c.set(3, 7, SNOW_D); c.set(12, 7, SNOW_D)
+    c.set(7, 9, MUZZLE); c.set(8, 9, MUZZLE)         # nose
 
     if frame == 1:
-        c.hline(4, 4, 2, MUZZLE); c.hline(10, 4, 2, MUZZLE)
+        c.hline(4, 6, 2, MUZZLE); c.hline(10, 6, 2, MUZZLE)
     else:
-        c.rect(4, 3, 2, 2, ICEYE); c.rect(10, 3, 2, 2, ICEYE)
-        c.set(4, 3, WHITE); c.set(10, 3, WHITE)      # catchlights
-    c.set(3, 5, BLUSH); c.set(12, 5, BLUSH)
+        c.rect(4, 5, 2, 2, ICEYE); c.rect(10, 5, 2, 2, ICEYE)
+        c.set(4, 5, WHITE); c.set(10, 5, WHITE)      # catchlights
+    c.set(2, 7, BLUSH); c.set(13, 7, BLUSH)
 
-    # NECK — without it the tapered head floated above the suit like a mask.
-    c.hline(6, 9, 4, SNOW)
-    c.set(6, 9, SNOW_D); c.set(9, 9, SNOW_D)
+    c.hline(5, 10, 6, RING)                          # collar, under the chin
 
-    c.hline(4, 10, 8, RING)                          # suit collar
-
-    c.set(2, 12, SNOW_D)                             # BRUSH TAIL
-    c.hline(1, 13, 3, SNOW)
+    # BRUSH TAIL — orange with the pale tip every fox has.
+    c.set(2, 12, SNOW_D)
+    c.hline(0, 13, 3, SNOW)
     c.hline(0, 14, 3, SNOW)
-    c.hline(0, 15, 3, WHITE)                         # the pale tip
+    c.hline(0, 15, 3, WHITE)                         # the tip
     c.hline(0, 16, 2, SNOW_D)
-    c.set(0, 13, SNOW_D); c.set(3, 13, SNOW_D)
-    c.set(3, 14, SNOW_D)
+    c.set(0, 12, SNOW_D)
 
-    c.rect(4, 11, 8, 6, SUIT)                        # suit
-    c.vline(3, 11, 6, SUIT_D); c.vline(12, 11, 6, SUIT_D)
-    c.vline(5, 11, 5, STRAP); c.vline(10, 11, 5, STRAP)
-    c.rect(6, 13, 4, 2, STRAP)
+    # BODY — a dumpling, widest at the belly. No outlined columns at x2/x13:
+    # they read as little wings rather than as a rounder body.
+    c.hline(4, 11, 8, SUIT)
+    c.rect(3, 12, 10, 4, SUIT)
+    c.hline(4, 16, 8, SUIT)
+    c.set(3, 12, SUIT_D); c.set(12, 12, SUIT_D)
+    c.set(3, 15, SUIT_D); c.set(12, 15, SUIT_D)
+
+    c.vline(5, 11, 4, STRAP); c.vline(10, 11, 4, STRAP)          # harness
+    c.rect(6, 13, 4, 2, STRAP)                                   # chest panel
     c.set(6, 13, AMBER); c.set(9, 14, GLASS_D)
-    c.set(4, 12, BADGE)
-    c.hline(4, 16, 8, STRAP); c.hline(7, 16, 2, AMBER)
+    c.set(4, 12, BADGE)                                          # shoulder badge
+    c.hline(4, 15, 8, STRAP); c.hline(7, 15, 2, AMBER)           # belt + buckle
 
-    paw = 11 if frame == 2 else 12
-    c.set(13, paw + 1, SNOW_D)
+    paw = 12 if frame == 2 else 13                               # waving paw
+    c.set(13, paw + 1, SUIT_D)
     c.rect(13, paw, 2, 1, SNOW)
-    c.set(14, paw, SNOW_D)
 
-    c.hline(4, 17, 3, SUIT); c.hline(9, 17, 3, SUIT)             # suit legs
-    c.rect(4, 18, 3, 1, STRAP); c.rect(9, 18, 3, 1, STRAP)
+    c.hline(4, 17, 3, SUIT); c.hline(9, 17, 3, SUIT)             # stubby legs
+    c.rect(4, 18, 3, 1, STRAP); c.rect(9, 18, 3, 1, STRAP)       # boots
     c.hline(4, 19, 3, STRAP_D); c.hline(9, 19, 3, STRAP_D)
     return c
 

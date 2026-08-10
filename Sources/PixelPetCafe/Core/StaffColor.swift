@@ -36,11 +36,11 @@ enum StaffPalette {
         "bo":      StaffColorPair(body: StaffColor(r: 122, g: 88,  b: 62),  clothes: StaffColor(r: 150, g: 68,  b: 60)),
         "earl":    StaffColorPair(body: StaffColor(r: 138, g: 120, b: 150), clothes: StaffColor(r: 46,  g: 58,  b: 92)),
         "marble":  StaffColorPair(body: StaffColor(r: 172, g: 168, b: 178), clothes: StaffColor(r: 90,  g: 74,  b: 52)),
-        // Jeki: arctic-white FUR, and a separate off-white spacesuit. These
-        // used to be the same white, which made the fox and the suit one blob
-        // and meant a tint moved both together; now they recolour apart.
-        // Must match SNOW / SUIT in tools/generate_sprites.py exactly.
-        "jeki":   StaffColorPair(body: StaffColor(r: 250, g: 250, b: 253), clothes: StaffColor(r: 223, g: 231, b: 242)),
+        // Jeki: red-fox FUR against a separate off-white spacesuit. Fur and
+        // suit were once the same white, which made him one shapeless blob and
+        // meant a tint moved both together; they recolour apart now.
+        // Must match FOXFUR / SUIT in tools/generate_sprites.py exactly.
+        "jeki":   StaffColorPair(body: StaffColor(r: 232, g: 140, b: 72), clothes: StaffColor(r: 223, g: 231, b: 242)),
     ]
 
     static func pair(for id: String, in state: GameState) -> StaffColorPair {
