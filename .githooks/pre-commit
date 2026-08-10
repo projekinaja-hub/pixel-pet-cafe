@@ -18,20 +18,20 @@ fi
 echo "pre-commit: running tests…"
 cd "$ROOT" || exit 0
 
-# Some machines intermittently throw "accessing build database: disk I/O
-# error". Retry-on-failure rather than pre-emptively deleting build.db:
-# deleting it destroys SPM's dependency database, after which SPM can no
-# longer tell that a source file was DELETED and keeps linking its orphaned
-# object file — a deleted test once kept "failing" for exactly this reason.
+# The build database used to corrupt intermittently here: ~/Documents is a
+# Google Drive sync root and DriveFS interferes with SQLite locking, which
+# produced "accessing build database: disk I/O error" — and, far worse, let
+# the run CONTINUE against the previous binary, so a pass or failure said
+# nothing about the code being committed.
 #
-# Worth knowing: when that error appears, the test run still executes — against
-# the PREVIOUS binary. A pass or failure printed after it is not about the code
-# you just edited.
+# tools/test.sh now builds in ~/Library/Caches, outside every sync root, so
+# that cannot happen. The retry-and-purge dance that used to live here is gone
+# with it; if this error ever reappears, the scratch path is being overridden
+# back into a synced folder.
 OUTPUT="$(./tools/test.sh 2>&1)"
 if echo "$OUTPUT" | grep -q "disk I/O error"; then
-    rm -f .build/build.db
-    rm -rf .build/*/debug/PixelPetCafeTests.build 2>/dev/null
-    OUTPUT="$(./tools/test.sh 2>&1)"
+    echo "pre-commit: build database corrupted — is PPC_SCRATCH pointing into a synced folder?" >&2
+    exit 1
 fi
 if echo "$OUTPUT" | grep -qE "with [1-9][0-9]* failure|error: fatalError|error: compile"; then
     echo "──────────────────────────────────────────────"

@@ -3,16 +3,23 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# separate scratch path: editor LSP holds .build/build.db
-swift build -c release --scratch-path .build-release || true  # spurious build.db exit on this FS
-test -x .build-release/release/PixelPetCafe || { echo "build failed"; exit 1; }
+# Builds OUTSIDE the project: ~/Documents is a Google Drive sync root, and
+# DriveFS interferes with SQLite locking on the build database ("disk I/O
+# error"). ~/Library/Caches is outside every sync root.
+#
+# The `|| true` that used to be here swallowed that spurious failure — and
+# every real one with it. With the scratch path out of Drive's reach the error
+# doesn't occur, so a failure here is now genuine and must stop the build.
+SCRATCH="${PPC_SCRATCH:-$HOME/Library/Caches/pixel-pet-cafe}"
+swift build -c release --scratch-path "$SCRATCH"
+test -x "$SCRATCH/release/PixelPetCafe" || { echo "build failed"; exit 1; }
 
 APP=dist/PixelPetCafe.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-cp .build-release/release/PixelPetCafe "$APP/Contents/MacOS/"
-cp -R .build-release/release/PixelPetCafe_PixelPetCafe.bundle "$APP/Contents/Resources/"
+cp "$SCRATCH/release/PixelPetCafe" "$APP/Contents/MacOS/"
+cp -R "$SCRATCH/release/PixelPetCafe_PixelPetCafe.bundle" "$APP/Contents/Resources/"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
