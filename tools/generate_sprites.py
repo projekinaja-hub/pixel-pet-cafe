@@ -170,16 +170,16 @@ def character(fur, fur_d, belly, apron, species, accent=None):
 # the apron entirely. Both fight the parametric builder's fixed row layout, and
 # bending it here would risk all eight existing species for one character.
 
-# Jeki is a RED fox, not an arctic one.
+# Jeki is an ARCTIC fox — white, as in the reference image.
 #
-# He was white, faithful to the reference image, and it did not survive being
-# made chubby. The species was carried entirely by SILHOUETTE — a sharp
-# triangular head — and rounding him off for the café's dumpling proportions
-# deleted exactly that, leaving a featureless white blob. Colour carries it
-# instead: an orange head against a white spacesuit has internal contrast that
-# doesn't depend on outline, and the pale muzzle and tail-tip become real fox
-# markings rather than more white on white.
-SNOW    = (232, 140, 72, 255)    # fox fur
+# He was briefly turned orange, because making him chubby destroyed the sharp
+# triangular silhouette that had been carrying the species, leaving a white
+# blob on a light background. Colour was the wrong fix for that. The actual
+# problem was that he had no OUTLINE: every other character in this game is
+# drawn with an INK silhouette, and Jeki never was, so white fur simply
+# dissolved into a pale room. Outline him like the rest of the cast and white
+# works — see `outlined()`.
+SNOW    = (250, 250, 253, 255)   # arctic fur
 # The suit was drawn in SNOW too — the exact same white as the fur — so the
 # fox and his spacesuit merged into one featureless blob and nothing about him
 # read as "wearing" anything. A cool off-white separates the two while still
@@ -188,7 +188,7 @@ SNOW    = (232, 140, 72, 255)    # fox fur
 # them together.
 SUIT    = (223, 231, 242, 255)   # spacesuit body
 SUIT_D  = (176, 189, 208, 255)
-SNOW_D  = (186, 100, 48, 255)
+SNOW_D  = (198, 208, 224, 255)
 # The glass is tinted well below the fur's value on purpose. At the first
 # attempt it was nearly white, and a white fox inside a white bubble had no
 # silhouette at all — the head simply dissolved into the helmet.
@@ -204,6 +204,28 @@ STRAP_D = (106, 114, 128, 255)
 AMBER   = (240, 148, 54, 255)
 BADGE   = (74, 168, 226, 255)
 RING    = (122, 216, 234, 255)
+
+def outlined(src, colour=INK):
+    """Draw a 1px silhouette outline, the way character() does with INK.
+
+    A white animal has no silhouette against a light background without one.
+    That absence is what made the chubby white fox unreadable and prompted
+    turning him orange — the outline is the real fix, and it keeps him the
+    arctic fox the reference image actually shows."""
+    out = Canvas(src.w, src.h)
+    for y in range(src.h):
+        out.px[y] = list(src.px[y])
+    for y in range(src.h):
+        for x in range(src.w):
+            if src.px[y][x][3] != 0:
+                continue
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                nx, ny = x + dx, y + dy
+                if 0 <= nx < src.w and 0 <= ny < src.h and src.px[ny][nx][3] != 0:
+                    out.px[y][x] = colour
+                    break
+    return out
+
 
 def astro_fox_bare(frame=0):
     """Jeki as he appears in the café: helmet off, so the face can actually be
@@ -280,7 +302,7 @@ def astro_fox_bare(frame=0):
     c.hline(4, 17, 3, SUIT); c.hline(9, 17, 3, SUIT)             # stubby legs
     c.rect(4, 18, 3, 1, STRAP); c.rect(9, 18, 3, 1, STRAP)       # boots
     c.hline(4, 19, 3, STRAP_D); c.hline(9, 19, 3, STRAP_D)
-    return c
+    return outlined(c)
 
 
 STAFF = {
