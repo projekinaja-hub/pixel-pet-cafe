@@ -673,6 +673,24 @@ struct StyleTab: View {
                                 .foregroundColor(Theme.gold)
                         }
                     }
+                    // The money combo. A bonus nobody can see is a bonus that
+                    // doesn't feel earned, and the decay in particular is only
+                    // fair if you can watch it draining.
+                    HStack(spacing: 6) {
+                        Text("💰 +\(Int(controller.typingCombo.rounded()))% money")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundColor(controller.typingCombo > 0 ? Theme.gold : Theme.dim)
+                        Text(controller.typingCombo >= TypingCombo.maxPercent
+                             ? "· MAXED — double pay!"
+                             : "· keep typing (\(TypingCombo.keystrokesToCap) keys = double pay)")
+                            .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                            .foregroundColor(controller.typingCombo >= TypingCombo.maxPercent
+                                             ? Theme.gold : Theme.dim)
+                    }
+                    ProgressView(value: min(1, controller.typingCombo / TypingCombo.maxPercent))
+                        .progressViewStyle(.linear)
+                        .tint(Theme.gold)
+                        .frame(height: 3)
                 }
             }
         }

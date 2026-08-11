@@ -56,6 +56,11 @@ final class GameController: ObservableObject {
     @Published private(set) var workBoost: Double = 1
     @Published private(set) var lastKeystrokeAt: Date?
     @Published private(set) var keystrokesPerSec: Double = 0
+    /// Typing combo, 0...TypingCombo.maxPercent. Deliberately NOT persisted:
+    /// it decays to nothing in under two minutes, so saving it would only
+    /// offer a way to bank a bonus across a relaunch.
+    @Published private(set) var typingCombo: Double = 0
+    var typingPayMultiplier: Double { TypingCombo.multiplier(percent: typingCombo) }
     /// Standard typing speed: words-per-minute at 5 chars/word.
     var wpm: Double { keystrokesPerSec * 12 }
     /// "Are they typing right now?" — answered by recency, so the café can
@@ -217,7 +222,11 @@ final class GameController: ObservableObject {
         if let clear = banner, bannerClearAt < now, clear.text.isEmpty == false, now > bannerClearAt {
             banner = nil
         }
-        let events = SalesEngine.tick(&state, dt: dt, now: now, boost: workBoost, rng: &rng)
+        let combo = TypingCombo.next(current: typingCombo, keystrokes: keystrokesSinceLastTick,
+                                     dt: dt, typing: isActivelyTyping)
+        if abs(combo - typingCombo) > 0.001 { typingCombo = combo }
+        let events = SalesEngine.tick(&state, dt: dt, now: now, boost: workBoost,
+                                      pay: typingPayMultiplier, rng: &rng)
         for e in events { saleEvents.send(e) }
         // holiday jingle + banner when a calendar holiday begins while we're
         // running (in-app feedback); checkNotifications below handles the

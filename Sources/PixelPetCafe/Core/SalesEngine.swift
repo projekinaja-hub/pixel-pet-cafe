@@ -338,6 +338,7 @@ enum SalesEngine {
     /// the whole chain's income rather than per café.
     static func tick<R: RandomNumberGenerator>(
         _ s: inout GameState, dt: TimeInterval, now: Date = Date(), boost: Double = 1,
+        pay: Double = 1,
         rng: inout R
     ) -> [SaleEvent] {
         guard dt > 0 else { return [] }
@@ -364,7 +365,8 @@ enum SalesEngine {
         let repBefore = s.reputation
         for i in s.cafes.indices {
             s.activeCafe = i
-            let events = tickOneCafe(&s, dt: dt, now: now, boost: i == viewedCafe ? boost : 1, rng: &rng)
+            let events = tickOneCafe(&s, dt: dt, now: now, boost: i == viewedCafe ? boost : 1,
+                                     pay: i == viewedCafe ? pay : 1, rng: &rng)
             if i == viewedCafe { viewedEvents = events }
         }
         s.activeCafe = viewedCafe
@@ -400,7 +402,8 @@ enum SalesEngine {
     }
 
     private static func tickOneCafe<R: RandomNumberGenerator>(
-        _ s: inout GameState, dt: TimeInterval, now: Date, boost: Double, rng: inout R
+        _ s: inout GameState, dt: TimeInterval, now: Date, boost: Double,
+        pay: Double = 1, rng: inout R
     ) -> [SaleEvent] {
         managerRestock(&s)
         janitorClean(&s, dt: dt)
@@ -462,7 +465,7 @@ enum SalesEngine {
                 continue
             }
             slotsLeft -= 1
-            events.append(serveCustomer(&s, now: now, rng: &rng))
+            events.append(serveCustomer(&s, now: now, pay: pay, rng: &rng))
             if events.count >= 20 { s.customerProgress = 0; break }  // sanity cap per tick
         }
         // No reputation ding for capacity-blocking (tried -5/tick, then
@@ -496,7 +499,7 @@ enum SalesEngine {
                 let items = servable(s)
                 if !items.isEmpty {
                     let avgPrice = items.reduce(0) { $0 + price($1, s) } / Double(items.count)
-                    let earned = filled * avgPrice * deliveryFeeRetained
+                    let earned = filled * avgPrice * deliveryFeeRetained * pay
                     s.coins += earned
                     s.lifetimeCoins += earned
                     s.lifetimeCoinsThisRun += earned
@@ -608,7 +611,7 @@ enum SalesEngine {
     }
 
     private static func serveCustomer<R: RandomNumberGenerator>(
-        _ s: inout GameState, now: Date, rng: inout R
+        _ s: inout GameState, now: Date, pay: Double = 1, rng: inout R
     ) -> SaleEvent {
         let species = Int.random(in: 0...2, using: &rng)
         let wantsDineIn = Double.random(in: 0..<1, using: &rng) < dineInShare
@@ -656,7 +659,10 @@ enum SalesEngine {
         }
         // 2% of customers are big spenders paying 10× — the core-loop jackpot
         let whale = Double.random(in: 0..<1, using: &rng) < 0.02
-        let earned = price(chosen, s) * (whale ? 10 : 1)
+        // TypingCombo (`pay`) lifts what LANDS in the wallet rather than the
+        // item's price, so menu prices, tips and every display derived from
+        // `price` stay honest — only the payout moves.
+        let earned = price(chosen, s) * (whale ? 10 : 1) * pay
         s.coins += earned
         s.lifetimeCoins += earned
         s.lifetimeCoinsThisRun += earned
