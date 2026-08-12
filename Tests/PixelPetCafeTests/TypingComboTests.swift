@@ -93,3 +93,29 @@ final class TypingComboTests: XCTestCase {
                        "250 seconds at 4 keys/sec should be exactly the cap")
     }
 }
+
+/// The combo maths was tested; the WIRING was not. This is the only thing that
+/// proves `pay` actually reaches the wallet rather than being computed and
+/// dropped somewhere between GameController and SalesEngine.
+final class TypingComboPayoutTests: XCTestCase {
+    private func earned(pay: Double) -> Double {
+        var s = GameState.newGame().normalized()
+        s.coins = 0
+        for ing in MenuCatalog.ingredients { s.stock[ing.id] = 999 }
+        var rng = SeededGenerator(seed: 42)          // same customers both runs
+        for _ in 0..<600 { _ = SalesEngine.tick(&s, dt: 1, boost: 1, pay: pay, rng: &rng) }
+        return s.coins
+    }
+
+    func testFullComboActuallyDoublesWhatYouEarn() {
+        let single = earned(pay: 1)
+        let double = earned(pay: TypingCombo.multiplier(percent: TypingCombo.maxPercent))
+        XCTAssertGreaterThan(single, 0, "the fixture earned nothing; it proves nothing")
+        // Slightly OVER 2x is correct, not a bug: doubled pay also grows
+        // lifetimeCoins twice as fast, which unlocks pricier menu items sooner.
+        // The band catches the thing that matters — pay reaching the wallet at
+        // all — without pinning that second-order effect.
+        XCTAssertGreaterThan(double / single, 1.95, "combo isn't reaching the payout")
+        XCTAssertLessThan(double / single, 2.5, "payout is compounding more than doubling")
+    }
+}
